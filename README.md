@@ -16,8 +16,29 @@ ClipPilot uses Google Gemini to analyze your video clips — detecting scenes, r
 ## Prerequisites
 
 - **Node.js** 20+
-- **ffmpeg** and **ffprobe** installed and on your PATH
+- **tsx** — TypeScript runner (`npm install -g tsx`)
+- **ffmpeg** and **ffprobe** — for proxy creation and thumbnails
 - A **Google Gemini API key** ([get one here](https://aistudio.google.com/apikey))
+
+### Installing prerequisites on macOS
+
+```bash
+# Node.js (via Homebrew)
+brew install node
+
+# tsx (TypeScript runner — required to run ClipPilot)
+npm install -g tsx
+
+# ffmpeg + ffprobe
+brew install ffmpeg
+```
+
+### Installing prerequisites on Ubuntu/Debian
+
+```bash
+sudo apt update && sudo apt install -y nodejs npm ffmpeg
+npm install -g tsx
+```
 
 ## Installation
 
@@ -25,18 +46,13 @@ ClipPilot uses Google Gemini to analyze your video clips — detecting scenes, r
 git clone https://github.com/mbinz/clippilot.git
 cd clippilot
 npm install
+npm link    # makes "clippilot" available globally
 ```
 
-To use `clippilot` as a global command:
+You can verify the installation with:
 
 ```bash
-npm link
-```
-
-Or run directly via:
-
-```bash
-npx tsx bin/clippilot.ts <command>
+clippilot --version
 ```
 
 ## Quick start
