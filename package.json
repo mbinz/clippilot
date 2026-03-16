@@ -1,0 +1,48 @@
+{
+  "name": "clippilot",
+  "version": "0.1.0",
+  "description": "AI-powered video footage review and story-building tool for DaVinci Resolve",
+  "type": "module",
+  "bin": {
+    "clippilot": "./bin/clippilot.ts"
+  },
+  "scripts": {
+    "dev": "tsx bin/clippilot.ts",
+    "test": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:all": "vitest run",
+    "test:watch": "vitest watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "video",
+    "ai",
+    "gemini",
+    "davinci-resolve",
+    "cli"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@google/genai": "^1.45.0",
+    "better-sqlite3": "^12.8.0",
+    "chalk": "^5.6.2",
+    "cli-progress": "^3.12.0",
+    "cli-table3": "^0.6.5",
+    "commander": "^14.0.3",
+    "ora": "^9.3.0",
+    "p-limit": "^7.3.0",
+    "uuid": "^13.0.0",
+    "zod": "^4.3.6",
+    "zod-to-json-schema": "^3.25.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/cli-progress": "^3.11.6",
+    "@types/node": "^25.5.0",
+    "@types/uuid": "^10.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.0"
+  }
+}
