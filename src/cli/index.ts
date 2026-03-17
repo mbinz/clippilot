@@ -6,6 +6,7 @@ import { registerExportCommand } from './commands/export.js';
 import { registerTagCommand } from './commands/tag.js';
 import { registerStatsCommand } from './commands/stats.js';
 import { registerConfigCommand } from './commands/config.js';
+import { registerUiCommand } from './commands/ui.js';
 import { setLogLevel } from '../utils/logger.js';
 
 export function createProgram(): Command {
@@ -30,6 +31,7 @@ export function createProgram(): Command {
   registerExportCommand(program);
   registerStatsCommand(program);
   registerConfigCommand(program);
+  registerUiCommand(program);
 
   return program;
 }

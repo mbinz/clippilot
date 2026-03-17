@@ -8,8 +8,9 @@ ClipPilot uses Google Gemini to analyze your video clips — detecting scenes, r
 
 1. **Ingest** — Point ClipPilot at a folder of videos. It creates lightweight 720p proxies, extracts thumbnails, and stores metadata in a local SQLite database.
 2. **Analyze** — Each proxy is sent to Gemini 2.5 Flash, which returns structured scene descriptions, quality scores, and editorial ratings.
-3. **Search** — Full-text search across all AI-generated descriptions and keywords.
-4. **Export** — Export your clip selection as CSV, JSON, EDL, or FCPXML for DaVinci Resolve. Exports always reference the original full-quality files.
+3. **Browse** — Open the web UI to browse clips with a visual grid, full-text search, and filters for quality, location, mood, tags, and more.
+4. **Similar Clips** — Automatically detect duplicate/similar clips based on location, timing, visual keywords, and scene content. Mark the best clip in each group.
+5. **Export** — Export your clip selection as CSV, JSON, EDL, or FCPXML for DaVinci Resolve. Exports always reference the original full-quality files.
 
 **Core principle: originals are never touched.** ClipPilot works exclusively with proxies. Your source files are only read once (to create the proxy) and referenced by path in exports.
 
@@ -181,6 +182,29 @@ clippilot stats
 clippilot stats --project "Mallorca 2025"
 ```
 
+### `clippilot ui`
+
+Launch the web UI for browsing and filtering clips at `http://localhost:3847`.
+
+```bash
+clippilot ui                    # opens browser automatically
+clippilot ui --port 8080        # custom port
+clippilot ui --no-open          # don't auto-open browser
+```
+
+The web UI provides:
+- **Grid view** — Thumbnails with quality score, duration, and suggested-use badges
+- **Full-text search** — Search AI descriptions and keywords
+- **Filters** — Filter by project, location, date range, quality, tags, people, suggested use, mood
+- **Clip detail** — Click any clip to see full AI analysis, thumbnail strip, editable metadata, and proxy video preview
+- **Similarity clusters** — Switch to the "Similar Clusters" tab to view groups of similar clips. Click "Recompute Similarity" to detect clusters based on location/timing proximity, visual keyword overlap (>60%), and matching scene settings/activities. Mark the best clip in each group or skip duplicates.
+
+The web UI must be built before first use:
+
+```bash
+cd web && npm install && npm run build
+```
+
 ### `clippilot config`
 
 View or edit the configuration.
@@ -223,6 +247,11 @@ npm test              # Run unit tests
 npm run test:integration  # Run integration tests (requires ffmpeg)
 npm run test:all      # Run all tests
 npm run typecheck     # TypeScript type check
+
+# Web UI development
+npm run web:build     # Build the React frontend
+npm run web:dev       # Start Vite dev server with hot-reload
+npm run ui            # Start the API server (shortcut for clippilot ui)
 ```
 
 ## License
