@@ -8,6 +8,8 @@ export interface ExportSegment {
   duration_sec: number;
   start_sec: number;
   end_sec: number;
+  start_timecode: string | null;
+  nb_frames: number | null;
   fps: number;
   resolution: string | null;
   ai_summary: string | null;

@@ -1,5 +1,5 @@
 import type { ExportSegment, ExportOptions } from '../../types/export.js';
-import { secondsToTimecode } from '../../utils/timecode.js';
+import { secondsToTimecode, timecodeToSeconds } from '../../utils/timecode.js';
 import path from 'node:path';
 
 export function exportEdl(segments: ExportSegment[], options: ExportOptions): string {
@@ -14,13 +14,21 @@ export function exportEdl(segments: ExportSegment[], options: ExportOptions): st
 
   for (const seg of segments) {
     const eventNum = String(seg.position).padStart(3, '0');
-    const reelName = `CLIP${String(seg.clip_id).padStart(4, '0')}`;
+    const reelName = path.parse(seg.file_path).name.substring(0, 32);
 
-    const srcIn = secondsToTimecode(seg.start_sec, fps);
-    const srcOut = secondsToTimecode(seg.end_sec, fps);
-    const recIn = secondsToTimecode(recordPosition, fps);
-    const segDuration = seg.end_sec - seg.start_sec;
-    const recOut = secondsToTimecode(recordPosition + segDuration, fps);
+    const clipFps = seg.fps || fps;
+    const tcBaseFrames = seg.start_timecode
+      ? Math.round(timecodeToSeconds(seg.start_timecode, clipFps) * clipFps)
+      : 0;
+    const startFrames = tcBaseFrames + Math.round(seg.start_sec * clipFps);
+    const endFrames = (seg.nb_frames != null)
+      ? tcBaseFrames + seg.nb_frames
+      : tcBaseFrames + Math.round(seg.end_sec * clipFps);
+    const srcIn = secondsToTimecode(startFrames / clipFps, clipFps);
+    const srcOut = secondsToTimecode(endFrames / clipFps, clipFps);
+    const recIn = secondsToTimecode(recordPosition, clipFps);
+    const segDuration = (endFrames - startFrames) / clipFps;
+    const recOut = secondsToTimecode(recordPosition + segDuration, clipFps);
 
     lines.push(`${eventNum}  ${reelName}  V  C        ${srcIn} ${srcOut} ${recIn} ${recOut}`);
     lines.push(`* FROM CLIP NAME: ${path.basename(seg.file_path)}`);

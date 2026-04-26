@@ -42,12 +42,22 @@ export async function probeFile(filePath: string): Promise<ClipMetadata> {
       recorded_at = creationTime;
     }
 
+    const start_timecode: string | null =
+      videoStream?.tags?.timecode
+      ?? data.streams?.find((s: any) => s.tags?.timecode)?.tags?.timecode
+      ?? format?.tags?.timecode
+      ?? null;
+
+    const nb_frames: number = parseInt(videoStream?.nb_frames ?? '0', 10) || 0;
+
     return {
       duration_sec: duration,
       resolution: `${width}x${height}`,
       fps,
+      nb_frames,
       codec: videoStream?.codec_name ?? 'unknown',
       recorded_at,
+      start_timecode,
       file_size: fileStat.size,
     };
   } catch (err: any) {
@@ -79,12 +89,22 @@ export function parseProbeOutput(stdout: string, fileSize: number): ClipMetadata
     recorded_at = creationTime;
   }
 
+  const start_timecode: string | null =
+    videoStream?.tags?.timecode
+    ?? data.streams?.find((s: any) => s.tags?.timecode)?.tags?.timecode
+    ?? format?.tags?.timecode
+    ?? null;
+
+  const nb_frames: number = parseInt(videoStream?.nb_frames ?? '0', 10) || 0;
+
   return {
     duration_sec: duration,
     resolution: `${width}x${height}`,
     fps,
+    nb_frames,
     codec: videoStream?.codec_name ?? 'unknown',
     recorded_at,
+    start_timecode,
     file_size: fileSize,
   };
 }

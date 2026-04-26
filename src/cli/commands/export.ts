@@ -16,7 +16,7 @@ export function registerExportCommand(parent: Command): void {
     .description('Export a story or clip list for DaVinci Resolve')
     .option('--story <id>', 'Story ID to export')
     .option('--clips <ids>', 'Comma-separated clip IDs (e.g., 1,5,12)')
-    .option('--format <format>', 'Export format: csv, json, edl, fcpxml', 'csv')
+    .option('--format <format>', 'Export format: csv, json, edl, fcpxml', 'edl')
     .option('--output <path>', 'Output file path')
     .option('--title <title>', 'Timeline title', 'ClipPilot Export')
     .option('--fps <fps>', 'Frame rate for timecode', '30')
@@ -52,6 +52,8 @@ export function registerExportCommand(parent: Command): void {
             duration_sec: seg.duration_sec,
             start_sec: seg.start_sec,
             end_sec: seg.end_sec ?? seg.duration_sec,
+            start_timecode: seg.start_timecode ?? null,
+            nb_frames: null,
             fps,
             resolution: seg.resolution,
             ai_summary: seg.ai_summary,
@@ -83,6 +85,8 @@ export function registerExportCommand(parent: Command): void {
                 duration_sec: clip.duration_sec,
                 start_sec: 0,
                 end_sec: clip.duration_sec,
+                start_timecode: clip.start_timecode ?? null,
+                nb_frames: clip.nb_frames ?? null,
                 fps: clip.fps ?? fps,
                 resolution: clip.resolution,
                 ai_summary: clip.ai_summary,

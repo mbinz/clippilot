@@ -28,5 +28,6 @@ export interface StoryWithSegments extends Story {
     resolution: string | null;
     fps: number | null;
     ai_summary: string | null;
+    start_timecode: string | null;
   })[];
 }

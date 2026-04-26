@@ -10,6 +10,8 @@ export interface Clip {
   fps: number | null;
   codec: string | null;
   recorded_at: string | null;
+  start_timecode: string | null;
+  nb_frames: number | null;
   ingested_at: string;
   analysis_status: AnalysisStatus;
   analysis_error: string | null;
@@ -38,8 +40,10 @@ export interface ClipMetadata {
   duration_sec: number;
   resolution: string;
   fps: number;
+  nb_frames: number;
   codec: string;
   recorded_at: string | null;
+  start_timecode: string | null;
   file_size: number;
 }
 
@@ -52,8 +56,10 @@ export interface InsertClip {
   duration_sec: number;
   resolution: string | null;
   fps: number | null;
+  nb_frames: number | null;
   codec: string | null;
   recorded_at: string | null;
+  start_timecode: string | null;
   location: string | null;
   manual_tags: string | null;
   people: string | null;
