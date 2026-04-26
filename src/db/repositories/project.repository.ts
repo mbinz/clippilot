@@ -30,6 +30,10 @@ export class ProjectRepository {
     return (this.stmtFindById.get(id) as Project) ?? null;
   }
 
+  findByName(name: string): Project | null {
+    return (this.stmtFindByName.get(name) as Project) ?? null;
+  }
+
   list(): Project[] {
     return this.stmtList.all() as Project[];
   }

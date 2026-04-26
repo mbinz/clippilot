@@ -13,6 +13,7 @@ export function registerStatsCommand(parent: Command): void {
     .command('stats')
     .description('Show project statistics')
     .option('--project <name>', 'Show stats for specific project')
+    .option('--json', 'Emit JSON instead of a table (for scripts and Claude skills)')
     .action(async (options) => {
       const basePath = process.cwd();
       const db = createDb(resolveDbPath(basePath));
@@ -22,6 +23,18 @@ export function registerStatsCommand(parent: Command): void {
         const clipRepo = new ClipRepository(db);
         const projectRepo = new ProjectRepository(db);
         const projects = projectRepo.list();
+
+        if (options.json) {
+          const payload = projects
+            .filter((p) => !options.project || p.name === options.project)
+            .map((p) => ({
+              project: p.name,
+              project_id: p.id,
+              ...clipRepo.getStats(p.id),
+            }));
+          console.log(JSON.stringify({ projects: payload }, null, 2));
+          return;
+        }
 
         if (projects.length === 0) {
           console.log(chalk.yellow('No projects found. Run "clippilot ingest <path>" first.'));

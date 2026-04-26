@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit",
     "web:dev": "cd web && npx vite",
     "web:build": "cd web && npm run build",
-    "ui": "tsx bin/clippilot.ts ui"
+    "ui": "tsx bin/clippilot.ts ui",
+    "skill:install": "mkdir -p ~/.claude/skills/clippilot && cp .claude/skills/clippilot/SKILL.md ~/.claude/skills/clippilot/SKILL.md && echo 'Skill installed. Use /clippilot in any Claude Code session.'"
   },
   "keywords": [
     "video",
@@ -38,6 +39,7 @@
     "open": "^11.0.0",
     "ora": "^9.3.0",
     "p-limit": "^7.3.0",
+    "sharp": "^0.34.5",
     "uuid": "^13.0.0",
     "zod": "^4.3.6",
     "zod-to-json-schema": "^3.25.1"

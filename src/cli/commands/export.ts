@@ -20,6 +20,7 @@ export function registerExportCommand(parent: Command): void {
     .option('--output <path>', 'Output file path')
     .option('--title <title>', 'Timeline title', 'ClipPilot Export')
     .option('--fps <fps>', 'Frame rate for timecode', '30')
+    .option('--json', 'Emit JSON confirmation (requires --output)')
     .action(async (options) => {
       if (!options.story && !options.clips) {
         console.error(chalk.red('Error: Specify --story <id> or --clips <id1,id2,...>'));
@@ -100,7 +101,22 @@ export function registerExportCommand(parent: Command): void {
 
         if (options.output) {
           await writeFile(options.output, output, 'utf-8');
-          console.log(chalk.green(`Exported ${segments.length} segment(s) to ${options.output}`));
+          if (options.json) {
+            console.log(
+              JSON.stringify(
+                {
+                  ok: true,
+                  path: path.resolve(options.output),
+                  format,
+                  count: segments.length,
+                },
+                null,
+                2,
+              ),
+            );
+          } else {
+            console.log(chalk.green(`Exported ${segments.length} segment(s) to ${options.output}`));
+          }
         } else {
           console.log(output);
         }
