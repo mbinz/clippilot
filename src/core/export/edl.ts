@@ -22,7 +22,7 @@ export function exportEdl(segments: ExportSegment[], options: ExportOptions): st
       : 0;
     const startFrames = tcBaseFrames + Math.round(seg.start_sec * clipFps);
     const endFrames = (seg.nb_frames != null)
-      ? tcBaseFrames + seg.nb_frames
+      ? tcBaseFrames + seg.nb_frames - 1
       : tcBaseFrames + Math.round(seg.end_sec * clipFps);
     const srcIn = secondsToTimecode(startFrames / clipFps, clipFps);
     const srcOut = secondsToTimecode(endFrames / clipFps, clipFps);
