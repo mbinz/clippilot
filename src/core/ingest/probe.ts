@@ -6,6 +6,20 @@ import { FfmpegNotFoundError } from '../../utils/errors.js';
 
 const execFileAsync = promisify(execFile);
 
+// Compute frame count using floor(duration_ts / ticks_per_frame), matching how
+// DaVinci Resolve counts frames. The nb_frames header field rounds up in some
+// containers, causing off-by-one errors in EDL source-out timecodes.
+function computeNbFrames(videoStream: any, fps: number): number {
+  const durationTs = parseInt(videoStream?.duration_ts ?? '0', 10);
+  const timeBase: string = videoStream?.time_base ?? '';
+  const [tbNum, tbDen] = timeBase.split('/').map(Number);
+  if (durationTs > 0 && tbNum > 0 && tbDen > 0 && fps > 0) {
+    const ticksPerFrame = Math.round((tbDen / tbNum) / fps);
+    if (ticksPerFrame > 0) return Math.floor(durationTs / ticksPerFrame);
+  }
+  return parseInt(videoStream?.nb_frames ?? '0', 10) || 0;
+}
+
 export async function probeFile(filePath: string): Promise<ClipMetadata> {
   try {
     const { stdout } = await execFileAsync('ffprobe', [
@@ -48,7 +62,7 @@ export async function probeFile(filePath: string): Promise<ClipMetadata> {
       ?? format?.tags?.timecode
       ?? null;
 
-    const nb_frames: number = parseInt(videoStream?.nb_frames ?? '0', 10) || 0;
+    const nb_frames: number = computeNbFrames(videoStream, fps);
 
     return {
       duration_sec: duration,
@@ -95,7 +109,7 @@ export function parseProbeOutput(stdout: string, fileSize: number): ClipMetadata
     ?? format?.tags?.timecode
     ?? null;
 
-  const nb_frames: number = parseInt(videoStream?.nb_frames ?? '0', 10) || 0;
+  const nb_frames: number = computeNbFrames(videoStream, fps);
 
   return {
     duration_sec: duration,
