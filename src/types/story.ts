@@ -27,6 +27,9 @@ export interface StoryWithSegments extends Story {
     duration_sec: number;
     resolution: string | null;
     fps: number | null;
+    nb_frames: number | null;
+    has_video: number;
+    has_audio: number;
     ai_summary: string | null;
     start_timecode: string | null;
   })[];

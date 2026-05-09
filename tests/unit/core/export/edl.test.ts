@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { exportEdl } from '../../../../src/core/export/edl.js';
 import type { ExportSegment, ExportOptions } from '../../../../src/types/export.js';
+import { assertEdlValid } from './_helpers.js';
 
-const OPTIONS: ExportOptions = { title: 'Mallorca 2025', fps: 30, format: 'edl' };
+const OPTIONS: ExportOptions = { title: 'Mallorca 2025', fps: 25, format: 'edl' };
 
 function makeSegment(overrides: Partial<ExportSegment> = {}): ExportSegment {
   return {
@@ -13,7 +14,11 @@ function makeSegment(overrides: Partial<ExportSegment> = {}): ExportSegment {
     duration_sec: 30,
     start_sec: 0,
     end_sec: 15,
-    fps: 30,
+    fps: 25,
+    nb_frames: 375, // 15s × 25fps
+    start_timecode: null,
+    has_video: true,
+    has_audio: true,
     resolution: '1920x1080',
     ai_summary: 'Beach scene',
     ai_quality_overall: 3.5,
@@ -28,6 +33,12 @@ describe('exportEdl', () => {
     const edl = exportEdl([makeSegment()], OPTIONS);
     expect(edl).toContain('TITLE: Mallorca 2025');
     expect(edl).toContain('FCM: NON-DROP FRAME');
+  });
+
+  it('passes all structural invariants', () => {
+    const s = makeSegment();
+    const edl = exportEdl([s], OPTIONS);
+    assertEdlValid(edl, [s], 25);
   });
 
   it('generates correct event number', () => {
@@ -46,22 +57,39 @@ describe('exportEdl', () => {
     expect(edl).toContain('* SOURCE FILE: /videos/beach.mp4');
   });
 
-  it('includes timecodes in correct format', () => {
-    const edl = exportEdl([makeSegment({ start_sec: 0, end_sec: 15 })], OPTIONS);
-    // Source in: 00:00:00:00, Source out: 00:00:15:00
-    expect(edl).toContain('00:00:00:00');
-    expect(edl).toContain('00:00:15:00');
+  it('source-out is nb_frames-1 at 25fps (stays within clip bounds)', () => {
+    // nb_frames=375 → source-out frame = 374 = 14 seconds + 24 frames at 25fps
+    // 374 / 25 = 14.96s → 00:00:14:24
+    const edl = exportEdl([makeSegment()], OPTIONS);
+    expect(edl).toContain('00:00:14:24');
   });
 
   it('chain record positions for multiple segments', () => {
-    const edl = exportEdl([
-      makeSegment({ position: 1, start_sec: 0, end_sec: 10 }),
-      makeSegment({ position: 2, clip_id: 2, start_sec: 5, end_sec: 20 }),
-    ], OPTIONS);
+    const segments = [
+      makeSegment({ position: 1, nb_frames: 250, start_sec: 0, end_sec: 10 }),
+      makeSegment({ position: 2, clip_id: 2, nb_frames: 375, start_sec: 0, end_sec: 15 }),
+    ];
+    const edl = exportEdl(segments, OPTIONS);
+    assertEdlValid(edl, segments, 25);
+  });
 
-    // First segment record: 00:00:00:00 to 00:00:10:00
-    // Second segment record starts at 00:00:10:00
-    expect(edl).toContain('00:00:10:00');
+  it('sanitizes reel name — no spaces or special chars', () => {
+    const edl = exportEdl([makeSegment({ file_path: '/footage/B-roll (Take 2).mov' })], OPTIONS);
+    // Reel name must match alphanumeric+underscore only
+    const lines = edl.split('\n');
+    const eventLine = lines.find(l => /^\d{3}/.test(l));
+    expect(eventLine).toBeDefined();
+    const reelName = eventLine!.split(/\s+/)[1];
+    expect(reelName).toMatch(/^[A-Za-z0-9_]+$/);
+  });
+
+  it('strips newlines from AI summary comment', () => {
+    const edl = exportEdl([makeSegment({ ai_summary: 'Line one\nLine two' })], OPTIONS);
+    const lines = edl.split('\n');
+    const commentLine = lines.find(l => l.startsWith('* COMMENT:'));
+    expect(commentLine).toBeDefined();
+    expect(commentLine).not.toContain('\n');
+    expect(commentLine).toContain('Line one Line two');
   });
 
   it('includes AI comment if summary is present', () => {

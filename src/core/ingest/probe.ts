@@ -32,6 +32,7 @@ export async function probeFile(filePath: string): Promise<ClipMetadata> {
 
     const data = JSON.parse(stdout);
     const videoStream = data.streams?.find((s: any) => s.codec_type === 'video');
+    const audioStream = data.streams?.find((s: any) => s.codec_type === 'audio');
     const format = data.format;
 
     const fileStat = await stat(filePath);
@@ -73,6 +74,8 @@ export async function probeFile(filePath: string): Promise<ClipMetadata> {
       recorded_at,
       start_timecode,
       file_size: fileStat.size,
+      has_video: videoStream != null,
+      has_audio: audioStream != null,
     };
   } catch (err: any) {
     if (err.code === 'ENOENT') {
@@ -85,6 +88,7 @@ export async function probeFile(filePath: string): Promise<ClipMetadata> {
 export function parseProbeOutput(stdout: string, fileSize: number): ClipMetadata {
   const data = JSON.parse(stdout);
   const videoStream = data.streams?.find((s: any) => s.codec_type === 'video');
+  const audioStream = data.streams?.find((s: any) => s.codec_type === 'audio');
   const format = data.format;
 
   const duration = parseFloat(format?.duration ?? videoStream?.duration ?? '0');
@@ -120,5 +124,7 @@ export function parseProbeOutput(stdout: string, fileSize: number): ClipMetadata
     recorded_at,
     start_timecode,
     file_size: fileSize,
+    has_video: videoStream != null,
+    has_audio: audioStream != null,
   };
 }

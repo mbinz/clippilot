@@ -12,6 +12,8 @@ export interface Clip {
   recorded_at: string | null;
   start_timecode: string | null;
   nb_frames: number | null;
+  has_video: number;
+  has_audio: number;
   ingested_at: string;
   analysis_status: AnalysisStatus;
   analysis_error: string | null;
@@ -45,6 +47,8 @@ export interface ClipMetadata {
   recorded_at: string | null;
   start_timecode: string | null;
   file_size: number;
+  has_video: boolean;
+  has_audio: boolean;
 }
 
 export interface InsertClip {
@@ -57,6 +61,8 @@ export interface InsertClip {
   resolution: string | null;
   fps: number | null;
   nb_frames: number | null;
+  has_video: number;
+  has_audio: number;
   codec: string | null;
   recorded_at: string | null;
   start_timecode: string | null;

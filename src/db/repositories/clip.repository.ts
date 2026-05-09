@@ -18,9 +18,9 @@ export class ClipRepository {
   constructor(private db: Database.Database) {
     this.stmtInsert = db.prepare(`
       INSERT INTO clips (project_id, file_path, proxy_path, file_hash, file_size,
-        duration_sec, resolution, fps, nb_frames, codec, recorded_at, start_timecode, location, manual_tags, people)
+        duration_sec, resolution, fps, nb_frames, has_video, has_audio, codec, recorded_at, start_timecode, location, manual_tags, people)
       VALUES (@project_id, @file_path, @proxy_path, @file_hash, @file_size,
-        @duration_sec, @resolution, @fps, @nb_frames, @codec, @recorded_at, @start_timecode, @location, @manual_tags, @people)
+        @duration_sec, @resolution, @fps, @nb_frames, @has_video, @has_audio, @codec, @recorded_at, @start_timecode, @location, @manual_tags, @people)
     `);
 
     this.stmtFindByHash = db.prepare('SELECT * FROM clips WHERE file_hash = ?');

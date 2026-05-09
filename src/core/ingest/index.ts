@@ -88,6 +88,8 @@ export async function ingestDirectory(
         resolution: metadata.resolution,
         fps: metadata.fps,
         nb_frames: metadata.nb_frames,
+        has_video: metadata.has_video ? 1 : 0,
+        has_audio: metadata.has_audio ? 1 : 0,
         codec: metadata.codec,
         recorded_at: options.date ?? metadata.recorded_at,
         start_timecode: metadata.start_timecode,

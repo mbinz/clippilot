@@ -11,6 +11,8 @@ export interface ExportSegment {
   start_timecode: string | null;
   nb_frames: number | null;
   fps: number;
+  has_video: boolean;
+  has_audio: boolean;
   resolution: string | null;
   ai_summary: string | null;
   ai_quality_overall: number | null;

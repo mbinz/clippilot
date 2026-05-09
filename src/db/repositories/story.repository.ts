@@ -23,7 +23,8 @@ export class StoryRepository {
     this.stmtFindStory = db.prepare('SELECT * FROM stories WHERE id = ?');
 
     this.stmtFindSegments = db.prepare(`
-      SELECT ss.*, c.file_path, c.proxy_path, c.duration_sec, c.resolution, c.fps, c.ai_summary, c.start_timecode
+      SELECT ss.*, c.file_path, c.proxy_path, c.duration_sec, c.resolution, c.fps,
+             c.nb_frames, c.has_video, c.has_audio, c.ai_summary, c.start_timecode
       FROM story_segments ss
       JOIN clips c ON c.id = ss.clip_id
       WHERE ss.story_id = ?

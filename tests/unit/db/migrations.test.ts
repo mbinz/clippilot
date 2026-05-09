@@ -41,10 +41,11 @@ describe('migrations', () => {
     runMigrations(db);
 
     const migrations = db.prepare('SELECT * FROM _migrations ORDER BY version').all() as any[];
-    expect(migrations).toHaveLength(3);
+    expect(migrations).toHaveLength(6);
     expect(migrations[0].version).toBe(1);
     expect(migrations[1].version).toBe(2);
     expect(migrations[2].version).toBe(3);
+    expect(migrations[5].version).toBe(6);
   });
 
   it('is idempotent — second run does nothing', () => {
@@ -52,7 +53,7 @@ describe('migrations', () => {
     runMigrations(db); // should not throw
 
     const migrations = db.prepare('SELECT * FROM _migrations').all();
-    expect(migrations).toHaveLength(3);
+    expect(migrations).toHaveLength(6);
   });
 
   it('creates indexes', () => {
