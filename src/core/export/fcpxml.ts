@@ -91,8 +91,9 @@ export function exportFcpxml(segments: ExportSegment[], options: ExportOptions):
     const durationAttr = timeAttr(durationFrames, clipFps);
 
     clipLines.push(
-      `                <clip name="${xmlEscape(seg.file_name)}" ref="${assetId}" ` +
-      `offset="${offsetAttr}" start="${startAttr}" duration="${durationAttr}"/>`,
+      `                <asset-clip name="${xmlEscape(seg.file_name)}" ref="${assetId}" ` +
+      `offset="${offsetAttr}" start="${startAttr}" duration="${durationAttr}" ` +
+      `format="${formatId}" tcFormat="NDF"/>`,
     );
 
     timelineFrames += durationFrames;

@@ -83,9 +83,9 @@ describe('exportFcpxml', () => {
     expect(xml).toContain('<spine>');
   });
 
-  it('includes clip elements in spine with correct ref', () => {
+  it('includes asset-clip elements in spine with correct ref', () => {
     const xml = exportFcpxml([makeSegment()], OPTIONS);
-    expect(xml).toContain('<clip');
+    expect(xml).toContain('<asset-clip');
     expect(xml).toContain('ref="r1"');
   });
 

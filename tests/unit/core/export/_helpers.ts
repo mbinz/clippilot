@@ -50,7 +50,7 @@ export function assertFcpxmlValid(xml: string, segments: ExportSegment[], fps: n
 
   // 9. Sequence duration equals sum of clip durations (extract from spine)
   // Parse clip durations from spine
-  const clipDurationMatches = [...xml.matchAll(/<clip[^>]+duration="(\d+)\/(\d+)s"/g)];
+  const clipDurationMatches = [...xml.matchAll(/<asset-clip[^>]+duration="(\d+)\/(\d+)s"/g)];
   if (clipDurationMatches.length > 0) {
     const totalNumerator = clipDurationMatches.reduce(
       (sum, m) => sum + parseInt(m[1], 10),
