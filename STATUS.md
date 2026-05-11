@@ -35,7 +35,7 @@ for scope and roadmap; web UI fate decides after first real-project use.
 
 ## Quality / test coverage map
 
-`npm run test:all` runs 25 test files / 191 tests. State per module:
+`npm run test:all` runs 26 test files / 213 tests. State per module:
 
 | Module | Source | Tests | Coverage |
 |---|---|---|---|
@@ -51,7 +51,7 @@ for scope and roadmap; web UI fate decides after first real-project use.
 | `db/migrations` | 001–006 + runner | migrations runner | **good** (004–006 are single-column ALTERs, covered transitively) |
 | `utils` | fs, timecode, concurrency, errors, logger | fs, timecode | **partial** |
 | `cli/json` | clip projection | full unit | **good** |
-| `cli/commands` | 11 commands | — | **none** (manual smoke only) |
+| `cli/commands` | 12 commands (analyze, config, contact-sheet, export, get-clip, ingest, mark-best, search, similar, stats, tag, ui) | — | **none** (manual smoke only) |
 
 Type checking: `npm run typecheck` (strict TS, no errors expected).
 
