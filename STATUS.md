@@ -9,8 +9,8 @@ Update this file whenever the answer to any of those questions shifts.
 Solo project, MIT. Run via `tsx`, no compiled binary.
 
 **Direction in flight:** transitioning from one-stop-shop CLI/Web app to
-**data pipeline + Claude skill** ("chat with the material"). See [PLAN.md](PLAN.md)
-for the active plan; web UI fate decides after first real-project use.
+**data pipeline + Claude skill** ("chat with the material"). See [PRD.md](PRD.md)
+for scope and roadmap; web UI fate decides after first real-project use.
 
 ## Implemented
 
@@ -23,11 +23,11 @@ for the active plan; web UI fate decides after first real-project use.
 - **Skill surface** — `.claude/skills/clippilot/SKILL.md` documents the verbs Claude should use (`search`, `get-clip`, `similar`, `mark-best`, `tag`, `contact-sheet`, `export`, `stats`) — all emit JSON.
 - **Web UI (legacy)** — Hono server (`clippilot ui`), Vite frontend in `web/`. Frozen for features; deletion candidate after the contact-sheet flow is validated on a real project.
 - **Tag / Stats / Config** — CLI with `--json`
-- **DB migrations** — runner with versioning, migrations 001–003 applied
+- **DB migrations** — runner with versioning, migrations 001–006 applied: `001_initial`, `002_stories`, `003_similarity`, `004_timecode` (clips.start_timecode), `005_nb_frames` (clips.nb_frames), `006_has_audio_video` (clips.has_video/has_audio)
 
 ## Not implemented / known gaps
 
-- **No story-AI feature.** Earlier scaffolding (migration `004_story_ai.ts`) was deleted — sequence reasoning is now expected to live in the chat (Claude reasons over `get-clip` results), with no persisted state.
+- **No story-AI feature.** Earlier scaffolding (a since-deleted `004_story_ai.ts`; the `004` slot was reused for `004_timecode`) — sequence reasoning is now expected to live in the chat (Claude reasons over `get-clip` results), with no persisted state. The `story` repository and `002_stories` table remain but are unused by the CLI.
 - **`thumbnail` repository, `gemini-client`, `proxy` modules** — production code present, no direct unit tests (proxy/thumbnail covered indirectly by the `ingest` integration test).
 - **`projects` API route** — exists in `src/core/server/routes/projects.ts` but no test. Likely deleted in Phase C with the rest of `web/`.
 - **No packaging** — no `bin` build, no npm publish. Install via repo clone + `npm install -g tsx`.
@@ -48,7 +48,7 @@ for the active plan; web UI fate decides after first real-project use.
 | `core/server/routes` | clips, facets, projects, similarity | clips, facets, similarity | **partial** (projects untested; whole module deleted in Phase C if web goes) |
 | `core/config` | manager, defaults | — | **none** |
 | `db/repositories` | clip, project, similarity, story, thumbnail | clip, project, similarity, story | **partial** (thumbnail untested) |
-| `db/migrations` | 001–003 + runner | migrations runner | **good** |
+| `db/migrations` | 001–006 + runner | migrations runner | **good** (004–006 are single-column ALTERs, covered transitively) |
 | `utils` | fs, timecode, concurrency, errors, logger | fs, timecode | **partial** |
 | `cli/json` | clip projection | full unit | **good** |
 | `cli/commands` | 11 commands | — | **none** (manual smoke only) |
