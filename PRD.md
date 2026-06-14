@@ -6,102 +6,124 @@ Reviewing personal video footage (hundreds to low-thousands of clips per project
 ## Users
 Solo creators editing their own footage in DaVinci Resolve. Comfortable with a terminal. Already use Claude Code or Claude Desktop and want to "chat with the material" instead of clicking through bins.
 
-## v1 scope (the bet)
-ClipPilot is **a data pipeline + a CLI that Claude can drive.** Claude is the primary interface; DaVinci Resolve is the visual finishing tool. The web UI's only remaining job — exploratory grid scrolling on medium (100–1000) projects — is replaced by a `contact-sheet` CLI that writes a labeled composite PNG that Claude reads as an image.
+## Product vision
+ClipPilot is **a data pipeline + web UI + CLI skill**. The web UI is the primary interactive surface for browsing, marking, and building sequences. The CLI is the scripting and AI-agent surface (Claude drives it). DaVinci Resolve is the visual finishing tool — ClipPilot hands off clean per-scene timelines, then gets out of the way.
 
-### In scope
-- Local ingest: recursive scan, ffprobe metadata, 720p proxies, thumbnails, content-hash dedupe → SQLite.
-- Structured analysis via Gemini 2.5 Flash (scene, quality, editorial, keywords) — Zod-validated.
-- Query/search via FTS over the analysis output.
-- Similarity clustering (location/time/keywords/scene) for near-duplicate handling.
-- DaVinci handoff: CSV, JSON, EDL, FCPXML exports. Originals never mutated.
-- A skill at `.claude/skills/clippilot/SKILL.md` so Claude knows which verbs to call.
+### Where ClipPilot sits in the editorial pipeline
+The professional editing pipeline is **selects → assembly → rough cut → fine cut**. The assembly stage is "lay out usable footage organized by scene, build sequences in order, goal = flow." **ClipPilot owns selects + assembly.** It produces the organized per-scene starting timelines. Resolve owns rough cut, fine cut, and final assembly. We are not trying to be the final editor — we hand off a clean *starting point*.
 
-### Out of scope (v1)
-- Server/MCP. CLI-as-skill is the only surface.
-- Story-AI / persisted sequence reasoning. Claude composes sequences in chat from `get-clip` output; no DB state for it.
-- Packaging / distribution. Run via `tsx`, no compiled binary.
-- CI. Tests run locally only.
+## Surfaces
 
-## Why CLI, not MCP (yet)
-An earlier plan went straight to MCP. On review: MCP only earns its keep if **per-clip inline thumbnails at scale** become the dominant interaction. The contact-sheet bet pushes the opposite direction. CLI-as-skill matches the project's values:
+### Web UI (primary interactive surface)
+- Browse clips: grid, search, filters, facets
+- Clip detail: proxy playback, thumbnails, AI metadata, editable tags/location/people
+- Similarity clusters: pick the best take from near-duplicates
+- Sequence builder: organize clips into scenes, set in/out cut points, export per-scene timelines to Resolve
 
-- One surface for human + AI (no drift between CLI and MCP server).
-- No new SDK dependency, no server lifecycle.
-- Adding a feature = a flag on a CLI command, not a new tool file.
-- Works in any shell-capable agent, not only MCP-aware clients.
-- `Read` already renders PNG/JPG visually in Claude Code — so contact sheets and individual thumbnails work today via plain file paths.
-
-Upgrade to MCP **only** if the v1 decision gate (below) hits a concrete wall.
-
-## Surface — CLI subcommands + a skill
-
-All read commands accept `--json`. Write commands print confirmation JSON.
+### CLI (pipeline + AI skill surface)
+All read commands emit `--json`. Write commands print confirmation JSON.
 
 | Command | Kind | Output |
 |---|---|---|
+| `clippilot ingest [path]` | write | progress + summary JSON |
+| `clippilot analyze [--limit N]` | write | progress + summary JSON |
 | `clippilot search <query> [--filter k=v] [--limit N]` | read | JSON: clip metadata + thumbnail paths |
-| `clippilot contact-sheet [--filter k=v] [-n 24] [--page N] -o <path>` | read | writes composite PNG; prints path |
 | `clippilot get-clip <id>` | read | JSON: full metadata + thumbnail + proxy paths |
 | `clippilot similar <id>` | read | JSON: cluster members + thumbnail paths |
 | `clippilot mark-best <id>` | write | confirmation JSON |
 | `clippilot tag <id> <tag>...` | write | confirmation JSON |
-| `clippilot export <id>... --format <fmt> -o <path>` | write | path to written file |
+| `clippilot export --cut <id> --format <fmt> -o <dir>` | write | one file per scene; prints paths *(planned; today the flag is `--story`, single-file)* |
+| `clippilot export --clips <ids> --format <fmt> -o <path>` | write | ad-hoc clip-list → single flat timeline (quick export) |
+| `clippilot contact-sheet [--filter k=v] [-n 24] -o <path>` | read | writes composite PNG |
+| `clippilot stats` | read | JSON |
+| `clippilot config` | read/write | JSON |
 
-Plus the existing pipeline commands: `ingest`, `analyze`, `config`, `stats`.
+Sequence reasoning ("propose an order for these clips") is **not** a CLI command. Claude does it in chat using `get-clip` results; the resulting cuts/scenes/segments are persisted in the DB.
 
-Sequence reasoning ("propose an order for these clips") is **not** a CLI command. Claude does it in chat using `get-clip` results.
+## Data model — Project → Cut → Scene → Segment
 
-## Roadmap (implementation order)
+```
+Project (the trip — e.g. "Italy 2025")
+  └─ Cut          ← multiple per project: a 3-min cut, a 15-min cut (an "edit")
+       └─ Scene    ← ordered, named: Rome, Cooking class, Beach day
+            └─ Segment  ← ordered: clip_id + in/out (start_sec/end_sec)
+```
 
-1. **Phase A — done.** Removed `004_story_ai.ts`. Baseline: `npm run typecheck && npm run test:all` green.
-2. **Add `--json` to read commands** — `search`, `stats`. Update `tag` to accept structured args and print confirmation JSON. Tests round-trip parse the output.
-3. **`contact-sheet` command** — composite PNG generator. Default n=24, deterministic 4×6 grid, clip-ID label per cell. Test: deterministic layout for a fixture.
-4. **`get-clip` and `similar` commands** — thin wrappers over existing repos/engines, JSON output. Shape tests per fixture.
-5. **`mark-best` write command** — wraps existing repo. Round-trip test.
-6. **`export` already exists** — verify it accepts a clip-ID list, emits a path, supports `--json` confirmation. Reuse existing exporter tests.
-7. **Write the skill** — `.claude/skills/clippilot/SKILL.md`: verbs, when-to-use, examples. ~80 lines. References `STATUS.md`.
-8. **Use it on one real project** for at least a session. Friction notes go in `STATUS.md` under known issues.
-9. **Decision gate** — three questions:
-   - Did per-clip-thumbnail browsing feel slow because Claude had to `Read` many files?
-   - Did shell-quoting on multi-clip writes hurt?
-   - Did discoverability fail (forgot which verbs exist)?
+Decisions (settled 2026-06-14):
+- **Scenes are first-class, deliberate edit constructs** — named and reorderable, not auto-derived from source folders. This matches the editorial "assembly by scene" stage.
+- **Scenes live inside a cut.** No cross-cut sharing — if two cuts both want Rome, it's built in each. Simple schema, no surprise side-effects.
+- **A segment** = one clip reference with in/out points. The same clip may appear multiple times (in one scene or across scenes) at different cut points.
+- **No effects, transitions, or audio mixing** — segment placement only.
 
-   Any clear yes → plan Phase D: MCP server with the same surface.
-   All no → CLI-as-skill stands. Execute Phase B + C deletions.
-10. Update `STATUS.md`.
+Schema mapping: the existing `stories` table = a **Cut**. A new `scenes` table (id, story_id, name, position) sits between; `story_segments` gains a `scene_id` and orders within its scene. (Schema keeps the `stories`/`story_segments` names to avoid churn; product vocabulary is Cut/Scene/Segment.)
 
-## Deletion phases (target state)
+## Export to DaVinci Resolve — per-scene timelines
 
-**Phase B — when CLI-as-skill works on a real project:**
-- `src/core/search/advanced.ts` (Claude composes filters)
-- `src/cli/formatters/` (no human-facing pretty-printing once `--json` is default)
+**One timeline file per scene** (e.g. `01_Rome.fcpxml`, `02_Cooking.fcpxml`), numeric-prefixed by scene order so they sort correctly in Resolve's media pool. The user imports them, then assembles a master timeline in Resolve by dragging the scene-timelines together (Resolve nests them automatically) or using stacked timelines.
 
-**Phase C — when `contact-sheet` proves to replace exploratory grid:**
-- `web/` (entire frontend)
-- `src/core/server/` and `src/core/server/routes/`
-- npm scripts: `web:dev`, `web:build`, `ui`
-- deps: `hono`, `@hono/node-server`, `open`
-- `src/cli/commands/ui.ts`
+Rationale / hard constraint: **Resolve only imports the *last* timeline from a multi-timeline FCPXML** — a single file with N `<project>` elements silently drops all but one. So one-file-per-scene is the only robust handoff. ClipPilot records scene order but does **not** emit the master file; final assembly is Resolve's job (its native scene workflow is bin-per-scene → timeline-per-scene → assemble).
 
-If `contact-sheet` doesn't feel right after a real project, web stays; accept the dual-surface cost and document it in `STATUS.md`.
+No single flat "everything" timeline export for a cut — its scenes are never concatenated into one file. (The separate `--clips` quick export is unrelated: it takes an ad-hoc clip list, not a cut, and writes one flat timeline.)
+
+## In scope
+
+### Pipeline
+- Local ingest: recursive scan, ffprobe metadata, 720p proxies, thumbnails, content-hash dedupe → SQLite
+- Structured analysis via Gemini 2.5 Flash (scene, quality, editorial, keywords) — Zod-validated
+
+### Browse & annotate (UI)
+- Grid + search + filters + facets + pagination
+- Clip detail panel: proxy playback, thumbnail strip, AI metadata
+- Editable metadata: tags, location, people
+- Mark-best within similarity cluster
+
+### Sequence builder (UI + data layer)
+- Create/rename/delete cuts within a project
+- Create/rename/reorder scenes within a cut
+- Add clips to a scene; reorder segments via drag-and-drop
+- Per-segment in/out cut points (start_sec / end_sec)
+- Same clip can appear multiple times at different cut points
+- No effects, transitions, or audio mixing — segment placement only
+- Export a cut → one FCPXML/EDL file per scene
+
+### Export hardening (top priority)
+- Per-scene export: one timeline file per scene, ordered numeric prefix
+- Mixed source frame rates: conform to chosen timeline fps instead of rejecting
+- Drop-frame timecode support (in addition to NDF)
+- End-to-end verified against real DaVinci Resolve import (import scene files → assemble master)
+- Export available from UI (not just CLI)
+
+### DaVinci handoff formats
+- FCPXML (primary), EDL, CSV, JSON
+
+## Out of scope (v1)
+- Story-AI / AI-generated sequence ordering (Claude reasons over `get-clip` in chat; no AI-specific tables — its proposals persist as normal cuts/scenes/segments)
+- MCP server surface
+- Effects, transitions, audio mixing in the sequence builder
+- Packaging / distribution (run via `tsx`, no compiled binary)
+- CI (tests run locally only)
+
+## Roadmap (priority order)
+
+1. **Scene schema** — migration adding a `scenes` table + `story_segments.scene_id`; update `StoryRepository` to the Cut→Scene→Segment shape
+2. **Per-scene export hardening** — export a cut as one file per scene; mixed-fps conforming; drop-frame TC; verified against a real Resolve import + master assembly
+3. **Cut/scene server routes** — CRUD for cuts, scenes, and segments
+4. **Sequence builder UI** — manage cuts/scenes, drag clips into scenes, set in/out per segment, per-scene export download
+5. **Mark-best in UI** — button in ClipDetail calling existing `/similarity/groups/:id/best` route
+6. **Cut/scene CLI commands** — create cut, add scene, add-clip with in/out, export (lower priority if UI covers it)
 
 ## Keep (architectural commitments)
 - `src/core/ingest/*` — proxies, thumbnails, ffprobe, scanner, hasher
 - `src/core/analyze/*` — Gemini structured analysis
 - `src/core/similarity/*` — clustering
-- `src/core/export/*` — csv, json, edl, fcpxml (DaVinci handoff)
+- `src/core/export/*` — csv, json, edl, fcpxml
 - `src/db/*` — schema, repos, migration runner
-- `src/core/search/engine.ts` — basic search (advanced.ts is a Phase B deletion candidate)
-- Pipeline CLI commands: `ingest`, `analyze`, `config`, `stats`, `export`
-
-## Open questions (decide during build)
-
-- **`sharp` vs `ffmpeg tile`** for contact sheets. `ffmpeg` already a dep; `sharp` adds binary install pain on some platforms but cleaner labels. Lean `ffmpeg` first; switch if labels are ugly. (Resolved during v0.2: shipped with `sharp`.)
-- **Thumbnail surfacing in `search --json`.** Paths only, or a `?images=true` flag that emits a quick contact-sheet for the result set? Decide after first real use.
-- **Skill location.** Repo-local `.claude/skills/` (versioned with code) vs user-global `~/.claude/skills/`. Repo-local is the default; the skill is project-specific.
+- `src/core/search/` — `engine.ts` (FTS) and `advanced.ts` (filtered search used by the web server's clips route)
+- `web/` — primary UI surface (kept; Phase C deletion plan cancelled)
+- `src/core/server/` — Hono backend serving the UI
 
 ## What this buys
-- Surface area shrinks ~40% after Phase B+C: no web, no server, no advanced search, no formatters, no story-AI scaffold, no MCP server.
-- Adding a feature later = one new CLI subcommand file + one line in the skill.
-- MCP stays a real option, only paid for when there's a concrete reason.
+- One source of truth: browse, annotate, sequence, and export from the same UI, driven by the same SQLite data the CLI uses.
+- AI chat (Claude) drives the CLI for discovery and bulk operations; the UI handles the visual and interactive parts.
+- Scene-structured output matches both the editorial assembly stage and Resolve's native bin/timeline-per-scene workflow.
+- DaVinci Resolve gets clean per-scene FCPXMLs that open correctly without manual relinking, ready to assemble into a master.
