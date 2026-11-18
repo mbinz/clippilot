@@ -119,9 +119,9 @@ What Resolve actually writes (the facts M1.1/M1.2 must reproduce):
 
 **M1.4 — OTIO audio/video link ✅** — `Resolve_OTIO` link-group + channel metadata matching the golden.
 
-Done when: M1.1 + M1.2 green, M1.3 checklist passes for at least one format. ✅ (OTIO linked-audio re-import confirmation pending)
+Done when: M1.1 + M1.2 green, M1.3 checklist passes for at least one format. ✅ — OTIO re-import confirmed linked audio/video.
 
-### M2 — Understand the footage
+### M2 — Understand the footage  ← NEXT
 - Resumable / incremental ingest (survive interruption on a 123 GB trip); capture folder as scene hint.
 - Gemini analysis of the proxy **video** → timestamped highlights table. Pilot on `03 Arrifana/Delfine`
   (33 clips already ingested) to judge quality + cost before running all 508.
