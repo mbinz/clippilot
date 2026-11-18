@@ -5,13 +5,13 @@ export const USER_PROMPT = `Analysiere diesen Videoclip. Antworte als JSON mit f
 {
   "scenes": [
     {
-      "start_sec": 0,
-      "end_sec": 15,
+      "start_sec": <Sekunden ab Clip-Beginn>,
+      "end_sec": <Sekunden ab Clip-Beginn>,
       "description_de": "Beschreibung auf Deutsch",
       "description_en": "Description in English",
       "subjects": ["Person 1"],
-      "setting": "Ort/Setting",
-      "activity": "Aktivität",
+      "setting": "<kurzer englischer Tag, z.B. marina>",
+      "activity": "<kurzer englischer Tag, z.B. dolphin watching>",
       "mood": "Stimmung",
       "visual_keywords": ["keyword1", "keyword2"]
     }
@@ -34,8 +34,8 @@ export const USER_PROMPT = `Analysiere diesen Videoclip. Antworte als JSON mit f
   "clip_summary": "Kurze Zusammenfassung des Clips",
   "highlights": [
     {
-      "start_sec": 3.5,
-      "end_sec": 7.0,
+      "start_sec": <Sekunden ab Clip-Beginn>,
+      "end_sec": <Sekunden ab Clip-Beginn>,
       "description": "Description of the standout moment, in English",
       "quality": 8
     }
@@ -44,6 +44,7 @@ export const USER_PROMPT = `Analysiere diesen Videoclip. Antworte als JSON mit f
 
 Bewertungsskala jeweils 1-5.
 highlights: 0 bis 5 herausragende Momente des Clips (leeres Array, wenn es keine gibt).
-start_sec und end_sec sind Zahlen in Sekunden ab Clip-Beginn. description auf Englisch.
+start_sec und end_sec sind Zahlen in Sekunden ab Clip-Beginn und müssen aus dem stammen, was im Video tatsächlich zu sehen ist (keine Beispielwerte übernehmen). description auf Englisch.
 quality ist eine ganze Zahl von 1 bis 10: wie stark der Moment als Einstellung in einem Reise-Montage-Video ist.
+setting und activity: kurze englische Tags in Kleinbuchstaben (lowercase), je 1-3 Wörter (1-3 words), z.B. "marina", "open sea", "dolphin watching". Keine ganzen Sätze, wiederverwendbar über Clips hinweg.
 suggested_use muss einer von: "Hero Shot", "B-Roll", "Establishing", "Transition", "Skip" sein.`;
