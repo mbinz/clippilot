@@ -37,7 +37,7 @@ export async function probeFile(filePath: string): Promise<ClipMetadata> {
 
     const fileStat = await stat(filePath);
 
-    const duration = parseFloat(format?.duration ?? videoStream?.duration ?? '0');
+    const duration = pickDuration(videoStream, format);
     const width = videoStream?.width ?? 0;
     const height = videoStream?.height ?? 0;
 
@@ -91,7 +91,7 @@ export function parseProbeOutput(stdout: string, fileSize: number): ClipMetadata
   const audioStream = data.streams?.find((s: any) => s.codec_type === 'audio');
   const format = data.format;
 
-  const duration = parseFloat(format?.duration ?? videoStream?.duration ?? '0');
+  const duration = pickDuration(videoStream, format);
   const width = videoStream?.width ?? 0;
   const height = videoStream?.height ?? 0;
 
@@ -127,4 +127,12 @@ export function parseProbeOutput(stdout: string, fileSize: number): ClipMetadata
     has_video: videoStream != null,
     has_audio: audioStream != null,
   };
+}
+
+/** Video-stream duration (what Resolve uses for the media extent); container duration if the stream has none. */
+function pickDuration(videoStream: any, format: any): number {
+  const stream = parseFloat(videoStream?.duration);
+  if (Number.isFinite(stream) && stream > 0) return stream;
+  const container = parseFloat(format?.duration);
+  return Number.isFinite(container) ? container : 0;
 }

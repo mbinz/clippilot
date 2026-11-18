@@ -23,8 +23,19 @@ const FFPROBE_TC: Record<string, string> = {
   'C0562.MP4': '06:37:54:72',
   'C0382.MP4': '05:58:51:84',
 };
-// GoPro VFR clip: ffprobe avg rate 49.93 and nb_frames 1413 (Resolve says 1415 frames @50).
-const FFPROBE_VFR = { 'GH010376.MP4': { fps: 49.93, nb_frames: 1413 } } as const;
+// RULE: ExportSegment inputs that come from ingest (duration_sec, nb_frames, fps, TC, resolution) are
+// hardcoded real ffprobe values, never derived from the golden — otherwise asset assertions are circular.
+// Only source in/out and speed are derived from the golden's clip times.
+// duration_sec = video-stream duration (what probe.ts stores); nb_frames = ffprobe count.
+const FFPROBE_MEDIA: Record<string, { duration_sec: number; nb_frames: number; fps?: number }> = {
+  'C0289.MP4': { duration_sec: 12.96, nb_frames: 324 },
+  'GH010365.MP4': { duration_sec: 9.239989, nb_frames: 231 },
+  'C0361.MP4': { duration_sec: 7.2, nb_frames: 360 },
+  // GoPro VFR: avg rate 49.93; Resolve's 1415 frames @50 vs ffprobe nb_frames 1413.
+  'GH010376.MP4': { duration_sec: 28.2999, nb_frames: 1413, fps: 49.93 },
+  'C0562.MP4': { duration_sec: 4.32, nb_frames: 432 },
+  'C0382.MP4': { duration_sec: 3.84, nb_frames: 384 },
+};
 
 interface Format { frameDuration: Rat; width: string; height: string }
 interface ResolvedClip {
@@ -120,18 +131,18 @@ function goldenSegments(): ExportSegment[] {
     const speed = goldenSpeed(c);
     const inPoint = c.start.sub(c.assetStart);
     const sourceDur = c.duration.mul(new Rat(BigInt(Math.round(speed * 1000)), 1000n));
-    const vfr = (FFPROBE_VFR as Record<string, { fps: number; nb_frames: number }>)[c.name];
-    const fps = vfr?.fps ?? fpsOf(c.assetFormat);
+    const media = FFPROBE_MEDIA[c.name];
+    const fps = media.fps ?? fpsOf(c.assetFormat);
     return {
       position: i + 1,
       clip_id: i + 1,
       file_path: decodeURIComponent(c.src.replace(/^file:\/\//, '')),
       file_name: c.name,
-      duration_sec: c.assetDuration.toNumber(),
+      duration_sec: media.duration_sec,
       start_sec: inPoint.toNumber(),
       end_sec: inPoint.add(sourceDur).toNumber(),
       start_timecode: FFPROBE_TC[c.name],
-      nb_frames: vfr?.nb_frames ?? Math.round(c.assetDuration.toNumber() * fps),
+      nb_frames: media.nb_frames,
       fps,
       has_video: true,
       has_audio: true,

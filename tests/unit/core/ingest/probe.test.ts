@@ -75,3 +75,23 @@ describe('parseProbeOutput', () => {
     expect(meta.fps).toBe(0);
   });
 });
+
+describe('parseProbeOutput duration source', () => {
+  const gopro = (streamDuration: string | undefined) => JSON.stringify({
+    streams: [
+      { codec_type: 'video', codec_name: 'hevc', width: 3840, height: 2160, r_frame_rate: '25/1', duration: streamDuration },
+      { codec_type: 'audio', codec_name: 'aac' },
+    ],
+    format: { duration: '9.365333' },
+  });
+
+  it('prefers the video stream duration over the container duration (what Resolve uses)', () => {
+    const meta = parseProbeOutput(gopro('9.239989'), 1);
+    expect(meta.duration_sec).toBeCloseTo(9.239989, 6);
+  });
+
+  it('falls back to the container duration when the stream has none', () => {
+    expect(parseProbeOutput(gopro(undefined), 1).duration_sec).toBeCloseTo(9.365333, 6);
+    expect(parseProbeOutput(gopro('N/A'), 1).duration_sec).toBeCloseTo(9.365333, 6);
+  });
+});
