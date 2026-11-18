@@ -11,7 +11,7 @@ export function assertFcpxmlValid(xml: string, segments: ExportSegment[], fps: n
   expect(xml, 'missing XML declaration').toMatch(/^<\?xml version="1\.0"/);
 
   // 2. FCPXML version
-  expect(xml, 'wrong or missing fcpxml version').toContain('fcpxml version="1.8"');
+  expect(xml, 'wrong or missing fcpxml version').toContain('fcpxml version="1.10"');
 
   // 3. Collect all defined IDs (format + assets)
   const definedIds = new Set<string>();

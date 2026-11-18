@@ -158,11 +158,11 @@ describe('FCPXML regression: 25fps source clips on 25fps timeline', () => {
     assertFcpxmlValid(xml, clips, FPS);
   });
 
-  it('throws on mixed frame rates', () => {
+  it('mixed frame rates no longer throw (each clip keeps its own format)', () => {
     const clips = [
       seg({ fps: 25 }),
       seg({ position: 2, clip_id: 2, fps: 30, file_path: '/f/b.mov', file_name: 'b.mov' }),
     ];
-    expect(() => exportFcpxml(clips, OPTIONS_FCPXML)).toThrow(/mixed frame rate/i);
+    expect(() => exportFcpxml(clips, OPTIONS_FCPXML)).not.toThrow();
   });
 });

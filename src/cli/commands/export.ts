@@ -14,7 +14,27 @@ import path from 'node:path';
  * Derive the timeline fps from segments. All clips must share the same rate.
  * Returns the detected fps, or throws with a user-friendly message if mixed.
  */
-function detectFps(segments: ExportSegment[], explicitFps: number | null): number {
+function detectFps(
+  segments: ExportSegment[],
+  explicitFps: number | null,
+  allowMixed = false,
+): number {
+  if (allowMixed) {
+    // FCPXML conforms each clip to its own format; the timeline rate is --fps or the most common clip rate.
+    if (explicitFps !== null) return explicitFps;
+    const counts = new Map<number, number>();
+    for (const s of segments) {
+      if (s.fps > 0) counts.set(s.fps, (counts.get(s.fps) ?? 0) + 1);
+    }
+    const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (!top) {
+      throw new Error(
+        'Could not detect frame rate from clips. Re-ingest the footage or pass --fps explicitly.',
+      );
+    }
+    return top[0];
+  }
+
   if (explicitFps !== null) {
     // Validate every clip matches the explicit rate (within 0.1 fps tolerance)
     const mismatched = segments.filter(
@@ -141,7 +161,7 @@ export function registerExportCommand(parent: Command): void {
 
         let fps: number;
         try {
-          fps = detectFps(segments, explicitFps);
+          fps = detectFps(segments, explicitFps, format === 'fcpxml');
         } catch (err: any) {
           console.error(chalk.red(`Error: ${err.message}`));
           process.exit(1);
@@ -161,9 +181,13 @@ export function registerExportCommand(parent: Command): void {
           }
         }
 
+        // Timeline frame size for FCPXML: the first clip's resolution.
+        const res = segments.find(s => s.resolution)?.resolution?.match(/^(\d+)x(\d+)$/);
         const output = exportSegments(segments, {
           title: options.title,
           fps,
+          width: res ? Number(res[1]) : undefined,
+          height: res ? Number(res[2]) : undefined,
           format,
         });
 

@@ -34,9 +34,9 @@ describe('exportFcpxml', () => {
     expect(xml).toMatch(/^<\?xml version="1\.0"/);
   });
 
-  it('uses FCPXML version 1.8', () => {
+  it('uses FCPXML version 1.10 (oldest with <media-rep>)', () => {
     const xml = exportFcpxml([makeSegment()], OPTIONS);
-    expect(xml).toContain('fcpxml version="1.8"');
+    expect(xml).toContain('fcpxml version="1.10"');
   });
 
   it('passes all structural invariants', () => {
@@ -126,11 +126,14 @@ describe('exportFcpxml', () => {
     expect(xml).toContain('hasAudio="1"');
   });
 
-  it('throws on mixed frame rates', () => {
+  it('mixed frame rates: one format per rate, each asset references its own', () => {
     const segs = [
       makeSegment({ fps: 25 }),
       makeSegment({ position: 2, clip_id: 2, fps: 30, file_path: '/videos/other.mp4', file_name: 'other.mp4' }),
     ];
-    expect(() => exportFcpxml(segs, OPTIONS)).toThrow(/mixed frame rate/i);
+    const xml = exportFcpxml(segs, OPTIONS);
+    expect(xml).toContain('frameDuration="100/2500s"');
+    expect(xml).toContain('frameDuration="100/3000s"');
+    expect(xml.match(/<format /g)).toHaveLength(2);
   });
 });
