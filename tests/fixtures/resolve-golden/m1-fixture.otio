@@ -1,0 +1,3590 @@
+{
+    "OTIO_SCHEMA": "Timeline.1",
+    "metadata": {
+        "Resolve_OTIO": {
+            "Resolve OTIO Meta Version": "1.0"
+        }
+    },
+    "name": "",
+    "global_start_time": {
+        "OTIO_SCHEMA": "RationalTime.1",
+        "rate": 24.0,
+        "value": 86400.0
+    },
+    "tracks": {
+        "OTIO_SCHEMA": "Stack.1",
+        "metadata": {},
+        "name": "",
+        "source_range": null,
+        "effects": [],
+        "markers": [],
+        "enabled": true,
+        "children": [
+            {
+                "OTIO_SCHEMA": "Track.1",
+                "metadata": {
+                    "Resolve_OTIO": {
+                        "Locked": false
+                    }
+                },
+                "name": "Video 1",
+                "source_range": null,
+                "effects": [],
+                "markers": [],
+                "enabled": true,
+                "children": [
+                    {
+                        "OTIO_SCHEMA": "Clip.2",
+                        "metadata": {
+                            "Resolve_OTIO": {
+                                "Link Group ID": 1
+                            }
+                        },
+                        "name": "C0289.MP4",
+                        "source_range": {
+                            "OTIO_SCHEMA": "TimeRange.1",
+                            "duration": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 205.0
+                            },
+                            "start_time": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 478418.0
+                            }
+                        },
+                        "effects": [
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Transform",
+                                        "Enabled": true,
+                                        "Name": "Transform",
+                                        "Parameters": [],
+                                        "Type": 2
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Cropping",
+                                        "Enabled": true,
+                                        "Name": "Cropping",
+                                        "Parameters": [],
+                                        "Type": 3
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Dynamic Zoom",
+                                        "Enabled": false,
+                                        "Name": "Dynamic Zoom",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": [
+                                                    0.0,
+                                                    0.0
+                                                ],
+                                                "Key Frames": {
+                                                    "-50": {
+                                                        "Value": [
+                                                            0.0,
+                                                            0.0
+                                                        ],
+                                                        "Variant Type": "POINTF"
+                                                    },
+                                                    "910": {
+                                                        "Value": [
+                                                            0.0,
+                                                            0.0
+                                                        ],
+                                                        "Variant Type": "POINTF"
+                                                    }
+                                                },
+                                                "Parameter ID": "dynamicZoomCenter",
+                                                "Parameter Value": [
+                                                    0.0,
+                                                    0.0
+                                                ],
+                                                "Variant Type": "POINTF"
+                                            },
+                                            {
+                                                "Default Parameter Value": 1.0,
+                                                "Key Frames": {
+                                                    "-50": {
+                                                        "Value": 0.8,
+                                                        "Variant Type": "Double"
+                                                    },
+                                                    "910": {
+                                                        "Value": 1.0,
+                                                        "Variant Type": "Double"
+                                                    }
+                                                },
+                                                "Parameter ID": "dynamicZoomScale",
+                                                "Parameter Value": 1.0,
+                                                "Variant Type": "Double",
+                                                "maxValue": 100.0,
+                                                "minValue": 0.01
+                                            }
+                                        ],
+                                        "Type": 59
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Composite",
+                                        "Enabled": true,
+                                        "Name": "Composite",
+                                        "Parameters": [],
+                                        "Type": 1
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Lens Correction",
+                                        "Enabled": true,
+                                        "Name": "Lens Correction",
+                                        "Parameters": [],
+                                        "Type": 43
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Retime and Scaling",
+                                        "Enabled": true,
+                                        "Name": "Retime and Scaling",
+                                        "Parameters": [],
+                                        "Type": 22
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Video Faders",
+                                        "Enabled": true,
+                                        "Name": "Video Faders",
+                                        "Parameters": [],
+                                        "Type": 36
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Immersive Output Transform",
+                                        "Enabled": true,
+                                        "Name": "Immersive Output Transform",
+                                        "Parameters": [],
+                                        "Type": 86
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            }
+                        ],
+                        "markers": [
+                            {
+                                "OTIO_SCHEMA": "Marker.2",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Keywords": [],
+                                        "Note": ""
+                                    }
+                                },
+                                "name": "01 Ankunft",
+                                "color": "BLUE",
+                                "marked_range": {
+                                    "OTIO_SCHEMA": "TimeRange.1",
+                                    "duration": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 24.0,
+                                        "value": 1.0
+                                    },
+                                    "start_time": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 24.0,
+                                        "value": 478418.0
+                                    }
+                                }
+                            }
+                        ],
+                        "enabled": true,
+                        "media_references": {
+                            "DEFAULT_MEDIA": {
+                                "OTIO_SCHEMA": "ExternalReference.1",
+                                "metadata": {},
+                                "name": "C0289.MP4",
+                                "available_range": {
+                                    "OTIO_SCHEMA": "TimeRange.1",
+                                    "duration": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 25.0,
+                                        "value": 324.0
+                                    },
+                                    "start_time": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 25.0,
+                                        "value": 498300.0
+                                    }
+                                },
+                                "available_image_bounds": null,
+                                "target_url": "/Users/michaelbinz/Video/ClipPilot M1 Fixture/Src /01 Ankunft/C0289.MP4"
+                            }
+                        },
+                        "active_media_reference_key": "DEFAULT_MEDIA"
+                    },
+                    {
+                        "OTIO_SCHEMA": "Clip.2",
+                        "metadata": {
+                            "Resolve_OTIO": {
+                                "Link Group ID": 2
+                            }
+                        },
+                        "name": "GH010365.MP4",
+                        "source_range": {
+                            "OTIO_SCHEMA": "TimeRange.1",
+                            "duration": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 136.0
+                            },
+                            "start_time": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 1208165.2
+                            }
+                        },
+                        "effects": [
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Transform",
+                                        "Enabled": true,
+                                        "Name": "Transform",
+                                        "Parameters": [],
+                                        "Type": 2
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Cropping",
+                                        "Enabled": true,
+                                        "Name": "Cropping",
+                                        "Parameters": [],
+                                        "Type": 3
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Dynamic Zoom",
+                                        "Enabled": false,
+                                        "Name": "Dynamic Zoom",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": [
+                                                    0.0,
+                                                    0.0
+                                                ],
+                                                "Key Frames": {
+                                                    "-34": {
+                                                        "Value": [
+                                                            0.0,
+                                                            0.0
+                                                        ],
+                                                        "Variant Type": "POINTF"
+                                                    },
+                                                    "926": {
+                                                        "Value": [
+                                                            0.0,
+                                                            0.0
+                                                        ],
+                                                        "Variant Type": "POINTF"
+                                                    }
+                                                },
+                                                "Parameter ID": "dynamicZoomCenter",
+                                                "Parameter Value": [
+                                                    0.0,
+                                                    0.0
+                                                ],
+                                                "Variant Type": "POINTF"
+                                            },
+                                            {
+                                                "Default Parameter Value": 1.0,
+                                                "Key Frames": {
+                                                    "-34": {
+                                                        "Value": 0.8,
+                                                        "Variant Type": "Double"
+                                                    },
+                                                    "926": {
+                                                        "Value": 1.0,
+                                                        "Variant Type": "Double"
+                                                    }
+                                                },
+                                                "Parameter ID": "dynamicZoomScale",
+                                                "Parameter Value": 1.0,
+                                                "Variant Type": "Double",
+                                                "maxValue": 100.0,
+                                                "minValue": 0.01
+                                            }
+                                        ],
+                                        "Type": 59
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Composite",
+                                        "Enabled": true,
+                                        "Name": "Composite",
+                                        "Parameters": [],
+                                        "Type": 1
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Lens Correction",
+                                        "Enabled": true,
+                                        "Name": "Lens Correction",
+                                        "Parameters": [],
+                                        "Type": 43
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Retime and Scaling",
+                                        "Enabled": true,
+                                        "Name": "Retime and Scaling",
+                                        "Parameters": [],
+                                        "Type": 22
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Video Faders",
+                                        "Enabled": true,
+                                        "Name": "Video Faders",
+                                        "Parameters": [],
+                                        "Type": 36
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Immersive Output Transform",
+                                        "Enabled": true,
+                                        "Name": "Immersive Output Transform",
+                                        "Parameters": [],
+                                        "Type": 86
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            }
+                        ],
+                        "markers": [],
+                        "enabled": true,
+                        "media_references": {
+                            "DEFAULT_MEDIA": {
+                                "OTIO_SCHEMA": "ExternalReference.1",
+                                "metadata": {},
+                                "name": "GH010365.MP4",
+                                "available_range": {
+                                    "OTIO_SCHEMA": "TimeRange.1",
+                                    "duration": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 25.0,
+                                        "value": 231.0
+                                    },
+                                    "start_time": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 25.0,
+                                        "value": 1258470.0
+                                    }
+                                },
+                                "available_image_bounds": null,
+                                "target_url": "/Users/michaelbinz/Video/ClipPilot M1 Fixture/Src /01 Ankunft/GH010365.MP4"
+                            }
+                        },
+                        "active_media_reference_key": "DEFAULT_MEDIA"
+                    },
+                    {
+                        "OTIO_SCHEMA": "Clip.2",
+                        "metadata": {
+                            "Resolve_OTIO": {
+                                "Link Group ID": 3
+                            }
+                        },
+                        "name": "C0361.MP4",
+                        "source_range": {
+                            "OTIO_SCHEMA": "TimeRange.1",
+                            "duration": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 80.0
+                            },
+                            "start_time": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 510442.62
+                            }
+                        },
+                        "effects": [
+                            {
+                                "OTIO_SCHEMA": "LinearTimeWarp.1",
+                                "metadata": {},
+                                "name": "",
+                                "effect_name": "",
+                                "time_scalar": 0.5
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Transform",
+                                        "Enabled": true,
+                                        "Name": "Transform",
+                                        "Parameters": [],
+                                        "Type": 2
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Cropping",
+                                        "Enabled": true,
+                                        "Name": "Cropping",
+                                        "Parameters": [],
+                                        "Type": 3
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Dynamic Zoom",
+                                        "Enabled": false,
+                                        "Name": "Dynamic Zoom",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": [
+                                                    0.0,
+                                                    0.0
+                                                ],
+                                                "Key Frames": {
+                                                    "-75": {
+                                                        "Value": [
+                                                            0.0,
+                                                            0.0
+                                                        ],
+                                                        "Variant Type": "POINTF"
+                                                    },
+                                                    "405": {
+                                                        "Value": [
+                                                            0.0,
+                                                            0.0
+                                                        ],
+                                                        "Variant Type": "POINTF"
+                                                    }
+                                                },
+                                                "Parameter ID": "dynamicZoomCenter",
+                                                "Parameter Value": [
+                                                    0.0,
+                                                    0.0
+                                                ],
+                                                "Variant Type": "POINTF"
+                                            },
+                                            {
+                                                "Default Parameter Value": 1.0,
+                                                "Key Frames": {
+                                                    "-75": {
+                                                        "Value": 0.8,
+                                                        "Variant Type": "Double"
+                                                    },
+                                                    "405": {
+                                                        "Value": 1.0,
+                                                        "Variant Type": "Double"
+                                                    }
+                                                },
+                                                "Parameter ID": "dynamicZoomScale",
+                                                "Parameter Value": 1.0,
+                                                "Variant Type": "Double",
+                                                "maxValue": 100.0,
+                                                "minValue": 0.01
+                                            }
+                                        ],
+                                        "Type": 59
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Composite",
+                                        "Enabled": true,
+                                        "Name": "Composite",
+                                        "Parameters": [],
+                                        "Type": 1
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Lens Correction",
+                                        "Enabled": true,
+                                        "Name": "Lens Correction",
+                                        "Parameters": [],
+                                        "Type": 43
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Retime and Scaling",
+                                        "Enabled": true,
+                                        "Name": "Retime and Scaling",
+                                        "Parameters": [],
+                                        "Type": 22
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Video Faders",
+                                        "Enabled": true,
+                                        "Name": "Video Faders",
+                                        "Parameters": [],
+                                        "Type": 36
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Immersive Output Transform",
+                                        "Enabled": true,
+                                        "Name": "Immersive Output Transform",
+                                        "Parameters": [],
+                                        "Type": 86
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            }
+                        ],
+                        "markers": [
+                            {
+                                "OTIO_SCHEMA": "Marker.2",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Keywords": [],
+                                        "Note": ""
+                                    }
+                                },
+                                "name": "02 Farol Strand",
+                                "color": "BLUE",
+                                "marked_range": {
+                                    "OTIO_SCHEMA": "TimeRange.1",
+                                    "duration": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 24.0,
+                                        "value": 1.0
+                                    },
+                                    "start_time": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 24.0,
+                                        "value": 510480.12
+                                    }
+                                }
+                            }
+                        ],
+                        "enabled": true,
+                        "media_references": {
+                            "DEFAULT_MEDIA": {
+                                "OTIO_SCHEMA": "ExternalReference.1",
+                                "metadata": {},
+                                "name": "C0361.MP4",
+                                "available_range": {
+                                    "OTIO_SCHEMA": "TimeRange.1",
+                                    "duration": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 50.0,
+                                        "value": 360.0
+                                    },
+                                    "start_time": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 50.0,
+                                        "value": 1063344.0
+                                    }
+                                },
+                                "available_image_bounds": null,
+                                "target_url": "/Users/michaelbinz/Video/ClipPilot M1 Fixture/Src /02 Farol Strand/C0361.MP4"
+                            }
+                        },
+                        "active_media_reference_key": "DEFAULT_MEDIA"
+                    },
+                    {
+                        "OTIO_SCHEMA": "Clip.2",
+                        "metadata": {
+                            "Resolve_OTIO": {
+                                "Link Group ID": 4
+                            }
+                        },
+                        "name": "GH010376.MP4",
+                        "source_range": {
+                            "OTIO_SCHEMA": "TimeRange.1",
+                            "duration": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 236.0
+                            },
+                            "start_time": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 880871.8400000001
+                            }
+                        },
+                        "effects": [
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Transform",
+                                        "Enabled": true,
+                                        "Name": "Transform",
+                                        "Parameters": [],
+                                        "Type": 2
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Cropping",
+                                        "Enabled": true,
+                                        "Name": "Cropping",
+                                        "Parameters": [],
+                                        "Type": 3
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Dynamic Zoom",
+                                        "Enabled": false,
+                                        "Name": "Dynamic Zoom",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": [
+                                                    0.0,
+                                                    0.0
+                                                ],
+                                                "Key Frames": {
+                                                    "-332": {
+                                                        "Value": [
+                                                            0.0,
+                                                            0.0
+                                                        ],
+                                                        "Variant Type": "POINTF"
+                                                    },
+                                                    "148": {
+                                                        "Value": [
+                                                            0.0,
+                                                            0.0
+                                                        ],
+                                                        "Variant Type": "POINTF"
+                                                    }
+                                                },
+                                                "Parameter ID": "dynamicZoomCenter",
+                                                "Parameter Value": [
+                                                    0.0,
+                                                    0.0
+                                                ],
+                                                "Variant Type": "POINTF"
+                                            },
+                                            {
+                                                "Default Parameter Value": 1.0,
+                                                "Key Frames": {
+                                                    "-332": {
+                                                        "Value": 0.8,
+                                                        "Variant Type": "Double"
+                                                    },
+                                                    "148": {
+                                                        "Value": 1.0,
+                                                        "Variant Type": "Double"
+                                                    }
+                                                },
+                                                "Parameter ID": "dynamicZoomScale",
+                                                "Parameter Value": 1.0,
+                                                "Variant Type": "Double",
+                                                "maxValue": 100.0,
+                                                "minValue": 0.01
+                                            }
+                                        ],
+                                        "Type": 59
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Composite",
+                                        "Enabled": true,
+                                        "Name": "Composite",
+                                        "Parameters": [],
+                                        "Type": 1
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Lens Correction",
+                                        "Enabled": true,
+                                        "Name": "Lens Correction",
+                                        "Parameters": [],
+                                        "Type": 43
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Retime and Scaling",
+                                        "Enabled": true,
+                                        "Name": "Retime and Scaling",
+                                        "Parameters": [],
+                                        "Type": 22
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Video Faders",
+                                        "Enabled": true,
+                                        "Name": "Video Faders",
+                                        "Parameters": [],
+                                        "Type": 36
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Immersive Output Transform",
+                                        "Enabled": true,
+                                        "Name": "Immersive Output Transform",
+                                        "Parameters": [],
+                                        "Type": 86
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            }
+                        ],
+                        "markers": [],
+                        "enabled": true,
+                        "media_references": {
+                            "DEFAULT_MEDIA": {
+                                "OTIO_SCHEMA": "ExternalReference.1",
+                                "metadata": {},
+                                "name": "GH010376.MP4",
+                                "available_range": {
+                                    "OTIO_SCHEMA": "TimeRange.1",
+                                    "duration": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 50.0,
+                                        "value": 1415.0
+                                    },
+                                    "start_time": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 50.0,
+                                        "value": 1834458.0000000003
+                                    }
+                                },
+                                "available_image_bounds": null,
+                                "target_url": "/Users/michaelbinz/Video/ClipPilot M1 Fixture/Src /02 Farol Strand/GH010376.MP4"
+                            }
+                        },
+                        "active_media_reference_key": "DEFAULT_MEDIA"
+                    },
+                    {
+                        "OTIO_SCHEMA": "Clip.2",
+                        "metadata": {
+                            "Resolve_OTIO": {
+                                "Link Group ID": 5
+                            }
+                        },
+                        "name": "C0562.MP4",
+                        "source_range": {
+                            "OTIO_SCHEMA": "TimeRange.1",
+                            "duration": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 69.0
+                            },
+                            "start_time": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 572993.89
+                            }
+                        },
+                        "effects": [
+                            {
+                                "OTIO_SCHEMA": "LinearTimeWarp.1",
+                                "metadata": {},
+                                "name": "",
+                                "effect_name": "",
+                                "time_scalar": 0.25000000000014557
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Transform",
+                                        "Enabled": true,
+                                        "Name": "Transform",
+                                        "Parameters": [],
+                                        "Type": 2
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Cropping",
+                                        "Enabled": true,
+                                        "Name": "Cropping",
+                                        "Parameters": [],
+                                        "Type": 3
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Dynamic Zoom",
+                                        "Enabled": false,
+                                        "Name": "Dynamic Zoom",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": [
+                                                    0.0,
+                                                    0.0
+                                                ],
+                                                "Key Frames": {
+                                                    "-37": {
+                                                        "Value": [
+                                                            0.0,
+                                                            0.0
+                                                        ],
+                                                        "Variant Type": "POINTF"
+                                                    },
+                                                    "203": {
+                                                        "Value": [
+                                                            0.0,
+                                                            0.0
+                                                        ],
+                                                        "Variant Type": "POINTF"
+                                                    }
+                                                },
+                                                "Parameter ID": "dynamicZoomCenter",
+                                                "Parameter Value": [
+                                                    0.0,
+                                                    0.0
+                                                ],
+                                                "Variant Type": "POINTF"
+                                            },
+                                            {
+                                                "Default Parameter Value": 1.0,
+                                                "Key Frames": {
+                                                    "-37": {
+                                                        "Value": 0.8,
+                                                        "Variant Type": "Double"
+                                                    },
+                                                    "203": {
+                                                        "Value": 1.0,
+                                                        "Variant Type": "Double"
+                                                    }
+                                                },
+                                                "Parameter ID": "dynamicZoomScale",
+                                                "Parameter Value": 1.0,
+                                                "Variant Type": "Double",
+                                                "maxValue": 100.0,
+                                                "minValue": 0.01
+                                            }
+                                        ],
+                                        "Type": 59
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Composite",
+                                        "Enabled": true,
+                                        "Name": "Composite",
+                                        "Parameters": [],
+                                        "Type": 1
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Lens Correction",
+                                        "Enabled": true,
+                                        "Name": "Lens Correction",
+                                        "Parameters": [],
+                                        "Type": 43
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Retime and Scaling",
+                                        "Enabled": true,
+                                        "Name": "Retime and Scaling",
+                                        "Parameters": [],
+                                        "Type": 22
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Video Faders",
+                                        "Enabled": true,
+                                        "Name": "Video Faders",
+                                        "Parameters": [],
+                                        "Type": 36
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Immersive Output Transform",
+                                        "Enabled": true,
+                                        "Name": "Immersive Output Transform",
+                                        "Parameters": [],
+                                        "Type": 86
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            }
+                        ],
+                        "markers": [],
+                        "enabled": true,
+                        "media_references": {
+                            "DEFAULT_MEDIA": {
+                                "OTIO_SCHEMA": "ExternalReference.1",
+                                "metadata": {},
+                                "name": "C0562.MP4",
+                                "available_range": {
+                                    "OTIO_SCHEMA": "TimeRange.1",
+                                    "duration": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 100.0,
+                                        "value": 432.0
+                                    },
+                                    "start_time": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 100.0,
+                                        "value": 2387436.0
+                                    }
+                                },
+                                "available_image_bounds": null,
+                                "target_url": "/Users/michaelbinz/Video/ClipPilot M1 Fixture/Src /03 Delfine/C0562.MP4"
+                            }
+                        },
+                        "active_media_reference_key": "DEFAULT_MEDIA"
+                    },
+                    {
+                        "OTIO_SCHEMA": "Clip.2",
+                        "metadata": {
+                            "Resolve_OTIO": {
+                                "Link Group ID": 6
+                            }
+                        },
+                        "name": "C0562.MP4",
+                        "source_range": {
+                            "OTIO_SCHEMA": "TimeRange.1",
+                            "duration": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 72.0
+                            },
+                            "start_time": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 572993.64
+                            }
+                        },
+                        "effects": [
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Transform",
+                                        "Enabled": true,
+                                        "Name": "Transform",
+                                        "Parameters": [],
+                                        "Type": 2
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Cropping",
+                                        "Enabled": true,
+                                        "Name": "Cropping",
+                                        "Parameters": [],
+                                        "Type": 3
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Dynamic Zoom",
+                                        "Enabled": false,
+                                        "Name": "Dynamic Zoom",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": [
+                                                    0.0,
+                                                    0.0
+                                                ],
+                                                "Key Frames": {
+                                                    "-9": {
+                                                        "Value": [
+                                                            0.0,
+                                                            0.0
+                                                        ],
+                                                        "Variant Type": "POINTF"
+                                                    },
+                                                    "231": {
+                                                        "Value": [
+                                                            0.0,
+                                                            0.0
+                                                        ],
+                                                        "Variant Type": "POINTF"
+                                                    }
+                                                },
+                                                "Parameter ID": "dynamicZoomCenter",
+                                                "Parameter Value": [
+                                                    0.0,
+                                                    0.0
+                                                ],
+                                                "Variant Type": "POINTF"
+                                            },
+                                            {
+                                                "Default Parameter Value": 1.0,
+                                                "Key Frames": {
+                                                    "-9": {
+                                                        "Value": 0.8,
+                                                        "Variant Type": "Double"
+                                                    },
+                                                    "231": {
+                                                        "Value": 1.0,
+                                                        "Variant Type": "Double"
+                                                    }
+                                                },
+                                                "Parameter ID": "dynamicZoomScale",
+                                                "Parameter Value": 1.0,
+                                                "Variant Type": "Double",
+                                                "maxValue": 100.0,
+                                                "minValue": 0.01
+                                            }
+                                        ],
+                                        "Type": 59
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Composite",
+                                        "Enabled": true,
+                                        "Name": "Composite",
+                                        "Parameters": [],
+                                        "Type": 1
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Lens Correction",
+                                        "Enabled": true,
+                                        "Name": "Lens Correction",
+                                        "Parameters": [],
+                                        "Type": 43
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Retime and Scaling",
+                                        "Enabled": true,
+                                        "Name": "Retime and Scaling",
+                                        "Parameters": [],
+                                        "Type": 22
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Video Faders",
+                                        "Enabled": true,
+                                        "Name": "Video Faders",
+                                        "Parameters": [],
+                                        "Type": 36
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Immersive Output Transform",
+                                        "Enabled": true,
+                                        "Name": "Immersive Output Transform",
+                                        "Parameters": [],
+                                        "Type": 86
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            }
+                        ],
+                        "markers": [
+                            {
+                                "OTIO_SCHEMA": "Marker.2",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Keywords": [],
+                                        "Note": ""
+                                    }
+                                },
+                                "name": "03 Delphine",
+                                "color": "BLUE",
+                                "marked_range": {
+                                    "OTIO_SCHEMA": "TimeRange.1",
+                                    "duration": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 24.0,
+                                        "value": 1.0
+                                    },
+                                    "start_time": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 24.0,
+                                        "value": 572993.64
+                                    }
+                                }
+                            }
+                        ],
+                        "enabled": true,
+                        "media_references": {
+                            "DEFAULT_MEDIA": {
+                                "OTIO_SCHEMA": "ExternalReference.1",
+                                "metadata": {},
+                                "name": "C0562.MP4",
+                                "available_range": {
+                                    "OTIO_SCHEMA": "TimeRange.1",
+                                    "duration": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 100.0,
+                                        "value": 432.0
+                                    },
+                                    "start_time": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 100.0,
+                                        "value": 2387436.0
+                                    }
+                                },
+                                "available_image_bounds": null,
+                                "target_url": "/Users/michaelbinz/Video/ClipPilot M1 Fixture/Src /03 Delfine/C0562.MP4"
+                            }
+                        },
+                        "active_media_reference_key": "DEFAULT_MEDIA"
+                    },
+                    {
+                        "OTIO_SCHEMA": "Clip.2",
+                        "metadata": {
+                            "Resolve_OTIO": {
+                                "Link Group ID": 7
+                            }
+                        },
+                        "name": "C0382.MP4",
+                        "source_range": {
+                            "OTIO_SCHEMA": "TimeRange.1",
+                            "duration": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 92.0
+                            },
+                            "start_time": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 516754.07999999998
+                            }
+                        },
+                        "effects": [
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Transform",
+                                        "Enabled": true,
+                                        "Name": "Transform",
+                                        "Parameters": [],
+                                        "Type": 2
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Cropping",
+                                        "Enabled": true,
+                                        "Name": "Cropping",
+                                        "Parameters": [],
+                                        "Type": 3
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Dynamic Zoom",
+                                        "Enabled": false,
+                                        "Name": "Dynamic Zoom",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": [
+                                                    0.0,
+                                                    0.0
+                                                ],
+                                                "Key Frames": {
+                                                    "0": {
+                                                        "Value": [
+                                                            0.0,
+                                                            0.0
+                                                        ],
+                                                        "Variant Type": "POINTF"
+                                                    },
+                                                    "240": {
+                                                        "Value": [
+                                                            0.0,
+                                                            0.0
+                                                        ],
+                                                        "Variant Type": "POINTF"
+                                                    }
+                                                },
+                                                "Parameter ID": "dynamicZoomCenter",
+                                                "Parameter Value": [
+                                                    0.0,
+                                                    0.0
+                                                ],
+                                                "Variant Type": "POINTF"
+                                            },
+                                            {
+                                                "Default Parameter Value": 1.0,
+                                                "Key Frames": {
+                                                    "0": {
+                                                        "Value": 0.8,
+                                                        "Variant Type": "Double"
+                                                    },
+                                                    "240": {
+                                                        "Value": 1.0,
+                                                        "Variant Type": "Double"
+                                                    }
+                                                },
+                                                "Parameter ID": "dynamicZoomScale",
+                                                "Parameter Value": 1.0,
+                                                "Variant Type": "Double",
+                                                "maxValue": 100.0,
+                                                "minValue": 0.01
+                                            }
+                                        ],
+                                        "Type": 59
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Composite",
+                                        "Enabled": true,
+                                        "Name": "Composite",
+                                        "Parameters": [],
+                                        "Type": 1
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Lens Correction",
+                                        "Enabled": true,
+                                        "Name": "Lens Correction",
+                                        "Parameters": [],
+                                        "Type": 43
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Retime and Scaling",
+                                        "Enabled": true,
+                                        "Name": "Retime and Scaling",
+                                        "Parameters": [],
+                                        "Type": 22
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Video Faders",
+                                        "Enabled": true,
+                                        "Name": "Video Faders",
+                                        "Parameters": [],
+                                        "Type": 36
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Immersive Output Transform",
+                                        "Enabled": true,
+                                        "Name": "Immersive Output Transform",
+                                        "Parameters": [],
+                                        "Type": 86
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            }
+                        ],
+                        "markers": [],
+                        "enabled": true,
+                        "media_references": {
+                            "DEFAULT_MEDIA": {
+                                "OTIO_SCHEMA": "ExternalReference.1",
+                                "metadata": {},
+                                "name": "C0382.MP4",
+                                "available_range": {
+                                    "OTIO_SCHEMA": "TimeRange.1",
+                                    "duration": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 100.0,
+                                        "value": 384.0
+                                    },
+                                    "start_time": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 100.0,
+                                        "value": 2153142.0
+                                    }
+                                },
+                                "available_image_bounds": null,
+                                "target_url": "/Users/michaelbinz/Video/ClipPilot M1 Fixture/Src /03 Delfine/C0382.MP4"
+                            }
+                        },
+                        "active_media_reference_key": "DEFAULT_MEDIA"
+                    }
+                ],
+                "kind": "Video"
+            },
+            {
+                "OTIO_SCHEMA": "Track.1",
+                "metadata": {
+                    "Resolve_OTIO": {
+                        "Audio Type": "Stereo",
+                        "Locked": false,
+                        "SoloOn": false
+                    }
+                },
+                "name": "Audio 1",
+                "source_range": null,
+                "effects": [],
+                "markers": [],
+                "enabled": true,
+                "children": [
+                    {
+                        "OTIO_SCHEMA": "Clip.2",
+                        "metadata": {
+                            "Resolve_OTIO": {
+                                "Channels": [
+                                    {
+                                        "Source Channel ID": 0,
+                                        "Source Track ID": 0
+                                    },
+                                    {
+                                        "Source Channel ID": 1,
+                                        "Source Track ID": 0
+                                    }
+                                ],
+                                "Link Group ID": 1
+                            }
+                        },
+                        "name": "C0289.MP4",
+                        "source_range": {
+                            "OTIO_SCHEMA": "TimeRange.1",
+                            "duration": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 205.0
+                            },
+                            "start_time": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 478418.0
+                            }
+                        },
+                        "effects": [
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Fairlight Clip Volume and Fades",
+                                        "Enabled": true,
+                                        "Name": "Volume",
+                                        "Parameters": [],
+                                        "Type": 62
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Fairlight Clip Pan",
+                                        "Enabled": true,
+                                        "Name": "Pan",
+                                        "Parameters": [],
+                                        "Type": 72
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Fairlight Clip Pitch",
+                                        "Enabled": true,
+                                        "Name": "Pitch",
+                                        "Parameters": [],
+                                        "Type": 67
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Clip Equaliser",
+                                        "Enabled": false,
+                                        "Name": "Equalizer",
+                                        "Parameters": [],
+                                        "Type": 64
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": false,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 0,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 0,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 1,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 1,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 2,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 2,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 3,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 3,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 4,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 4,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": false,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 5,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 5,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            }
+                        ],
+                        "markers": [
+                            {
+                                "OTIO_SCHEMA": "Marker.2",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Keywords": [],
+                                        "Note": ""
+                                    }
+                                },
+                                "name": "Marker 1",
+                                "color": "BLUE",
+                                "marked_range": {
+                                    "OTIO_SCHEMA": "TimeRange.1",
+                                    "duration": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 24.0,
+                                        "value": 1.0
+                                    },
+                                    "start_time": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 24.0,
+                                        "value": 478418.0
+                                    }
+                                }
+                            }
+                        ],
+                        "enabled": true,
+                        "media_references": {
+                            "DEFAULT_MEDIA": {
+                                "OTIO_SCHEMA": "ExternalReference.1",
+                                "metadata": {},
+                                "name": "C0289.MP4",
+                                "available_range": {
+                                    "OTIO_SCHEMA": "TimeRange.1",
+                                    "duration": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 25.0,
+                                        "value": 324.0
+                                    },
+                                    "start_time": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 25.0,
+                                        "value": 498300.0
+                                    }
+                                },
+                                "available_image_bounds": null,
+                                "target_url": "/Users/michaelbinz/Video/ClipPilot M1 Fixture/Src /01 Ankunft/C0289.MP4"
+                            }
+                        },
+                        "active_media_reference_key": "DEFAULT_MEDIA"
+                    },
+                    {
+                        "OTIO_SCHEMA": "Clip.2",
+                        "metadata": {
+                            "Resolve_OTIO": {
+                                "Channels": [
+                                    {
+                                        "Source Channel ID": 0,
+                                        "Source Track ID": 0
+                                    },
+                                    {
+                                        "Source Channel ID": 1,
+                                        "Source Track ID": 0
+                                    }
+                                ],
+                                "Link Group ID": 2
+                            }
+                        },
+                        "name": "GH010365.MP4",
+                        "source_range": {
+                            "OTIO_SCHEMA": "TimeRange.1",
+                            "duration": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 136.0
+                            },
+                            "start_time": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 1208165.2
+                            }
+                        },
+                        "effects": [
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Fairlight Clip Volume and Fades",
+                                        "Enabled": true,
+                                        "Name": "Volume",
+                                        "Parameters": [],
+                                        "Type": 62
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Fairlight Clip Pan",
+                                        "Enabled": true,
+                                        "Name": "Pan",
+                                        "Parameters": [],
+                                        "Type": 72
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Fairlight Clip Pitch",
+                                        "Enabled": true,
+                                        "Name": "Pitch",
+                                        "Parameters": [],
+                                        "Type": 67
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Clip Equaliser",
+                                        "Enabled": false,
+                                        "Name": "Equalizer",
+                                        "Parameters": [],
+                                        "Type": 64
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": false,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 0,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 0,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 1,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 1,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 2,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 2,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 3,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 3,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 4,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 4,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": false,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 5,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 5,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            }
+                        ],
+                        "markers": [],
+                        "enabled": true,
+                        "media_references": {
+                            "DEFAULT_MEDIA": {
+                                "OTIO_SCHEMA": "ExternalReference.1",
+                                "metadata": {},
+                                "name": "GH010365.MP4",
+                                "available_range": {
+                                    "OTIO_SCHEMA": "TimeRange.1",
+                                    "duration": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 25.0,
+                                        "value": 231.0
+                                    },
+                                    "start_time": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 25.0,
+                                        "value": 1258470.0
+                                    }
+                                },
+                                "available_image_bounds": null,
+                                "target_url": "/Users/michaelbinz/Video/ClipPilot M1 Fixture/Src /01 Ankunft/GH010365.MP4"
+                            }
+                        },
+                        "active_media_reference_key": "DEFAULT_MEDIA"
+                    },
+                    {
+                        "OTIO_SCHEMA": "Clip.2",
+                        "metadata": {
+                            "Resolve_OTIO": {
+                                "Channels": [
+                                    {
+                                        "Source Channel ID": 0,
+                                        "Source Track ID": 0
+                                    },
+                                    {
+                                        "Source Channel ID": 1,
+                                        "Source Track ID": 0
+                                    }
+                                ],
+                                "Link Group ID": 3
+                            }
+                        },
+                        "name": "C0361.MP4",
+                        "source_range": {
+                            "OTIO_SCHEMA": "TimeRange.1",
+                            "duration": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 80.0
+                            },
+                            "start_time": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 510442.62
+                            }
+                        },
+                        "effects": [
+                            {
+                                "OTIO_SCHEMA": "LinearTimeWarp.1",
+                                "metadata": {},
+                                "name": "",
+                                "effect_name": "",
+                                "time_scalar": 0.5
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Fairlight Clip Volume and Fades",
+                                        "Enabled": true,
+                                        "Name": "Volume",
+                                        "Parameters": [],
+                                        "Type": 62
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Fairlight Clip Pan",
+                                        "Enabled": true,
+                                        "Name": "Pan",
+                                        "Parameters": [],
+                                        "Type": 72
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Fairlight Clip Pitch",
+                                        "Enabled": true,
+                                        "Name": "Pitch",
+                                        "Parameters": [],
+                                        "Type": 67
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Clip Equaliser",
+                                        "Enabled": false,
+                                        "Name": "Equalizer",
+                                        "Parameters": [],
+                                        "Type": 64
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": false,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 0,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 0,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 1,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 1,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 2,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 2,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 3,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 3,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 4,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 4,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": false,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 5,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 5,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            }
+                        ],
+                        "markers": [
+                            {
+                                "OTIO_SCHEMA": "Marker.2",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Keywords": [],
+                                        "Note": ""
+                                    }
+                                },
+                                "name": "Marker 1",
+                                "color": "BLUE",
+                                "marked_range": {
+                                    "OTIO_SCHEMA": "TimeRange.1",
+                                    "duration": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 24.0,
+                                        "value": 1.0
+                                    },
+                                    "start_time": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 24.0,
+                                        "value": 510480.12
+                                    }
+                                }
+                            }
+                        ],
+                        "enabled": true,
+                        "media_references": {
+                            "DEFAULT_MEDIA": {
+                                "OTIO_SCHEMA": "ExternalReference.1",
+                                "metadata": {},
+                                "name": "C0361.MP4",
+                                "available_range": {
+                                    "OTIO_SCHEMA": "TimeRange.1",
+                                    "duration": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 50.0,
+                                        "value": 360.0
+                                    },
+                                    "start_time": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 50.0,
+                                        "value": 1063344.0
+                                    }
+                                },
+                                "available_image_bounds": null,
+                                "target_url": "/Users/michaelbinz/Video/ClipPilot M1 Fixture/Src /02 Farol Strand/C0361.MP4"
+                            }
+                        },
+                        "active_media_reference_key": "DEFAULT_MEDIA"
+                    },
+                    {
+                        "OTIO_SCHEMA": "Clip.2",
+                        "metadata": {
+                            "Resolve_OTIO": {
+                                "Channels": [
+                                    {
+                                        "Source Channel ID": 0,
+                                        "Source Track ID": 0
+                                    },
+                                    {
+                                        "Source Channel ID": 1,
+                                        "Source Track ID": 0
+                                    }
+                                ],
+                                "Link Group ID": 4
+                            }
+                        },
+                        "name": "GH010376.MP4",
+                        "source_range": {
+                            "OTIO_SCHEMA": "TimeRange.1",
+                            "duration": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 236.0
+                            },
+                            "start_time": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 880871.8400000001
+                            }
+                        },
+                        "effects": [
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Fairlight Clip Volume and Fades",
+                                        "Enabled": true,
+                                        "Name": "Volume",
+                                        "Parameters": [],
+                                        "Type": 62
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Fairlight Clip Pan",
+                                        "Enabled": true,
+                                        "Name": "Pan",
+                                        "Parameters": [],
+                                        "Type": 72
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Fairlight Clip Pitch",
+                                        "Enabled": true,
+                                        "Name": "Pitch",
+                                        "Parameters": [],
+                                        "Type": 67
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Clip Equaliser",
+                                        "Enabled": false,
+                                        "Name": "Equalizer",
+                                        "Parameters": [],
+                                        "Type": 64
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": false,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 0,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 0,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 1,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 1,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 2,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 2,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 3,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 3,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 4,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 4,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": false,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 5,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 5,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            }
+                        ],
+                        "markers": [],
+                        "enabled": true,
+                        "media_references": {
+                            "DEFAULT_MEDIA": {
+                                "OTIO_SCHEMA": "ExternalReference.1",
+                                "metadata": {},
+                                "name": "GH010376.MP4",
+                                "available_range": {
+                                    "OTIO_SCHEMA": "TimeRange.1",
+                                    "duration": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 50.0,
+                                        "value": 1415.0
+                                    },
+                                    "start_time": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 50.0,
+                                        "value": 1834458.0000000003
+                                    }
+                                },
+                                "available_image_bounds": null,
+                                "target_url": "/Users/michaelbinz/Video/ClipPilot M1 Fixture/Src /02 Farol Strand/GH010376.MP4"
+                            }
+                        },
+                        "active_media_reference_key": "DEFAULT_MEDIA"
+                    },
+                    {
+                        "OTIO_SCHEMA": "Clip.2",
+                        "metadata": {
+                            "Resolve_OTIO": {
+                                "Channels": [
+                                    {
+                                        "Source Channel ID": 0,
+                                        "Source Track ID": 0
+                                    },
+                                    {
+                                        "Source Channel ID": 1,
+                                        "Source Track ID": 0
+                                    }
+                                ],
+                                "Link Group ID": 5
+                            }
+                        },
+                        "name": "C0562.MP4",
+                        "source_range": {
+                            "OTIO_SCHEMA": "TimeRange.1",
+                            "duration": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 69.0
+                            },
+                            "start_time": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 572993.89
+                            }
+                        },
+                        "effects": [
+                            {
+                                "OTIO_SCHEMA": "LinearTimeWarp.1",
+                                "metadata": {},
+                                "name": "",
+                                "effect_name": "",
+                                "time_scalar": 0.25000000000014557
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Fairlight Clip Volume and Fades",
+                                        "Enabled": true,
+                                        "Name": "Volume",
+                                        "Parameters": [],
+                                        "Type": 62
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Fairlight Clip Pan",
+                                        "Enabled": true,
+                                        "Name": "Pan",
+                                        "Parameters": [],
+                                        "Type": 72
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Fairlight Clip Pitch",
+                                        "Enabled": true,
+                                        "Name": "Pitch",
+                                        "Parameters": [],
+                                        "Type": 67
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Clip Equaliser",
+                                        "Enabled": false,
+                                        "Name": "Equalizer",
+                                        "Parameters": [],
+                                        "Type": 64
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": false,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 0,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 0,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 1,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 1,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 2,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 2,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 3,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 3,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 4,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 4,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": false,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 5,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 5,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            }
+                        ],
+                        "markers": [],
+                        "enabled": true,
+                        "media_references": {
+                            "DEFAULT_MEDIA": {
+                                "OTIO_SCHEMA": "ExternalReference.1",
+                                "metadata": {},
+                                "name": "C0562.MP4",
+                                "available_range": {
+                                    "OTIO_SCHEMA": "TimeRange.1",
+                                    "duration": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 100.0,
+                                        "value": 432.0
+                                    },
+                                    "start_time": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 100.0,
+                                        "value": 2387436.0
+                                    }
+                                },
+                                "available_image_bounds": null,
+                                "target_url": "/Users/michaelbinz/Video/ClipPilot M1 Fixture/Src /03 Delfine/C0562.MP4"
+                            }
+                        },
+                        "active_media_reference_key": "DEFAULT_MEDIA"
+                    },
+                    {
+                        "OTIO_SCHEMA": "Clip.2",
+                        "metadata": {
+                            "Resolve_OTIO": {
+                                "Channels": [
+                                    {
+                                        "Source Channel ID": 0,
+                                        "Source Track ID": 0
+                                    },
+                                    {
+                                        "Source Channel ID": 1,
+                                        "Source Track ID": 0
+                                    }
+                                ],
+                                "Link Group ID": 6
+                            }
+                        },
+                        "name": "C0562.MP4",
+                        "source_range": {
+                            "OTIO_SCHEMA": "TimeRange.1",
+                            "duration": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 72.0
+                            },
+                            "start_time": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 572993.64
+                            }
+                        },
+                        "effects": [
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Fairlight Clip Volume and Fades",
+                                        "Enabled": true,
+                                        "Name": "Volume",
+                                        "Parameters": [],
+                                        "Type": 62
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Fairlight Clip Pan",
+                                        "Enabled": true,
+                                        "Name": "Pan",
+                                        "Parameters": [],
+                                        "Type": 72
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Fairlight Clip Pitch",
+                                        "Enabled": true,
+                                        "Name": "Pitch",
+                                        "Parameters": [],
+                                        "Type": 67
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Clip Equaliser",
+                                        "Enabled": false,
+                                        "Name": "Equalizer",
+                                        "Parameters": [],
+                                        "Type": 64
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": false,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 0,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 0,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 1,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 1,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 2,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 2,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 3,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 3,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 4,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 4,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": false,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 5,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 5,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            }
+                        ],
+                        "markers": [
+                            {
+                                "OTIO_SCHEMA": "Marker.2",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Keywords": [],
+                                        "Note": ""
+                                    }
+                                },
+                                "name": "Marker 1",
+                                "color": "BLUE",
+                                "marked_range": {
+                                    "OTIO_SCHEMA": "TimeRange.1",
+                                    "duration": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 24.0,
+                                        "value": 1.0
+                                    },
+                                    "start_time": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 24.0,
+                                        "value": 572993.64
+                                    }
+                                }
+                            }
+                        ],
+                        "enabled": true,
+                        "media_references": {
+                            "DEFAULT_MEDIA": {
+                                "OTIO_SCHEMA": "ExternalReference.1",
+                                "metadata": {},
+                                "name": "C0562.MP4",
+                                "available_range": {
+                                    "OTIO_SCHEMA": "TimeRange.1",
+                                    "duration": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 100.0,
+                                        "value": 432.0
+                                    },
+                                    "start_time": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 100.0,
+                                        "value": 2387436.0
+                                    }
+                                },
+                                "available_image_bounds": null,
+                                "target_url": "/Users/michaelbinz/Video/ClipPilot M1 Fixture/Src /03 Delfine/C0562.MP4"
+                            }
+                        },
+                        "active_media_reference_key": "DEFAULT_MEDIA"
+                    },
+                    {
+                        "OTIO_SCHEMA": "Clip.2",
+                        "metadata": {
+                            "Resolve_OTIO": {
+                                "Channels": [
+                                    {
+                                        "Source Channel ID": 0,
+                                        "Source Track ID": 0
+                                    },
+                                    {
+                                        "Source Channel ID": 1,
+                                        "Source Track ID": 0
+                                    }
+                                ],
+                                "Link Group ID": 7
+                            }
+                        },
+                        "name": "C0382.MP4",
+                        "source_range": {
+                            "OTIO_SCHEMA": "TimeRange.1",
+                            "duration": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 92.0
+                            },
+                            "start_time": {
+                                "OTIO_SCHEMA": "RationalTime.1",
+                                "rate": 24.0,
+                                "value": 516754.07999999998
+                            }
+                        },
+                        "effects": [
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Fairlight Clip Volume and Fades",
+                                        "Enabled": true,
+                                        "Name": "Volume",
+                                        "Parameters": [],
+                                        "Type": 62
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Fairlight Clip Pan",
+                                        "Enabled": true,
+                                        "Name": "Pan",
+                                        "Parameters": [],
+                                        "Type": 72
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 1,
+                                        "Effect Name": "Fairlight Clip Pitch",
+                                        "Enabled": true,
+                                        "Name": "Pitch",
+                                        "Parameters": [],
+                                        "Type": 67
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Clip Equaliser",
+                                        "Enabled": false,
+                                        "Name": "Equalizer",
+                                        "Parameters": [],
+                                        "Type": 64
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": false,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 0,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 0,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 1,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 1,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 2,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 2,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 3,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 3,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": true,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 4,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 4,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            },
+                            {
+                                "OTIO_SCHEMA": "Effect.1",
+                                "metadata": {
+                                    "Resolve_OTIO": {
+                                        "Display Type": 3,
+                                        "Effect Name": "Fairlight Equaliser Band",
+                                        "Enabled": false,
+                                        "Name": "Equalizer Band",
+                                        "Parameters": [
+                                            {
+                                                "Default Parameter Value": 5,
+                                                "Parameter ID": "eq band index",
+                                                "Parameter Value": 5,
+                                                "Variant Type": "Int",
+                                                "maxValue": 5.0,
+                                                "minValue": -1.0
+                                            }
+                                        ],
+                                        "Type": 63
+                                    }
+                                },
+                                "name": "",
+                                "effect_name": "Resolve Effect"
+                            }
+                        ],
+                        "markers": [],
+                        "enabled": true,
+                        "media_references": {
+                            "DEFAULT_MEDIA": {
+                                "OTIO_SCHEMA": "ExternalReference.1",
+                                "metadata": {},
+                                "name": "C0382.MP4",
+                                "available_range": {
+                                    "OTIO_SCHEMA": "TimeRange.1",
+                                    "duration": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 100.0,
+                                        "value": 384.0
+                                    },
+                                    "start_time": {
+                                        "OTIO_SCHEMA": "RationalTime.1",
+                                        "rate": 100.0,
+                                        "value": 2153142.0
+                                    }
+                                },
+                                "available_image_bounds": null,
+                                "target_url": "/Users/michaelbinz/Video/ClipPilot M1 Fixture/Src /03 Delfine/C0382.MP4"
+                            }
+                        },
+                        "active_media_reference_key": "DEFAULT_MEDIA"
+                    }
+                ],
+                "kind": "Audio"
+            }
+        ]
+    }
+}

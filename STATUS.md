@@ -66,21 +66,25 @@ Reference timeline "M1 Fixture" — 3840×2160, 25 fps. Approximate in/out is fi
 | 6 | C0562 (again) | 0.5 s → 3.5 s | 100 % | |
 | 7 | C0382 | whole clip | 100 % | |
 
-**M1.0 — Golden files (user, in free Resolve)** — build the timeline above by hand, export it as FCPXML
-and OTIO into `tests/fixtures/resolve-golden/` (`m1-fixture.fcpxml`, `m1-fixture.otio`); note the Resolve
-version + FCPXML version here.
-
-**M1.1 — FCPXML matches Resolve (implementer)**
-- `ExportSegment` gains `speed` (default 1.0) and optional `scene_name`; `ExportOptions` gains timeline `width`/`height`.
-- Tests first (`tests/unit/core/export/fcpxml-golden.test.ts`): parse the golden → derive the 7 segments
-  (source in, duration, speed, file path, fps, TC, marker) → run `exportFcpxml` → parse ours → assert structural
-  equivalence per clip: asset `src` URI (encoding incl. trailing space), asset `start`/`duration`, the asset's
-  format `frameDuration`/`width`/`height`, clip `offset`/`start`/`duration`, retime representation (whatever
-  Resolve wrote, e.g. `timeMap`), timeline markers, `tcFormat`. Compare parsed values, never raw strings.
-- Expected fixes (from ARCHITECTURE "Known export defects"): one `<format>` per distinct source format with
-  width/height; no mixed-fps throw; 100 fps in the rate table; TC at the clip's own rate (frames up to 99);
-  per-segment speed; scene markers; one timeline per cut.
-- Existing fcpxml tests that assert the old single-format / mixed-fps-throw behavior get updated, noted in report.
+**M1.0 — Golden files ✅ 2026-11-18** — `tests/fixtures/resolve-golden/m1-fixture.fcpxml` (from Resolve's
+`.fcpxmld` bundle, `Info.fcpxml`, **FCPXML 1.13**) and `m1-fixture.otio`. Deviations from the plan, all fine
+because tests derive values from the golden: timeline is **1920×1080 @ 24 fps** (Resolve default), clip
+lengths differ from the table, marker 3 sits on clip 6.
+What Resolve actually writes (the facts M1.1/M1.2 must reproduce):
+- One `<format>` per distinct source format, with `width`/`height` and `frameDuration` (`1/25s`, `1/50s`, `1/100s`);
+  sequence has its own format (`1/24s`), `tcStart="3600/1s"`, `tcFormat="NDF"`. Name pattern `FFVideoFormat1080p100` /
+  `FFVideoFormat3840x2160p25`.
+- One `<asset>` per **timeline use** (clip used twice → two assets), `format` = source format, `start` = source TC,
+  `duration` = full media, `audioSources`/`audioChannels`, `src` percent-encoded incl. trailing space (`Src%20/`).
+- `<asset-clip>` has `format` = source format, `offset`/`duration` on the timeline grid, `start` in source time.
+- Speed → `<timeMap frameSampling="floor">` with two linear `<timept>` spanning the asset; OTIO → `LinearTimeWarp.1`
+  with `time_scalar` 0.5 / 0.25.
+- **Sony 100p TC quirk:** Resolve reads ffprobe TC `06:37:54:72` as 23874.36 s and `05:58:51:84` as 21531.42 s —
+  frame field ÷ 200, not ÷ 100. 25p/50p clips (Sony and GoPro) are frame field ÷ fps as expected.
+  Hypothesis (2 data points, both Sony 100p): for fps > 50 the TC frame field counts at 2× fps.
+- **VFR quirk:** GH010376 — Resolve asset duration 1415 frames @50 (`283/10s`), ffprobe `nb_frames` 1413.
+- **Markers:** Resolve's FCPXML export contains **none**. OTIO has them as clip markers on V1 (and `Marker 1` on A1).
+- OTIO has a Video and an Audio track; each clip appears on both.
 
 **M1.2 — OTIO exporter (implementer)** — same golden-round-trip test against `m1-fixture.otio`, new
 `src/core/export/otio.ts` + `otio` format in CLI. No OTIO library dependency unless the golden needs it.

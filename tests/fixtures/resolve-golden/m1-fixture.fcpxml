@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE fcpxml>
+<fcpxml version="1.13">
+    <resources>
+        <format frameDuration="1/24s" width="1920" id="r0" name="FFVideoFormat1080p24" height="1080"/>
+        <format frameDuration="1/25s" width="3840" id="r1" name="FFVideoFormat3840x2160p25" height="2160"/>
+        <format frameDuration="1/50s" width="3840" id="r4" name="FFVideoFormat3840x2160p50" height="2160"/>
+        <format frameDuration="1/50s" width="1920" id="r6" name="FFVideoFormat1080p50" height="1080"/>
+        <format frameDuration="1/100s" width="1920" id="r8" name="FFVideoFormat1080p100" height="1080"/>
+        <asset audioSources="1" start="19932/1s" hasVideo="1" id="r2" name="C0289.MP4" audioChannels="2" hasAudio="1" format="r1" duration="324/25s">
+            <media-rep kind="original-media" src="file:///Users/michaelbinz/Video/ClipPilot%20M1%20Fixture/Src%20/01%20Ankunft/C0289.MP4"/>
+        </asset>
+        <asset audioSources="1" start="251694/5s" hasVideo="1" id="r3" name="GH010365.MP4" audioChannels="2" hasAudio="1" format="r1" duration="231/25s">
+            <media-rep kind="original-media" src="file:///Users/michaelbinz/Video/ClipPilot%20M1%20Fixture/Src%20/01%20Ankunft/GH010365.MP4"/>
+        </asset>
+        <asset audioSources="1" start="531672/25s" hasVideo="1" id="r5" name="C0361.MP4" audioChannels="2" hasAudio="1" format="r4" duration="36/5s">
+            <media-rep kind="original-media" src="file:///Users/michaelbinz/Video/ClipPilot%20M1%20Fixture/Src%20/02%20Farol%20Strand/C0361.MP4"/>
+        </asset>
+        <asset audioSources="1" start="917229/25s" hasVideo="1" id="r7" name="GH010376.MP4" audioChannels="2" hasAudio="1" format="r6" duration="283/10s">
+            <media-rep kind="original-media" src="file:///Users/michaelbinz/Video/ClipPilot%20M1%20Fixture/Src%20/02%20Farol%20Strand/GH010376.MP4"/>
+        </asset>
+        <asset audioSources="1" start="596859/25s" hasVideo="1" id="r9" name="C0562.MP4" audioChannels="2" hasAudio="1" format="r8" duration="108/25s">
+            <media-rep kind="original-media" src="file:///Users/michaelbinz/Video/ClipPilot%20M1%20Fixture/Src%20/03%20Delfine/C0562.MP4"/>
+        </asset>
+        <asset audioSources="1" start="596859/25s" hasVideo="1" id="r10" name="C0562.MP4" audioChannels="2" hasAudio="1" format="r8" duration="108/25s">
+            <media-rep kind="original-media" src="file:///Users/michaelbinz/Video/ClipPilot%20M1%20Fixture/Src%20/03%20Delfine/C0562.MP4"/>
+        </asset>
+        <asset audioSources="1" start="1076571/50s" hasVideo="1" id="r11" name="C0382.MP4" audioChannels="2" hasAudio="1" format="r8" duration="96/25s">
+            <media-rep kind="original-media" src="file:///Users/michaelbinz/Video/ClipPilot%20M1%20Fixture/Src%20/03%20Delfine/C0382.MP4"/>
+        </asset>
+    </resources>
+    <library>
+        <event name="M1 Fixture (Resolve)">
+            <project name="M1 Fixture (Resolve)">
+                <sequence tcStart="3600/1s" tcFormat="NDF" format="r0" duration="445/12s">
+                    <spine>
+                        <asset-clip start="498353/25s" name="C0289.MP4" tcFormat="NDF" enabled="1" offset="3600/1s" format="r1" ref="r2" duration="205/24s">
+                            <adjust-transform anchor="0 0" position="0 0" scale="1 1"/>
+                        </asset-clip>
+                        <asset-clip start="1258506/25s" name="GH010365.MP4" tcFormat="NDF" enabled="1" offset="86605/24s" format="r1" ref="r3" duration="17/3s">
+                            <adjust-transform anchor="0 0" position="0 0" scale="1 1"/>
+                        </asset-clip>
+                        <asset-clip start="21270/1s" name="C0361.MP4" tcFormat="NDF" enabled="1" offset="86741/24s" format="r4" ref="r5" duration="10/3s">
+                            <timeMap frameSampling="floor">
+                                <timept value="531672/25s" time="531672/25s" interp="linear"/>
+                                <timept value="25528871/1200s" time="12768743/600s" interp="linear"/>
+                            </timeMap>
+                            <adjust-transform anchor="0 0" position="0 0" scale="1 1"/>
+                        </asset-clip>
+                        <asset-clip start="1835151/50s" name="GH010376.MP4" tcFormat="NDF" enabled="1" offset="86821/24s" format="r6" ref="r7" duration="59/6s">
+                            <adjust-transform anchor="0 0" position="0 0" scale="1 1"/>
+                        </asset-clip>
+                        <asset-clip start="596898/25s" name="C0562.MP4" tcFormat="NDF" enabled="1" offset="29019/8s" format="r8" ref="r9" duration="23/8s">
+                            <timeMap frameSampling="floor">
+                                <timept value="596859/25s" time="596859/25s" interp="linear"/>
+                                <timept value="47709581827/1998000s" time="47735413469/1998000s" interp="linear"/>
+                            </timeMap>
+                            <adjust-transform anchor="0 0" position="0 0" scale="1 1"/>
+                        </asset-clip>
+                        <asset-clip start="95499/4s" name="C0562.MP4" tcFormat="NDF" enabled="1" offset="14521/4s" format="r8" ref="r10" duration="3/1s">
+                            <adjust-transform anchor="0 0" position="0 0" scale="1 1"/>
+                        </asset-clip>
+                        <asset-clip start="1076571/50s" name="C0382.MP4" tcFormat="NDF" enabled="1" offset="14533/4s" format="r8" ref="r11" duration="23/6s">
+                            <adjust-transform anchor="0 0" position="0 0" scale="1 1"/>
+                        </asset-clip>
+                    </spine>
+                </sequence>
+            </project>
+        </event>
+    </library>
+</fcpxml>
