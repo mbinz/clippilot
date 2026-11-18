@@ -210,6 +210,19 @@ mixing `Beach`/`beach`, one clip with `ai_scenes = null`) and literal highlights
 `--top` cap, unanalyzed clip counted in `scene_hints` but not in places.
 Done when: red→green, typecheck + test:all green, `summary --json` works on the Delfine pilot DB.
 
+**M2.2b — Prompt fixes after pilot run 1 (implementer)**
+Pilot run 1 (33 clips, 0 errors, 47 highlights, q 6–9): 6/47 highlights were exactly `3.5–7.0` = the numbers in
+the prompt's example JSON (anchoring), and `setting`/`activity` came back as long mixed DE/EN sentences, so
+`summary` places/moments were 37 singletons. Behavior:
+- The `highlights` example in `USER_PROMPT` uses placeholders, not numbers (e.g. `"start_sec": <Sekunden ab Clip-Beginn>`),
+  and the instructions say timestamps must come from what is visible in the video.
+- `setting` and `activity` in the scene example and instructions: short **English** lowercase tags, 1–3 words
+  (e.g. `"marina"`, `"open sea"`, `"dolphin watching"`), reusable across clips. Other fields unchanged.
+Tests first: `tests/unit/core/analyze/prompts.test.ts` — no `"start_sec": <digit>` / `"end_sec": <digit>` inside the
+highlights example; prompt mentions English tags of 1–3 words for setting/activity.
+Done when: red→green, typecheck + test:all green; pilot run 2 (`analyze --force` on Delfine) shows no repeated
+example timestamps and places/moments that group.
+
 **M2.4 — Pilot on Delfine (planner, with user)**
 - Working dir `~/Video/ClipPilot M2 Pilot/`; `ingest "~/Video/Portugal/Src /Import/03 Arrifana/Delfine"`; user OK on
   cost before `analyze`; show ~8 highlights with timestamps for the user to judge; `summary --json`.
