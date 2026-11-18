@@ -21,13 +21,13 @@ export const FFPROBE_TC: Record<string, string> = {
 // RULE: ExportSegment inputs that come from ingest (duration_sec, nb_frames, fps, TC, resolution) are
 // hardcoded real ffprobe values, never derived from the golden — otherwise asset assertions are circular.
 // Only source in/out and speed are derived from the golden's clip times.
-// duration_sec = video-stream duration (what probe.ts stores); nb_frames = ffprobe count.
+// Values as stored by ClipPilot ingest (fixture DB): duration_sec = video-stream duration, nb_frames = ffprobe count.
 export const FFPROBE_MEDIA: Record<string, { duration_sec: number; nb_frames: number; resolution: string; fps?: number }> = {
   'C0289.MP4': { duration_sec: 12.96, nb_frames: 324, resolution: '3840x2160' },
-  'GH010365.MP4': { duration_sec: 9.239989, nb_frames: 231, resolution: '3840x2160' },
+  'GH010365.MP4': { duration_sec: 9.239989, nb_frames: 230, resolution: '3840x2160' },
   'C0361.MP4': { duration_sec: 7.2, nb_frames: 360, resolution: '3840x2160' },
-  // GoPro VFR: avg rate 49.93; Resolve's 1415 frames @50 vs ffprobe nb_frames 1413.
-  'GH010376.MP4': { duration_sec: 28.2999, nb_frames: 1413, resolution: '1920x1080', fps: 49.93 },
+  // GoPro VFR: stored nb_frames 1414 vs Resolve's 1415 frames @50; stored fps is 50.0.
+  'GH010376.MP4': { duration_sec: 28.2999, nb_frames: 1414, resolution: '1920x1080' },
   'C0562.MP4': { duration_sec: 4.32, nb_frames: 432, resolution: '1920x1080' },
   'C0382.MP4': { duration_sec: 3.84, nb_frames: 384, resolution: '1920x1080' },
 };

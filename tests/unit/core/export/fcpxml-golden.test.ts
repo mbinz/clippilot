@@ -147,8 +147,10 @@ describe('exportFcpxml mixed rates', () => {
   });
 
   it('snaps VFR average rates (49.93 fps) onto the 50 fps grid', () => {
-    const vfr = ours.clips[3];
+    const vfrSegs = segments.map((s, i) => (i === 3 ? { ...s, fps: 49.93 } : s));
+    const vfr = resolve(exportFcpxml(vfrSegs, OPTIONS)).clips[3];
     expect(vfr.assetFormat.frameDuration.toString()).toBe('1/50');
+    expect(vfr.assetDuration.toString()).toBe(rat('283/10s').toString());
   });
 
   it('asset extent for the VFR clip follows container duration, not nb_frames (1415 vs 1413)', () => {
