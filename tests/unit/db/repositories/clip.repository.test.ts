@@ -177,4 +177,19 @@ describe('ClipRepository', () => {
     const results = repo.search('mountains');
     expect(results).toHaveLength(0);
   });
+
+  it('findByPathAndSize hits on same path and size, misses on different size', () => {
+    repo.insert(makeClip({ file_path: '/videos/a.mp4', file_size: 1234, file_hash: 'ha' }));
+    expect(repo.findByPathAndSize('/videos/a.mp4', 1234)?.file_hash).toBe('ha');
+    expect(repo.findByPathAndSize('/videos/a.mp4', 1235)).toBeNull();
+    expect(repo.findByPathAndSize('/videos/b.mp4', 1234)).toBeNull();
+  });
+
+  it('findPending returns analyzing clips too', () => {
+    const c = repo.insert(makeClip({ file_hash: 'hx' }));
+    repo.updateAnalysisStatus(c.id, 'analyzing');
+    const done = repo.insert(makeClip({ file_hash: 'hy', file_path: '/videos/y.mp4' }));
+    repo.updateAnalysisStatus(done.id, 'done');
+    expect(repo.findPending().map((x) => x.id)).toEqual([c.id]);
+  });
 });

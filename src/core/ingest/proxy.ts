@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { existsSync } from 'node:fs';
+import { rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { FfmpegNotFoundError } from '../../utils/errors.js';
 import { DEFAULT_PROXY_CRF, DEFAULT_AUDIO_BITRATE } from '../../constants.js';
@@ -20,6 +21,8 @@ export async function createProxy(
     return outputPath;
   }
 
+  const partialPath = path.join(proxyDir, `${hash}.partial.mp4`);
+
   try {
     await execFileAsync('ffmpeg', [
       '-i', inputPath,
@@ -31,9 +34,11 @@ export async function createProxy(
       '-b:a', DEFAULT_AUDIO_BITRATE,
       '-movflags', '+faststart',
       '-y',
-      outputPath,
+      partialPath,
     ], { timeout: 600000 }); // 10 minute timeout per clip
+    await rename(partialPath, outputPath);
   } catch (err: any) {
+    await rm(partialPath, { force: true });
     if (err.code === 'ENOENT') {
       throw new FfmpegNotFoundError();
     }

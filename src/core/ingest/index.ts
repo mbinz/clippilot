@@ -3,10 +3,12 @@ import type { ThumbnailRepository } from '../../db/repositories/thumbnail.reposi
 import { scanDirectory } from './scanner.js';
 import { computeFileHash } from './hasher.js';
 import { probeFile } from './probe.js';
+import { sceneHintFor } from './scene-hint.js';
 import { createProxy } from './proxy.js';
 import { extractThumbnails } from './thumbnail.js';
 import { ensureDir } from '../../utils/fs.js';
 import path from 'node:path';
+import { stat } from 'node:fs/promises';
 import { PROXY_DIR, THUMBNAIL_DIR } from '../../constants.js';
 
 export interface IngestOptions {
@@ -22,6 +24,7 @@ export interface IngestOptions {
 export interface IngestDependencies {
   clipRepo: ClipRepository;
   thumbnailRepo: ThumbnailRepository;
+  hashFile?: (filePath: string) => Promise<string>;
   onProgress: (current: number, total: number, filename: string) => void;
 }
 
@@ -37,6 +40,7 @@ export async function ingestDirectory(
   options: IngestOptions,
   deps: IngestDependencies,
 ): Promise<IngestResult> {
+  const hashFile = deps.hashFile ?? computeFileHash;
   const files = await scanDirectory(dirPath);
   const total = files.length;
   let imported = 0;
@@ -57,7 +61,15 @@ export async function ingestDirectory(
     const fileName = path.basename(filePath);
 
     try {
-      const hash = await computeFileHash(filePath);
+      // Fast skip: same path + size already ingested, no need to hash
+      const size = (await stat(filePath)).size;
+      if (deps.clipRepo.findByPathAndSize(filePath, size)) {
+        skipped++;
+        deps.onProgress(imported + skipped + errors, total, `${fileName} (skipped)`);
+        continue;
+      }
+
+      const hash = await hashFile(filePath);
 
       // Idempotency check
       if (deps.clipRepo.findByHash(hash)) {
@@ -96,6 +108,7 @@ export async function ingestDirectory(
         location: options.location,
         manual_tags: options.tags ? JSON.stringify(options.tags.split(',').map(s => s.trim())) : null,
         people: null,
+        scene_hint: sceneHintFor(dirPath, filePath),
       });
 
       // Insert thumbnails

@@ -14,6 +14,7 @@ export interface Clip {
   nb_frames: number | null;
   has_video: number;
   has_audio: number;
+  scene_hint: string | null;
   ingested_at: string;
   analysis_status: AnalysisStatus;
   analysis_error: string | null;
@@ -69,6 +70,7 @@ export interface InsertClip {
   location: string | null;
   manual_tags: string | null;
   people: string | null;
+  scene_hint?: string | null;
 }
 
 export interface ClipAnalysis {

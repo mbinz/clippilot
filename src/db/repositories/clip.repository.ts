@@ -5,6 +5,7 @@ export class ClipRepository {
   private stmtInsert: Database.Statement;
   private stmtFindByHash: Database.Statement;
   private stmtFindById: Database.Statement;
+  private stmtFindByPathAndSize: Database.Statement;
   private stmtFindPending: Database.Statement;
   private stmtFindPendingByProject: Database.Statement;
   private stmtUpdateAnalysis: Database.Statement;
@@ -18,16 +19,17 @@ export class ClipRepository {
   constructor(private db: Database.Database) {
     this.stmtInsert = db.prepare(`
       INSERT INTO clips (project_id, file_path, proxy_path, file_hash, file_size,
-        duration_sec, resolution, fps, nb_frames, has_video, has_audio, codec, recorded_at, start_timecode, location, manual_tags, people)
+        duration_sec, resolution, fps, nb_frames, has_video, has_audio, codec, recorded_at, start_timecode, location, manual_tags, people, scene_hint)
       VALUES (@project_id, @file_path, @proxy_path, @file_hash, @file_size,
-        @duration_sec, @resolution, @fps, @nb_frames, @has_video, @has_audio, @codec, @recorded_at, @start_timecode, @location, @manual_tags, @people)
+        @duration_sec, @resolution, @fps, @nb_frames, @has_video, @has_audio, @codec, @recorded_at, @start_timecode, @location, @manual_tags, @people, @scene_hint)
     `);
 
     this.stmtFindByHash = db.prepare('SELECT * FROM clips WHERE file_hash = ?');
     this.stmtFindById = db.prepare('SELECT * FROM clips WHERE id = ?');
-    this.stmtFindPending = db.prepare("SELECT * FROM clips WHERE analysis_status = 'pending'");
+    this.stmtFindByPathAndSize = db.prepare('SELECT * FROM clips WHERE file_path = ? AND file_size = ?');
+    this.stmtFindPending = db.prepare("SELECT * FROM clips WHERE analysis_status IN ('pending', 'analyzing')");
     this.stmtFindPendingByProject = db.prepare(
-      "SELECT * FROM clips WHERE analysis_status = 'pending' AND project_id = ?",
+      "SELECT * FROM clips WHERE analysis_status IN ('pending', 'analyzing') AND project_id = ?",
     );
 
     this.stmtUpdateAnalysis = db.prepare(`
@@ -72,12 +74,16 @@ export class ClipRepository {
   }
 
   insert(clip: InsertClip): Clip {
-    const result = this.stmtInsert.run(clip);
+    const result = this.stmtInsert.run({ ...clip, scene_hint: clip.scene_hint ?? null });
     return this.stmtFindById.get(result.lastInsertRowid) as Clip;
   }
 
   findByHash(hash: string): Clip | null {
     return (this.stmtFindByHash.get(hash) as Clip) ?? null;
+  }
+
+  findByPathAndSize(filePath: string, size: number): Clip | null {
+    return (this.stmtFindByPathAndSize.get(filePath, size) as Clip) ?? null;
   }
 
   findById(id: number): Clip | null {

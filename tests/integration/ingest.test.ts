@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
@@ -125,6 +125,86 @@ describe('ingest integration', () => {
     // Still only 1 clip in DB
     expect(clipRepo.listAll()).toHaveLength(1);
 
+    db.close();
+  });
+
+  async function makeVideo(file: string): Promise<void> {
+    await ensureDir(path.dirname(file));
+    await execFileAsync('ffmpeg', [
+      '-f', 'lavfi', '-i', 'testsrc=duration=2:size=320x240:rate=25',
+      '-f', 'lavfi', '-i', 'sine=frequency=440:duration=2',
+      '-shortest', '-c:v', 'libx264', '-preset', 'ultrafast',
+      '-c:a', 'aac', '-y', file,
+    ], { timeout: 30000 });
+  }
+
+  function setup(base: string) {
+    const db = new Database(path.join(base, 'test.db'));
+    db.pragma('foreign_keys = ON');
+    runMigrations(db);
+    const clipRepo = new ClipRepository(db);
+    const thumbnailRepo = new ThumbnailRepository(db);
+    const project = new ProjectRepository(db).findOrCreate('p');
+    const opts = {
+      projectId: project.id, location: null, tags: null, date: null,
+      noProxy: false, proxyResolution: 240, basePath: base,
+    };
+    return { db, clipRepo, thumbnailRepo, opts };
+  }
+
+  it('sets scene_hint per folder and fast-skips on second run without hashing', async () => {
+    if (!ffmpegAvailable) return;
+    const base = await mkdtemp(path.join(tmpDir, 'hint-'));
+    const root = path.join(base, 'Import');
+    // different durations so the two files hash differently
+    await makeVideo(path.join(root, 'A', 'x.mp4'));
+    await ensureDir(path.join(root, 'B'));
+    await execFileAsync('ffmpeg', [
+      '-f', 'lavfi', '-i', 'testsrc=duration=1:size=320x240:rate=25',
+      '-c:v', 'libx264', '-preset', 'ultrafast', '-y', path.join(root, 'B', 'y.mp4'),
+    ], { timeout: 30000 });
+
+    const { db, clipRepo, thumbnailRepo, opts } = setup(base);
+    const r1 = await ingestDirectory(root, opts, { clipRepo, thumbnailRepo, onProgress: () => {} });
+    expect(r1.imported).toBe(2);
+    const hints = clipRepo.listAll().map((c) => c.scene_hint).sort();
+    expect(hints).toEqual(['A', 'B']);
+
+    const hashFile = vi.fn(async () => 'should-not-be-called');
+    const r2 = await ingestDirectory(root, opts, { clipRepo, thumbnailRepo, onProgress: () => {}, hashFile });
+    expect(r2.skipped).toBe(2);
+    expect(r2.imported).toBe(0);
+    expect(hashFile).not.toHaveBeenCalled();
+    db.close();
+  });
+
+  it('overwrites a leftover .partial.mp4 and produces a valid proxy', async () => {
+    if (!ffmpegAvailable) return;
+    const base = await mkdtemp(path.join(tmpDir, 'partial-'));
+    const root = path.join(base, 'Src');
+    await makeVideo(path.join(root, 'z.mp4'));
+
+    const { computeFileHash } = await import('../../src/core/ingest/hasher.js');
+    const hash = await computeFileHash(path.join(root, 'z.mp4'));
+    const { PROXY_DIR } = await import('../../src/constants.js');
+    const realProxyDir = path.resolve(base, PROXY_DIR);
+    await ensureDir(realProxyDir);
+    await writeFile(path.join(realProxyDir, `${hash}.partial.mp4`), 'garbage');
+
+    const { db, clipRepo, thumbnailRepo, opts } = setup(base);
+    const r = await ingestDirectory(root, opts, { clipRepo, thumbnailRepo, onProgress: () => {} });
+    expect(r.imported).toBe(1);
+    expect(r.errors).toBe(0);
+
+    const clip = clipRepo.listAll()[0];
+    expect(clip.proxy_path).toBe(path.join(realProxyDir, `${hash}.mp4`));
+    expect(existsSync(path.join(realProxyDir, `${hash}.partial.mp4`))).toBe(false);
+    const { stdout } = await execFileAsync('ffprobe', [
+      '-v', 'error', '-show_entries', 'stream=codec_type:format=duration', '-of', 'json', clip.proxy_path!,
+    ]);
+    const info = JSON.parse(stdout);
+    expect(info.streams.some((s: any) => s.codec_type === 'video')).toBe(true);
+    expect(Math.abs(parseFloat(info.format.duration) - 2)).toBeLessThan(0.5);
     db.close();
   });
 });
