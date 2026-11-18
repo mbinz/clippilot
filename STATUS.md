@@ -86,6 +86,21 @@ What Resolve actually writes (the facts M1.1/M1.2 must reproduce):
 - **Markers:** Resolve's FCPXML export contains **none**. OTIO has them as clip markers on V1 (and `Marker 1` on A1).
 - OTIO has a Video and an Audio track; each clip appears on both.
 
+**M1.1 — FCPXML matches Resolve (implementer) ✅ 2026-11-18**
+- `ExportSegment` gains optional `speed` (default 1.0) and `scene_name`; `ExportOptions` gains `width`/`height`.
+- `tests/unit/core/export/fcpxml-golden.test.ts` builds the 7 segments from **real ffprobe facts** (stream duration,
+  nb_frames, TC strings, fps) — only source in/out + speed come from the golden's clip times — exports at
+  1920×1080 @ 24 and compares to the golden as exact rationals (asset src/start/duration, formats, clip
+  offset/start/duration, timeMap slope, tcFormat, sequence tcStart).
+- Fixed: one `<format>` per source format with width/height; one asset per use; mixed fps allowed (FCPXML);
+  100 fps in rate table; VFR average snapped (49.93 → 50); Sony fps>50 TC rule isolated in `tcFrameFieldRate`
+  (hypothesis — re-check in M1.3); `timeMap` for speed; scene markers on the first clip of each scene; no more
+  1-frame end trim; emits FCPXML 1.10.
+- Ingest: `duration_sec` from the video stream, not the container (GoPro differs by 3 frames). Existing DBs keep
+  old values until re-ingest.
+- Known leftovers: no `audioSources`/`audioChannels`; DF timecode treated as NDF; EDL still rejects mixed fps;
+  marker placement on retimed clips unverified.
+
 **M1.2 — OTIO exporter (implementer)** — same golden-round-trip test against `m1-fixture.otio`, new
 `src/core/export/otio.ts` + `otio` format in CLI. No OTIO library dependency unless the golden needs it.
 
