@@ -103,3 +103,30 @@ describe('ClipAnalysisResponseSchema', () => {
     expect(result.scenes).toHaveLength(2);
   });
 });
+
+describe('ClipAnalysisResponseSchema highlights', () => {
+  it('parses a response with highlights', () => {
+    const result = ClipAnalysisResponseSchema.parse({
+      ...VALID_RESPONSE,
+      highlights: [{ start_sec: 2.5, end_sec: 6, description: 'Wave crashes on rocks', quality: 8 }],
+    });
+    expect(result.highlights).toEqual([
+      { start_sec: 2.5, end_sec: 6, description: 'Wave crashes on rocks', quality: 8 },
+    ]);
+  });
+
+  it('defaults highlights to [] when missing', () => {
+    expect(ClipAnalysisResponseSchema.parse(VALID_RESPONSE).highlights).toEqual([]);
+  });
+
+  it('rejects highlight quality 11 and 0', () => {
+    for (const quality of [11, 0]) {
+      expect(() =>
+        ClipAnalysisResponseSchema.parse({
+          ...VALID_RESPONSE,
+          highlights: [{ start_sec: 1, end_sec: 3, description: 'x', quality }],
+        }),
+      ).toThrow();
+    }
+  });
+});

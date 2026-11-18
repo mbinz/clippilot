@@ -78,4 +78,15 @@ describe('clipToJson', () => {
     const json = clipToJson(baseClip());
     expect('thumbnails' in json).toBe(false);
   });
+
+  it('includes highlights when provided', () => {
+    const hl = [{ id: 1, start_sec: 1, end_sec: 2.5, description: 'Wave', quality: 7 }];
+    const json = clipToJson(baseClip(), undefined, hl);
+    expect(json.highlights).toEqual(hl);
+  });
+
+  it('omits highlights key when not provided', () => {
+    const json = clipToJson(baseClip());
+    expect('highlights' in json).toBe(false);
+  });
 });

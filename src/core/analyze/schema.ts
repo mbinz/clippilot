@@ -29,11 +29,21 @@ export const EditorialValueSchema = z.object({
   suggested_use: z.enum(['Hero Shot', 'B-Roll', 'Establishing', 'Transition', 'Skip']),
 });
 
+export const HighlightSchema = z.object({
+  start_sec: z.number(),
+  end_sec: z.number(),
+  description: z.string(),
+  quality: z.number().int().min(1).max(10),
+});
+
+export type HighlightResponse = z.infer<typeof HighlightSchema>;
+
 export const ClipAnalysisResponseSchema = z.object({
   scenes: z.array(SceneSchema),
   technical_quality: TechnicalQualitySchema,
   editorial_value: EditorialValueSchema,
   clip_summary: z.string(),
+  highlights: z.array(HighlightSchema).default([]),
 });
 
 export type ClipAnalysisResponse = z.infer<typeof ClipAnalysisResponseSchema>;

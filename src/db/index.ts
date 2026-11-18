@@ -5,3 +5,4 @@ export { ProjectRepository } from './repositories/project.repository.js';
 export { ThumbnailRepository } from './repositories/thumbnail.repository.js';
 export { StoryRepository } from './repositories/story.repository.js';
 export { SimilarityRepository } from './repositories/similarity.repository.js';
+export { HighlightRepository } from './repositories/highlight.repository.js';

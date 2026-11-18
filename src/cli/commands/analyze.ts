@@ -3,6 +3,7 @@ import chalk from 'chalk';
 import { createDb } from '../../db/connection.js';
 import { runMigrations } from '../../db/migrations/runner.js';
 import { ClipRepository } from '../../db/repositories/clip.repository.js';
+import { HighlightRepository } from '../../db/repositories/highlight.repository.js';
 import { resolveDbPath } from '../../utils/fs.js';
 import { loadConfig } from '../../core/config/manager.js';
 import { analyzeClips } from '../../core/analyze/index.js';
@@ -27,6 +28,7 @@ export function registerAnalyzeCommand(parent: Command): void {
       const db = createDb(resolveDbPath(basePath));
       runMigrations(db);
       const clipRepo = new ClipRepository(db);
+      const highlightRepo = new HighlightRepository(db);
 
       if (options.force) {
         clipRepo.resetAnalysis();
@@ -46,7 +48,7 @@ export function registerAnalyzeCommand(parent: Command): void {
       try {
         const result = await analyzeClips(pending, config, clipRepo, (current, filename) => {
           bar.update(current, { filename });
-        });
+        }, highlightRepo);
 
         bar.stop();
         console.log('');

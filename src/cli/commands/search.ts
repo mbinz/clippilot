@@ -4,6 +4,7 @@ import { createDb } from '../../db/connection.js';
 import { runMigrations } from '../../db/migrations/runner.js';
 import { ClipRepository } from '../../db/repositories/clip.repository.js';
 import { ThumbnailRepository } from '../../db/repositories/thumbnail.repository.js';
+import { HighlightRepository } from '../../db/repositories/highlight.repository.js';
 import { resolveDbPath } from '../../utils/fs.js';
 import { formatClipTable } from '../formatters/table.js';
 import { searchClips } from '../../core/search/engine.js';
@@ -24,6 +25,7 @@ export function registerSearchCommand(parent: Command): void {
       runMigrations(db);
       const clipRepo = new ClipRepository(db);
       const thumbnailRepo = new ThumbnailRepository(db);
+      const highlightRepo = new HighlightRepository(db);
 
       try {
         const results = searchClips(clipRepo, query, {
@@ -38,7 +40,7 @@ export function registerSearchCommand(parent: Command): void {
               {
                 query,
                 count: results.length,
-                clips: clipsToJson(results, thumbnailRepo),
+                clips: clipsToJson(results, thumbnailRepo, highlightRepo),
               },
               null,
               2,

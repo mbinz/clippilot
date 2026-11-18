@@ -1,4 +1,5 @@
 import type { Clip } from '../types/clip.js';
+import type { HighlightRepository } from '../db/repositories/highlight.repository.js';
 import type { ThumbnailRepository } from '../db/repositories/thumbnail.repository.js';
 
 export type ClipJson = Omit<
@@ -15,9 +16,30 @@ export type ClipJson = Omit<
   ai_quality_issues: unknown;
   ai_visual_keywords: unknown;
   thumbnails?: string[];
+  highlights?: HighlightJson[];
 };
 
-export function clipToJson(clip: Clip, thumbnails?: string[]): ClipJson {
+export interface HighlightJson {
+  id: number;
+  start_sec: number;
+  end_sec: number;
+  description: string;
+  quality: number;
+}
+
+export function highlightsToJson(
+  items: { id: number; start_sec: number; end_sec: number; description: string; quality: number }[],
+): HighlightJson[] {
+  return items.map(({ id, start_sec, end_sec, description, quality }) => ({
+    id, start_sec, end_sec, description, quality,
+  }));
+}
+
+export function clipToJson(
+  clip: Clip,
+  thumbnails?: string[],
+  highlights?: HighlightJson[],
+): ClipJson {
   const out: ClipJson = {
     ...clip,
     manual_tags: parseJson(clip.manual_tags),
@@ -27,12 +49,14 @@ export function clipToJson(clip: Clip, thumbnails?: string[]): ClipJson {
     ai_visual_keywords: parseJson(clip.ai_visual_keywords),
   };
   if (thumbnails) out.thumbnails = thumbnails;
+  if (highlights) out.highlights = highlights;
   return out;
 }
 
 export function clipsToJson(
   clips: Clip[],
   thumbnailRepo?: ThumbnailRepository,
+  highlightRepo?: HighlightRepository,
 ): ClipJson[] {
   return clips.map((c) =>
     clipToJson(
@@ -40,6 +64,7 @@ export function clipsToJson(
       thumbnailRepo
         ? thumbnailRepo.findByClip(c.id).map((t) => t.file_path)
         : undefined,
+      highlightRepo ? highlightsToJson(highlightRepo.findByClip(c.id)) : undefined,
     ),
   );
 }

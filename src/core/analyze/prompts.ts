@@ -31,8 +31,19 @@ export const USER_PROMPT = `Analysiere diesen Videoclip. Antworte als JSON mit f
     "uniqueness": 2,
     "suggested_use": "B-Roll"
   },
-  "clip_summary": "Kurze Zusammenfassung des Clips"
+  "clip_summary": "Kurze Zusammenfassung des Clips",
+  "highlights": [
+    {
+      "start_sec": 3.5,
+      "end_sec": 7.0,
+      "description": "Description of the standout moment, in English",
+      "quality": 8
+    }
+  ]
 }
 
 Bewertungsskala jeweils 1-5.
+highlights: 0 bis 5 herausragende Momente des Clips (leeres Array, wenn es keine gibt).
+start_sec und end_sec sind Zahlen in Sekunden ab Clip-Beginn. description auf Englisch.
+quality ist eine ganze Zahl von 1 bis 10: wie stark der Moment als Einstellung in einem Reise-Montage-Video ist.
 suggested_use muss einer von: "Hero Shot", "B-Roll", "Establishing", "Transition", "Skip" sein.`;

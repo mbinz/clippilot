@@ -4,7 +4,13 @@ import type { Clip } from '../../types/clip.js';
 import type { AppConfig } from '../../types/config.js';
 import type { ClipRepository } from '../../db/repositories/clip.repository.js';
 import { GeminiClient } from './gemini-client.js';
+import type { HighlightRepository } from '../../db/repositories/highlight.repository.js';
+import { normalizeHighlights } from './highlights.js';
 import type { ClipAnalysisResponse } from './schema.js';
+
+export interface AnalysisClient {
+  analyzeVideo(path: string): Promise<ClipAnalysisResponse>;
+}
 
 export interface AnalyzeResult {
   success: number;
@@ -38,8 +44,9 @@ export async function analyzeClips(
   config: AppConfig,
   clipRepo: ClipRepository,
   onProgress: (current: number, filename: string) => void,
+  highlightRepo?: HighlightRepository,
+  client: AnalysisClient = new GeminiClient(config),
 ): Promise<AnalyzeResult> {
-  const client = new GeminiClient(config);
   const limiter = pLimit(config.analysis_parallelism);
   let success = 0;
   let errors = 0;
@@ -55,6 +62,10 @@ export async function analyzeClips(
         const analysis = await client.analyzeVideo(videoPath);
         const dbFields = analysisToDbFields(analysis);
         clipRepo.updateAnalysis(clip.id, dbFields);
+        highlightRepo?.replaceForClip(
+          clip.id,
+          normalizeHighlights(analysis.highlights, clip.duration_sec),
+        );
         success++;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

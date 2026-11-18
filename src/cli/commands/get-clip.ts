@@ -4,8 +4,9 @@ import { runMigrations } from '../../db/migrations/runner.js';
 import { ClipRepository } from '../../db/repositories/clip.repository.js';
 import { ThumbnailRepository } from '../../db/repositories/thumbnail.repository.js';
 import { SimilarityRepository } from '../../db/repositories/similarity.repository.js';
+import { HighlightRepository } from '../../db/repositories/highlight.repository.js';
 import { resolveDbPath } from '../../utils/fs.js';
-import { clipToJson } from '../json.js';
+import { clipToJson, highlightsToJson } from '../json.js';
 
 export function registerGetClipCommand(parent: Command): void {
   parent
@@ -18,6 +19,7 @@ export function registerGetClipCommand(parent: Command): void {
       const clipRepo = new ClipRepository(db);
       const thumbRepo = new ThumbnailRepository(db);
       const simRepo = new SimilarityRepository(db);
+      const highlightRepo = new HighlightRepository(db);
 
       try {
         const id = parseInt(clipId, 10);
@@ -38,7 +40,7 @@ export function registerGetClipCommand(parent: Command): void {
           JSON.stringify(
             {
               ok: true,
-              clip: clipToJson(clip, thumbs),
+              clip: clipToJson(clip, thumbs, highlightsToJson(highlightRepo.findByClip(id))),
               similarity_groups: groups,
             },
             null,
