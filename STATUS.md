@@ -121,11 +121,99 @@ What Resolve actually writes (the facts M1.1/M1.2 must reproduce):
 
 Done when: M1.1 + M1.2 green, M1.3 checklist passes for at least one format. ✅ — OTIO re-import confirmed linked audio/video.
 
-### M2 — Understand the footage  ← NEXT
+### M2 — Understand the footage  ← IN PROGRESS (2026-11-18)
 - Resumable / incremental ingest (survive interruption on a 123 GB trip); capture folder as scene hint.
 - Gemini analysis of the proxy **video** → timestamped highlights table. Pilot on `03 Arrifana/Delfine`
-  (33 clips already ingested) to judge quality + cost before running all 508.
+  (33 clips, 457 s total, 9.2 GB) to judge quality + cost before running all 508.
 - Project summary command ("what's in here").
+
+Facts found while planning (2026-11-18):
+- `GeminiClient.analyzeVideo` **already** sends the proxy MP4 (inline base64), not thumbnails — ARCHITECTURE was wrong.
+  Inline requests cap at ~20 MB; Delfine proxies average ~4.4 MB. Long clips will need the Files API (deferred, see below).
+- DB path = `<cwd>/.clippilot/clippilot.db` (`resolveDbPath(process.cwd())`), proxies/thumbnails under the same dir.
+  The pilot therefore runs from a separate working dir (`~/Video/ClipPilot M2 Pilot/`); the Portugal DB is never opened.
+- Resume gaps today: (a) every re-run SHA-256-hashes every file before the skip check (123 GB re-read);
+  (b) `createProxy` writes in place, so an interrupted ffmpeg leaves a truncated `<hash>.mp4` that the next run
+  silently reuses; (c) clips stuck in `analysis_status='analyzing'` after an interrupted analyze are never picked up again.
+
+**M2.1 — Resumable ingest + scene hint (implementer)**
+Behavior:
+- Migration `007_scene_hint`: `clips.scene_hint TEXT` (nullable).
+- `ingestDirectory` sets `scene_hint` = the file's parent directory relative to the ingest root, with `/` separators
+  and segments kept verbatim (trailing spaces preserved). Files directly in the root get the root folder's basename.
+  e.g. root `…/Import`, file `…/Import/03 Arrifana/Delfine/C0560.MP4` → `03 Arrifana/Delfine`; root `…/Delfine`,
+  file `…/Delfine/C0560.MP4` → `Delfine`. Pure helper `sceneHintFor(rootDir, filePath)` in `core/ingest/`.
+- Fast skip: before hashing, if a clip with the same `file_path` **and** `file_size` exists, skip it without hashing
+  (counts as `skipped`). New `ClipRepository.findByPathAndSize(path, size)`. Hash-based skip stays as fallback.
+- Atomic proxy: `createProxy` renders to `<hash>.partial.mp4` and renames to `<hash>.mp4` only on success; a leftover
+  `.partial.mp4` is never treated as done (overwritten on retry). Existing final `<hash>.mp4` still reused.
+- `analyze` recovers interrupted runs: clips in `analyzing` are treated as pending (`findPending` returns
+  `pending` + `analyzing`).
+Tests first:
+- `tests/unit/core/ingest/scene-hint.test.ts`: the two examples above, a nested 3-level case, and a root path with a
+  trailing-space segment (`/x/Src /Import`, file `/x/Src /Import/01 Flug/a.mp4` → `01 Flug`).
+- `tests/unit/db/migrations.test.ts`: after migrations, `clips` has `scene_hint`.
+- `tests/unit/db/repositories/clip.repository.test.ts`: `findByPathAndSize` hits on same path+size, misses on
+  different size; `findPending` returns an `analyzing` clip.
+- `tests/integration/ingest.test.ts`: (1) ingest a 2-folder tree (`A/x.mp4`, `B/y.mp4` generated with ffmpeg) →
+  `scene_hint` `A`/`B`; (2) second ingest of the same tree reports `skipped=2` and **does not call the hasher**
+  (inject/spy — e.g. optional `hashFile` dependency in `IngestDependencies`); (3) a pre-existing
+  `<hash>.partial.mp4` garbage file in the proxy dir doesn't stop a valid proxy being produced (ffprobe the result
+  has a video stream and duration ≈ source).
+Done when: tests above red→green, `npm run typecheck && npm run test:all` green, `ingest` CLI unchanged in flags.
+
+**M2.2 — Timestamped highlights (implementer)**
+Behavior:
+- Migration `008_highlights`: table `highlights(id INTEGER PK, clip_id INTEGER NOT NULL REFERENCES clips(id) ON DELETE
+  CASCADE, start_sec REAL NOT NULL, end_sec REAL NOT NULL, description TEXT NOT NULL, quality INTEGER NOT NULL
+  CHECK (quality BETWEEN 1 AND 10), created_at TEXT DEFAULT now)`, index on `clip_id`.
+- Gemini response schema gains `highlights: [{ start_sec: number, end_sec: number, description: string (English),
+  quality: int 1–10 }]` (defaults to `[]` if missing, so old-shaped responses still parse). Prompt asks for 0–5
+  standout moments per clip, seconds from clip start, in English, quality = how strong as a shot in a travel montage.
+- Pure `normalizeHighlights(raw, durationSec)`: clamps `start_sec` ≥ 0 and `end_sec` ≤ duration, drops entries with
+  `end_sec - start_sec < 0.5` after clamping, sorts by `start_sec`, rounds to 0.01 s.
+- `HighlightRepository` (`db/repositories/highlight.repository.ts`): `replaceForClip(clipId, items)` (one transaction:
+  delete + insert, so re-analysis never duplicates), `findByClip(clipId)` ordered by start, `listByProject(projectId)`.
+- `analyzeClips` accepts an optional injected client (`{ analyzeVideo(path): Promise<ClipAnalysisResponse> }`,
+  default `new GeminiClient(config)`) and a `HighlightRepository`; on success it stores clip fields **and**
+  `replaceForClip(clip.id, normalizeHighlights(resp.highlights, clip.duration_sec))`.
+- JSON: `clipToJson(clip, thumbnails?, highlights?)` adds `highlights: [{id,start_sec,end_sec,description,quality}]`;
+  `get-clip --json` and `search --json` include them for every clip.
+Tests first:
+- `tests/unit/core/analyze/schema.test.ts`: response with highlights parses; response without `highlights` parses to
+  `[]`; quality 11 or 0 rejected.
+- `tests/unit/core/analyze/highlights.test.ts` (`normalizeHighlights`): clamp past-end, drop zero-length, sort.
+  Duration input is a literal clip duration (e.g. 13.0), never computed from the expected output.
+- `tests/unit/db/repositories/highlight.repository.test.ts`: replace twice → only second set remains; cascade on clip
+  delete; `listByProject` filters by project.
+- `tests/unit/core/analyze/analyze-clips.test.ts`: in-memory DB, a clip inserted with `duration_sec: 4.3`, fake client
+  returns a fixed literal response with one highlight `{start 3.5, end 9}` → stored highlight is `3.5–4.3`; clip
+  status `done`; a second run with a different fake response replaces the highlights.
+- `tests/unit/cli/json.test.ts`: `clipToJson` with highlights includes them; without → key absent.
+Done when: red→green, typecheck + test:all green.
+
+**M2.3 — Project summary command (implementer)**
+Behavior: `clippilot summary [--project <name>] [--top <n>=10] --json` prints
+```
+{ project, clips: { total, analyzed, pending, error }, total_duration_sec,
+  scene_hints: [{ scene_hint, clips, duration_sec, highlights }]   // sorted by scene_hint
+  places:  [{ name, clips }]     // ai_scenes[].setting + clips.location, case-insensitive merge, desc by clips
+  moments: [{ name, clips }]     // ai_scenes[].activity, same rules
+  best_highlights: [{ highlight_id, clip_id, file_name, scene_hint, start_sec, end_sec, description, quality }]
+                                 // desc by quality, then clip_id, start_sec; capped at --top
+}
+```
+Without `--json`: a short human table. Logic lives in a pure `buildProjectSummary(clips, highlights, {top})` in
+`src/core/summary.ts`; the command only loads rows and prints.
+Tests first: `tests/unit/core/summary.test.ts` with literal clip rows (2 scene hints, `ai_scenes` JSON strings
+mixing `Beach`/`beach`, one clip with `ai_scenes = null`) and literal highlights → expected counts, merge, ordering,
+`--top` cap, unanalyzed clip counted in `scene_hints` but not in places.
+Done when: red→green, typecheck + test:all green, `summary --json` works on the Delfine pilot DB.
+
+**M2.4 — Pilot on Delfine (planner, with user)**
+- Working dir `~/Video/ClipPilot M2 Pilot/`; `ingest "~/Video/Portugal/Src /Import/03 Arrifana/Delfine"`; user OK on
+  cost before `analyze`; show ~8 highlights with timestamps for the user to judge; `summary --json`.
+Done when: user judges highlights useful (or the prompt is tuned until they do).
 
 ### M3 — Storyboard model + CLI
 - Migration: `scenes`, cut brief, panel `intent` / `state` (filled | candidates | gap) / `speed`, panel candidates.
