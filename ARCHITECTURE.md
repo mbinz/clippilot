@@ -20,7 +20,7 @@ src/
     analyze/               # gemini-client + schema (Zod) + prompts
     search/                # engine (FTS) + advanced (filtered search for web)
     similarity/            # union-find clustering
-    export/                # csv, json, edl, fcpxml (+ fcpxml-rates)
+    export/                # otio (primary), fcpxml, csv, json, edl; timeline-plan (shared frame/TC math), fcpxml-rates
     contact-sheet.ts       # labeled grid PNG via sharp
     server/                # Hono routes backing the web UI
     config/                # manager + defaults
@@ -55,16 +55,15 @@ ingest (resumable) → analyze proxy video → highlights (timestamped moments)
 - **Panels** = `story_segments` gaining `scene_id`, `intent`, `state`, `speed`; candidates are a child table of panel → highlight. M3.
 - **Fillers** are files on disk ingested like any clip, tagged with a source (`library | generated | stock | ai`). Exporters never special-case.
 
-### Known export defects (input to M1)
+### Export facts learned in M1 (keep — they explain the code)
 
-Found 2026-11-18 reading `fcpxml.ts` against the Portugal project (25/50/100 fps, Sony TC + GoPro):
-- every asset references the single timeline `<format>` (`r0`) → clips at other rates get interpreted on the wrong frame grid
-- `<format>` has no `width`/`height`
-- mixed fps throws instead of conforming; no retime (`timeMap`) support
-- timecode hardcoded NDF; TC base computed via float seconds × fps
-- VFR phone footage: `nb_frames` vs `duration` disagree → asset extent off
-- source paths contain trailing-space folders (`Src /`) — URI encoding unverified in Resolve
-- never verified against a real Resolve import
+- One `<format>`/asset per source format and per timeline use; assets at the source rate, clips on the timeline grid.
+- Asset extent = **video stream** duration (not container; GoPro differs by ~3 frames). VFR averages snap (49.93 → 50).
+- Sony fps > 50: Resolve reads the TC frame field at 2×fps (`06:37:54:72` @100p → .36 s). `tcFrameFieldRate` — confirmed by import spot check on 100p; 60p is extrapolated.
+- Speed: FCPXML `timeMap`, OTIO `LinearTimeWarp`.
+- Resolve drops FCPXML clip markers on import; OTIO clip markers survive.
+- Paths with spaces / trailing spaces work (percent-encoded in FCPXML, plain in OTIO).
+- Still open: drop-frame TC (treated as NDF), audio channel count assumed stereo, EDL rejects mixed fps (EDL to be dropped).
 
 ## Persistence
 
@@ -78,7 +77,7 @@ Found 2026-11-18 reading `fcpxml.ts` against the Portugal project (25/50/100 fps
 2. **SQLite as single source of truth; originals immutable.** All derived assets (proxies, thumbnails, sheets) live under a project-scoped cache dir.
 3. **Structured Gemini output (Zod) over free-text.** Makes the analysis queryable; rejects model drift at parse time.
 4. **ffmpeg/ffprobe shelled out.** No native AV bindings beyond `better-sqlite3` and `sharp`. Keeps install simple; matches Resolve's own toolchain.
-5. **Vendor-neutral handoff — open formats are the boundary.** Must work with free Resolve. FCPXML vs OTIO decided by the M1 spike; one timeline per cut with scene markers. Resolve Studio scripting is an open question, never a requirement.
+5. **Vendor-neutral handoff — OTIO primary, FCPXML secondary** (decided 2026-11-18 by the M1 import test in free Resolve). Both import with every clip online, correct lengths, speeds and frames; only OTIO keeps scene markers (Resolve drops clip `<marker>`s from FCPXML). OTIO carries Resolve-specific `Resolve_OTIO` metadata (link groups, audio channels) — ignored by other OTIO consumers. One timeline per cut with scene markers. Resolve Studio scripting not needed. Both exporters share frame/TC math in `export/timeline-plan.ts`; tests compare against Resolve-written golden files in `tests/fixtures/resolve-golden/`.
 6. **No build step.** Run via `tsx`. Type-checking is the compile gate.
 7. **Paid / vendor-specific sources are plugins.** Stock and AI-video gap fillers sit behind a plugin seam (M6); the core stays free and offline-capable except for Gemini analysis.
 

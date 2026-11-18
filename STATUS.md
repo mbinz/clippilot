@@ -42,7 +42,7 @@ Acceptance project: `~/Video/Portugal` — 508 videos / 123 GB, Sony A7C II (`C0
 ### M0 — Docs reset ✅ 2026-11-18
 PRD / ARCHITECTURE / STATUS / CLAUDE.md rewritten around the storyboard workflow.
 
-### M1 — Export that works  ← IN PROGRESS
+### M1 — Export that works ✅ 2026-11-18
 Fixture: `~/Video/ClipPilot M1 Fixture/Src /` (path has spaces + trailing space on purpose), 6 real Portugal clips:
 
 | Folder | File | Camera | Format |
@@ -104,12 +104,22 @@ What Resolve actually writes (the facts M1.1/M1.2 must reproduce):
 **M1.2 — OTIO exporter (implementer)** — same golden-round-trip test against `m1-fixture.otio`, new
 `src/core/export/otio.ts` + `otio` format in CLI. No OTIO library dependency unless the golden needs it.
 
-**M1.3 — Fixture export + manual import (planner + user)** — ingest the fixture folder, export the reference
-timeline from ClipPilot in both formats, user imports both into free Resolve with this checklist:
-every clip online · offsets/durations match the hand-built timeline · 50 %/25 % speed correct · markers present ·
-no import warnings. Winner becomes primary; decision goes into ARCHITECTURE. EDL dropped unless there's a reason.
+**M1.2 — OTIO exporter ✅** — `src/core/export/otio.ts`, shared frame math in `timeline-plan.ts`, `--format otio`.
 
-Done when: M1.1 + M1.2 green, M1.3 checklist passes for at least one format.
+**M1.3 — Manual import in free Resolve ✅ 2026-11-18** (spike `scripts/m1-fixture-export.ts`, now deleted)
+| Check | FCPXML | OTIO |
+|---|---|---|
+| Imports, all 7 clips online | ✅ | ✅ |
+| Lengths / speeds 50 %·25 % | ✅ | ✅ |
+| First frame of Sony 100p clip | — | ✅ matches hand-built timeline |
+| Scene markers | ❌ dropped by Resolve | ✅ |
+| Audio linked to video | ✅ | ❌ → fixed in M1.4 |
+
+**Decision:** OTIO primary, FCPXML secondary (see ARCHITECTURE #5).
+
+**M1.4 — OTIO audio/video link ✅** — `Resolve_OTIO` link-group + channel metadata matching the golden.
+
+Done when: M1.1 + M1.2 green, M1.3 checklist passes for at least one format. ✅ (OTIO linked-audio re-import confirmation pending)
 
 ### M2 — Understand the footage
 - Resumable / incremental ingest (survive interruption on a 123 GB trip); capture folder as scene hint.
