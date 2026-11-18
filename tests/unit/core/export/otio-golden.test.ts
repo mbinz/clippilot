@@ -130,3 +130,31 @@ describe('exportOtio vs Resolve golden', () => {
     expect(plain.tracks.children.every((t: any) => t.children.every((c: any) => c.markers.length === 0))).toBe(true);
   });
 });
+
+describe('Resolve audio/video link metadata', () => {
+  // Channel layout is assumed stereo (2 channels on source track 0); channel count isn't in the DB yet.
+  const md = (o: any) => o.metadata.Resolve_OTIO;
+
+  it('timeline and track Resolve_OTIO metadata equal the golden', () => {
+    expect(ours.metadata).toEqual(golden.metadata);
+    expect(track(ours, 'Video').metadata).toEqual(track(golden, 'Video').metadata);
+    expect(track(ours, 'Audio').metadata).toEqual(track(golden, 'Audio').metadata);
+  });
+
+  it('each clip has the golden Link Group ID, shared by its video and audio twin, unique per segment', () => {
+    const gv = track(golden, 'Video').children.map((c: any) => md(c)['Link Group ID']);
+    const ov = track(ours, 'Video').children.map((c: any) => md(c)['Link Group ID']);
+    const oa = track(ours, 'Audio').children.map((c: any) => md(c)['Link Group ID']);
+    expect(ov).toEqual(gv);
+    expect(oa).toEqual(gv);
+    expect(new Set(ov).size).toBe(segments.length);
+  });
+
+  it('audio clips carry the golden Channels; video clips carry only the link id', () => {
+    track(golden, 'Audio').children.forEach((gc: any, i: number) => {
+      expect(md(track(ours, 'Audio').children[i])).toEqual(md(gc));
+    });
+    for (const c of track(ours, 'Video').children) expect(md(c).Channels).toBeUndefined();
+  });
+});
+

@@ -16,10 +16,41 @@ const range = (start: number, duration: number, rate: number) => ({
 });
 
 /**
+ * Resolve-specific metadata (ignored by other OTIO consumers). Without the shared `Link Group ID`
+ * Resolve imports video and audio clips unlinked (M1.3). Values mirror the golden export.
+ * Audio is assumed stereo (2 channels on source track 0): the channel count isn't stored yet.
+ */
+function resolveMetadata(
+  scope: 'timeline' | 'videoTrack' | 'audioTrack' | 'videoClip' | 'audioClip',
+  linkGroupId = 0,
+): Record<string, unknown> {
+  switch (scope) {
+    case 'timeline':
+      return { Resolve_OTIO: { 'Resolve OTIO Meta Version': '1.0' } };
+    case 'videoTrack':
+      return { Resolve_OTIO: { Locked: false } };
+    case 'audioTrack':
+      return { Resolve_OTIO: { 'Audio Type': 'Stereo', Locked: false, SoloOn: false } };
+    case 'videoClip':
+      return { Resolve_OTIO: { 'Link Group ID': linkGroupId } };
+    case 'audioClip':
+      return {
+        Resolve_OTIO: {
+          Channels: [
+            { 'Source Channel ID': 0, 'Source Track ID': 0 },
+            { 'Source Channel ID': 1, 'Source Track ID': 0 },
+          ],
+          'Link Group ID': linkGroupId,
+        },
+      };
+  }
+}
+
+/**
  * OTIO timeline mirroring DaVinci Resolve's export (tests/fixtures/resolve-golden/m1-fixture.otio):
  * a Video and an Audio track, each clip on both; source_range on the timeline grid in absolute source TC;
  * media references with plain-path target_url; speed as LinearTimeWarp; scene markers on the video clips.
- * Resolve's `Resolve_OTIO` metadata and its unnamed "Resolve Effect" entries are not emitted.
+ * Resolve's unnamed "Resolve Effect" entries are not emitted; `Resolve_OTIO` metadata is (see resolveMetadata).
  */
 export function exportOtio(segments: ExportSegment[], options: ExportOptions): string {
   if (segments.length === 0) {
@@ -29,7 +60,8 @@ export function exportOtio(segments: ExportSegment[], options: ExportOptions): s
   const tlRate = rateOf(timelineFps);
   const plans = planSegments(segments, timelineFps);
 
-  const clip = (p: PlannedSegment, withMarkers: boolean) => {
+  const clip = (p: PlannedSegment, index: number, kind: 'Video' | 'Audio') => {
+    const withMarkers = kind === 'Video';
     const clipRate = rateOf(p.clipFps);
     // Source TC of the media start on the timeline grid; the in-point is truncated to a timeline frame.
     const mediaStart = (p.tcBaseFrames / clipRate) * tlRate;
@@ -48,7 +80,7 @@ export function exportOtio(segments: ExportSegment[], options: ExportOptions): s
       : [];
     return {
       OTIO_SCHEMA: 'Clip.2',
-      metadata: {},
+      metadata: resolveMetadata(kind === 'Video' ? 'videoClip' : 'audioClip', index + 1),
       name: p.seg.file_name,
       source_range: range(mediaStart + inFrames * p.speed, p.timelineFrames, tlRate),
       effects,
@@ -68,22 +100,22 @@ export function exportOtio(segments: ExportSegment[], options: ExportOptions): s
     };
   };
 
-  const track = (kind: 'Video' | 'Audio', withMarkers: boolean) => ({
+  const track = (kind: 'Video' | 'Audio') => ({
     OTIO_SCHEMA: 'Track.1',
-    metadata: {},
+    metadata: resolveMetadata(kind === 'Video' ? 'videoTrack' : 'audioTrack'),
     name: `${kind} 1`,
     source_range: null,
     effects: [],
     markers: [],
     enabled: true,
-    children: plans.map(p => clip(p, withMarkers)),
+    children: plans.map((p, i) => clip(p, i, kind)),
     kind,
   });
 
   return JSON.stringify(
     {
       OTIO_SCHEMA: 'Timeline.1',
-      metadata: {},
+      metadata: resolveMetadata('timeline'),
       name: options.title,
       global_start_time: time(TIMELINE_START_SECONDS * tlRate, tlRate),
       tracks: {
@@ -94,7 +126,7 @@ export function exportOtio(segments: ExportSegment[], options: ExportOptions): s
         effects: [],
         markers: [],
         enabled: true,
-        children: [track('Video', true), track('Audio', false)],
+        children: [track('Video'), track('Audio')],
       },
     },
     null,
