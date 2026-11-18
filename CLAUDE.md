@@ -20,5 +20,7 @@ AI-assisted ingest + structured analysis of video footage, driven by a CLI that 
 
 ## Project-specific notes
 - Surface is CLI-as-skill, not MCP. Every read command emits `--json`.
-- `web/` is a deletion candidate once the contact-sheet flow proves out.
+- `web/` is the primary human UI (kept). The storyboard view (M4) lands there.
+- Product vocabulary: Project → Cut → Scene → Panel (`stories` = Cut, `story_segments` = Panel in the schema).
+- Export must work with **free** DaVinci Resolve and open formats; acceptance project is `~/Video/Portugal`.
 - DaVinci handoff format quirks live in `src/core/export/{edl,fcpxml}`.
