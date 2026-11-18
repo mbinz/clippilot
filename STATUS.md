@@ -42,14 +42,55 @@ Acceptance project: `~/Video/Portugal` — 508 videos / 123 GB, Sony A7C II (`C0
 ### M0 — Docs reset ✅ 2026-11-18
 PRD / ARCHITECTURE / STATUS / CLAUDE.md rewritten around the storyboard workflow.
 
-### M1 — Export that works  ← NEXT
-- Build a 3-camera fixture from real Portugal clips: 25 + 50 + 100 fps, Sony TC + GoPro, a VFR phone clip,
-  a path with spaces/trailing space, one segment at 25 % speed, same clip used twice.
-- Spike: FCPXML (fixed: per-asset `<format>` with width/height, conform to timeline fps, `timeMap` retime,
-  DF/NDF TC) vs OTIO. Import both into **free** Resolve. Pick primary; record the decision in ARCHITECTURE.
-- One timeline per cut with scene markers.
-- Manual Resolve import checklist + automated structural tests (golden files) for the winner.
-- See ARCHITECTURE "Known export defects" for the concrete bug list.
+### M1 — Export that works  ← IN PROGRESS
+Fixture: `~/Video/ClipPilot M1 Fixture/Src /` (path has spaces + trailing space on purpose), 6 real Portugal clips:
+
+| Folder | File | Camera | Format |
+|---|---|---|---|
+| `01 Ankunft` | `C0289.MP4` | Sony A7C II | 3840×2160 25p, TC `05:32:12:00`, 13.0 s |
+| `01 Ankunft` | `GH010365.MP4` | GoPro | 3840×2160 25p (avg rate wobbles), TC `13:58:58:20`, 9.4 s |
+| `02 Farol Strand` | `C0361.MP4` | Sony | 3840×2160 50p, TC `05:54:26:44`, 7.2 s |
+| `02 Farol Strand` | `GH010376.MP4` | GoPro | 1920×1080 50p **VFR** (avg 49.93), TC `10:11:29:08`, 28.4 s |
+| `03 Delfine` | `C0562.MP4` | Sony | 1920×1080 **100p**, TC `06:37:54:72` (frames count to 99!), 4.3 s |
+| `03 Delfine` | `C0382.MP4` | Sony | 1920×1080 100p, TC `05:58:51:84`, 3.8 s |
+
+Reference timeline "M1 Fixture" — 3840×2160, 25 fps. Approximate in/out is fine; tests read exact values from the golden:
+
+| # | Clip | Source in→out | Speed | Marker at start |
+|---|---|---|---|---|
+| 1 | C0289 | 2 s → 6 s | 100 % | `01 Ankunft` |
+| 2 | GH010365 | 1 s → 5 s | 100 % | |
+| 3 | C0361 | 1 s → 4 s | 50 % | `02 Farol Strand` |
+| 4 | GH010376 | 5 s → 9 s | 100 % | |
+| 5 | C0562 | 0.5 s → 3.5 s | 25 % | `03 Delfine` |
+| 6 | C0562 (again) | 0.5 s → 3.5 s | 100 % | |
+| 7 | C0382 | whole clip | 100 % | |
+
+**M1.0 — Golden files (user, in free Resolve)** — build the timeline above by hand, export it as FCPXML
+and OTIO into `tests/fixtures/resolve-golden/` (`m1-fixture.fcpxml`, `m1-fixture.otio`); note the Resolve
+version + FCPXML version here.
+
+**M1.1 — FCPXML matches Resolve (implementer)**
+- `ExportSegment` gains `speed` (default 1.0) and optional `scene_name`; `ExportOptions` gains timeline `width`/`height`.
+- Tests first (`tests/unit/core/export/fcpxml-golden.test.ts`): parse the golden → derive the 7 segments
+  (source in, duration, speed, file path, fps, TC, marker) → run `exportFcpxml` → parse ours → assert structural
+  equivalence per clip: asset `src` URI (encoding incl. trailing space), asset `start`/`duration`, the asset's
+  format `frameDuration`/`width`/`height`, clip `offset`/`start`/`duration`, retime representation (whatever
+  Resolve wrote, e.g. `timeMap`), timeline markers, `tcFormat`. Compare parsed values, never raw strings.
+- Expected fixes (from ARCHITECTURE "Known export defects"): one `<format>` per distinct source format with
+  width/height; no mixed-fps throw; 100 fps in the rate table; TC at the clip's own rate (frames up to 99);
+  per-segment speed; scene markers; one timeline per cut.
+- Existing fcpxml tests that assert the old single-format / mixed-fps-throw behavior get updated, noted in report.
+
+**M1.2 — OTIO exporter (implementer)** — same golden-round-trip test against `m1-fixture.otio`, new
+`src/core/export/otio.ts` + `otio` format in CLI. No OTIO library dependency unless the golden needs it.
+
+**M1.3 — Fixture export + manual import (planner + user)** — ingest the fixture folder, export the reference
+timeline from ClipPilot in both formats, user imports both into free Resolve with this checklist:
+every clip online · offsets/durations match the hand-built timeline · 50 %/25 % speed correct · markers present ·
+no import warnings. Winner becomes primary; decision goes into ARCHITECTURE. EDL dropped unless there's a reason.
+
+Done when: M1.1 + M1.2 green, M1.3 checklist passes for at least one format.
 
 ### M2 — Understand the footage
 - Resumable / incremental ingest (survive interruption on a 123 GB trip); capture folder as scene hint.
