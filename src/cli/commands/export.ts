@@ -20,7 +20,7 @@ function detectFps(
   allowMixed = false,
 ): number {
   if (allowMixed) {
-    // FCPXML conforms each clip to its own format; the timeline rate is --fps or the most common clip rate.
+    // FCPXML and OTIO conform each clip to its own format; the timeline rate is --fps or the most common clip rate.
     if (explicitFps !== null) return explicitFps;
     const counts = new Map<number, number>();
     for (const s of segments) {
@@ -74,7 +74,7 @@ export function registerExportCommand(parent: Command): void {
     .description('Export a story or clip list for DaVinci Resolve')
     .option('--story <id>', 'Story ID to export')
     .option('--clips <ids>', 'Comma-separated clip IDs (e.g., 1,5,12)')
-    .option('--format <format>', 'Export format: csv, json, edl, fcpxml', 'edl')
+    .option('--format <format>', 'Export format: csv, json, edl, fcpxml, otio', 'edl')
     .option('--output <path>', 'Output file path')
     .option('--title <title>', 'Timeline title', 'ClipPilot Export')
     .option('--fps <fps>', 'Frame rate for timecode (auto-detected from clips if omitted)')
@@ -161,7 +161,7 @@ export function registerExportCommand(parent: Command): void {
 
         let fps: number;
         try {
-          fps = detectFps(segments, explicitFps, format === 'fcpxml');
+          fps = detectFps(segments, explicitFps, format === 'fcpxml' || format === 'otio');
         } catch (err: any) {
           console.error(chalk.red(`Error: ${err.message}`));
           process.exit(1);

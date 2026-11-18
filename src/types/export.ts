@@ -1,4 +1,4 @@
-export type ExportFormat = 'csv' | 'json' | 'edl' | 'fcpxml';
+export type ExportFormat = 'csv' | 'json' | 'edl' | 'fcpxml' | 'otio';
 
 export interface ExportSegment {
   position: number;

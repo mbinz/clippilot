@@ -1,17 +1,15 @@
 import type { ExportSegment, ExportOptions } from '../../types/export.js';
 import { pathToFileUri } from '../../utils/fs.js';
+import { TIMELINE_START_SECONDS, planSegments } from './timeline-plan.js';
 import {
   formatName,
   frameDurationFor,
   snapFps,
   timeAttr,
-  timecodeToSourceFrames,
 } from './fcpxml-rates.js';
 
 // 1.10 is the oldest FCPXML version with <media-rep>, which we emit. Resolve itself writes 1.13.
 const FCPXML_VERSION = '1.10';
-// Resolve's default timeline start timecode (01:00:00:00).
-const TIMELINE_START_SECONDS = 3600;
 const DEFAULT_WIDTH = 1920;
 const DEFAULT_HEIGHT = 1080;
 
@@ -48,32 +46,14 @@ export function exportFcpxml(segments: ExportSegment[], options: ExportOptions):
 
   const assetLines: string[] = [];
   const clipLines: string[] = [];
-  let timelineFrames = 0;
-  let previousScene: string | null = null;
 
-  for (const seg of segments) {
-    const clipFps = snapFps(seg.fps > 0 ? seg.fps : timelineFps);
+  const plans = planSegments(segments, timelineFps);
+  for (const plan of plans) {
+    const { seg, clipFps, tcBaseFrames, assetFrames, startFrames, speed, timelineFrames: clipTimelineFrames } = plan;
     const cd = frameDurationFor(clipFps);
     const [width, height] = parseResolution(seg.resolution) ?? [timelineWidth, timelineHeight];
     const format = formatFor(width, height, clipFps);
     const assetId = `r${nextId++}`;
-    const speed = seg.speed != null && seg.speed > 0 ? seg.speed : 1;
-
-    // Source TC at the clip's own rate, integer frames.
-    const tcBaseFrames = seg.start_timecode ? timecodeToSourceFrames(seg.start_timecode, clipFps) : 0;
-    // Asset extent: container duration (what Resolve uses; nb_frames undercounts on VFR footage).
-    const assetFrames = seg.duration_sec > 0
-      ? Math.round(seg.duration_sec * clipFps)
-      : (seg.nb_frames ?? 0);
-
-    const startFrames = Math.round(seg.start_sec * clipFps);
-    // Timeline length on the timeline grid; source seconds / speed.
-    let clipTimelineFrames = Math.round(((seg.end_sec - seg.start_sec) / speed) * timelineFps);
-    // Stay in-bounds: never run past the end of the media (Resolve's own whole-clip export does not trim a frame).
-    const availableSourceSec = (assetFrames - startFrames) / clipFps;
-    const maxTimelineFrames = Math.floor((availableSourceSec / speed) * timelineFps + 1e-9);
-    if (assetFrames > 0 && clipTimelineFrames > maxTimelineFrames) clipTimelineFrames = maxTimelineFrames;
-    if (clipTimelineFrames < 1) clipTimelineFrames = 1;
 
     const uri = xmlEscape(pathToFileUri(seg.file_path));
     assetLines.push(
@@ -86,7 +66,7 @@ export function exportFcpxml(segments: ExportSegment[], options: ExportOptions):
     );
 
     const startAttr = timeAttr(tcBaseFrames + startFrames, clipFps);
-    const offsetAttr = `${TIMELINE_START_SECONDS * tl.den + timelineFrames * tl.num}/${tl.den}s`;
+    const offsetAttr = `${TIMELINE_START_SECONDS * tl.den + plan.offsetFrames * tl.num}/${tl.den}s`;
     const children: string[] = [];
 
     if (speed !== 1) {
@@ -105,14 +85,12 @@ export function exportFcpxml(segments: ExportSegment[], options: ExportOptions):
       );
     }
 
-    const scene = seg.scene_name ? seg.scene_name : null;
-    if (scene && scene !== previousScene) {
+    if (plan.sceneStart) {
       children.push(
         `                            <marker start="${startAttr}" duration="${timeAttr(1, clipFps)}" ` +
-        `value="${xmlEscape(scene)}"/>`,
+        `value="${xmlEscape(plan.sceneStart)}"/>`,
       );
     }
-    if (scene) previousScene = scene;
 
     const head =
       `                        <asset-clip name="${xmlEscape(seg.file_name)}" ref="${assetId}" ` +
@@ -124,9 +102,9 @@ export function exportFcpxml(segments: ExportSegment[], options: ExportOptions):
         : `${head}>\n${children.join('\n')}\n                        </asset-clip>`,
     );
 
-    timelineFrames += clipTimelineFrames;
   }
 
+  const totalFrames = plans.reduce((n, p) => n + p.timelineFrames, 0);
   const formatLines = [...formats.values()].map(
     f =>
       `        <format id="${f.id}" name="${formatName(f.width, f.height, f.fps)}" ` +
@@ -143,7 +121,7 @@ ${assetLines.join('\n')}
     <library>
         <event name="${xmlEscape(options.title)}">
             <project name="${xmlEscape(options.title)}">
-                <sequence format="${sequenceFormat.id}" duration="${timeAttr(timelineFrames, timelineFps)}" ` +
+                <sequence format="${sequenceFormat.id}" duration="${timeAttr(totalFrames, timelineFps)}" ` +
     `tcStart="${TIMELINE_START_SECONDS}/1s" tcFormat="NDF">
                     <spine>
 ${clipLines.join('\n')}

@@ -3,12 +3,14 @@ import { exportCsv } from './csv.js';
 import { exportJson } from './json.js';
 import { exportEdl } from './edl.js';
 import { exportFcpxml } from './fcpxml.js';
+import { exportOtio } from './otio.js';
 
 const exporters: Record<ExportFormat, (segments: ExportSegment[], options: ExportOptions) => string> = {
   csv: exportCsv,
   json: exportJson,
   edl: exportEdl,
   fcpxml: exportFcpxml,
+  otio: exportOtio,
 };
 
 export function exportSegments(
