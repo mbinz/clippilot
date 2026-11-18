@@ -52,6 +52,7 @@ on success. Always pass `--json` so output is parseable.
 | `clippilot config show` / `clippilot config set gemini_api_key <key>` | Inspect or set the Gemini API key. |
 | `clippilot search "<query>" --json [--min-quality N] [--limit N]` | User asks "find me clips about X". FTS over scenes, summary, keywords, location, people. |
 | `clippilot get-clip <id>` | User asks about one specific clip in detail (you already have its ID). |
+| `clippilot summary [--project <name>] [--top N] --json` | Overview of a project: scene hints, places, moments, best highlights. Run after analyze, before storyboarding. |
 | `clippilot similar <id>` | User asks "what other takes of this exist" or "any duplicates of clip N". |
 | `clippilot mark-best <id> [--group <gid>]` | User picks the best take among similar clips. Defaults to all groups containing the clip. |
 | `clippilot tag <id> [-l <location>] [-t a,b,c] [--people n,m] --json` | User adds metadata. |
@@ -94,6 +95,7 @@ JSON-encoded text columns:
 - `ai_quality_overall` plus per-axis (`stability`, `focus`, `exposure`, `composition`, `audio`)
 - `ai_editorial_emotional`, `ai_editorial_storytelling`, `ai_editorial_uniqueness`, `ai_editorial_suggested_use`
 - `ai_quality_issues: string[]`
+- `scene_hint: string | null` (source-folder grouping); `get-clip` and `search --json` also carry `highlights: [{start_sec, end_sec, description, quality}]` per clip
 
 Quality and editorial scores are 1–5. `analysis_status` of `done` means
 the AI fields are populated; `pending`/`error` means they aren't yet.

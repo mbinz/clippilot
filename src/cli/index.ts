@@ -11,6 +11,7 @@ import { registerContactSheetCommand } from './commands/contact-sheet.js';
 import { registerGetClipCommand } from './commands/get-clip.js';
 import { registerSimilarCommand } from './commands/similar.js';
 import { registerMarkBestCommand } from './commands/mark-best.js';
+import { registerSummaryCommand } from './commands/summary.js';
 import { setLogLevel } from '../utils/logger.js';
 
 export function createProgram(): Command {
@@ -40,6 +41,7 @@ export function createProgram(): Command {
   registerGetClipCommand(program);
   registerSimilarCommand(program);
   registerMarkBestCommand(program);
+  registerSummaryCommand(program);
 
   return program;
 }
