@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
 import { runMigrations } from '../../../../../src/db/migrations/runner.js';
 import { ClipRepository } from '../../../../../src/db/repositories/clip.repository.js';
+import { HighlightRepository } from '../../../../../src/db/repositories/highlight.repository.js';
 import { createClipRoutes } from '../../../../../src/core/server/routes/clips.js';
 
 function seedClip(db: Database.Database, hash: string, location?: string) {
@@ -29,21 +30,17 @@ function seedClip(db: Database.Database, hash: string, location?: string) {
   repo.updateAnalysis(clip.id, {
     ai_scenes: '[]',
     ai_summary: `Summary for ${hash}`,
-    ai_quality_stability: 4,
-    ai_quality_focus: 4,
-    ai_quality_exposure: 4,
-    ai_quality_composition: 3,
-    ai_quality_audio: 3,
-    ai_quality_overall: 3.6,
-    ai_quality_issues: '[]',
-    ai_editorial_emotional: 4,
-    ai_editorial_storytelling: 3,
-    ai_editorial_uniqueness: 2,
-    ai_editorial_suggested_use: 'B-Roll',
     ai_visual_keywords: '["test"]',
   });
 
   return clip;
+}
+
+function seedMoments(db: Database.Database, clipId: number) {
+  new HighlightRepository(db).replaceForClip(clipId, [
+    { start_sec: 1, end_sec: 3, description: 'wave', tier: 'hero', shot: 'wide', role: 'action', issues: ['shake'] },
+    { start_sec: 5, end_sec: 6, description: 'gull', tier: 'filler', shot: 'close', role: 'detail' },
+  ]);
 }
 
 describe('Clip API Routes', () => {
@@ -122,6 +119,39 @@ describe('Clip API Routes', () => {
     it('returns 404 for non-existent clip', async () => {
       const res = await app.request('/999');
       expect(res.status).toBe(404);
+    });
+  });
+
+  describe('moments (tier/shot/role/issues) instead of clip scores', () => {
+    it('GET / attaches highlights with parsed issues and no score fields', async () => {
+      const clip = seedClip(db, 'h1');
+      seedMoments(db, clip.id);
+      seedClip(db, 'h2');
+
+      const body = await (await app.request('/')).json();
+      const first = body.data.find((c: any) => c.id === clip.id);
+      expect(first.highlights).toMatchObject([
+        { start_sec: 1, end_sec: 3, tier: 'hero', shot: 'wide', role: 'action', issues: ['shake'] },
+        { start_sec: 5, end_sec: 6, tier: 'filler', shot: 'close', role: 'detail', issues: [] },
+      ]);
+      expect(body.data.find((c: any) => c.id !== clip.id).highlights).toEqual([]);
+      expect(Object.keys(first).filter((k) => /^ai_(quality|editorial)_/.test(k))).toEqual([]);
+    });
+
+    it('GET /:id includes highlights', async () => {
+      const clip = seedClip(db, 'h1');
+      seedMoments(db, clip.id);
+      const body = await (await app.request(`/${clip.id}`)).json();
+      expect(body.data.highlights.map((h: any) => h.tier)).toEqual(['hero', 'filler']);
+    });
+
+    it('GET /?min_tier=hero filters clips by best moment tier', async () => {
+      const a = seedClip(db, 'h1');
+      seedMoments(db, a.id);
+      const b = seedClip(db, 'h2');
+      new HighlightRepository(db).replaceForClip(b.id, [{ start_sec: 0, end_sec: 2, description: 'x', tier: 'solid' }]);
+      const body = await (await app.request('/?min_tier=hero')).json();
+      expect(body.data.map((c: any) => c.id)).toEqual([a.id]);
     });
   });
 

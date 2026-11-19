@@ -10,10 +10,6 @@ export function createFacetRoutes(db: Database.Database): Hono {
       "SELECT DISTINCT location FROM clips WHERE location IS NOT NULL AND location != '' ORDER BY location",
     ).all().map((r: any) => r.location as string);
 
-    const suggested_uses = db.prepare(
-      "SELECT DISTINCT ai_editorial_suggested_use FROM clips WHERE ai_editorial_suggested_use IS NOT NULL ORDER BY ai_editorial_suggested_use",
-    ).all().map((r: any) => r.ai_editorial_suggested_use as string);
-
     // Extract tags from JSON arrays
     const tagRows = db.prepare(
       "SELECT DISTINCT manual_tags FROM clips WHERE manual_tags IS NOT NULL AND manual_tags != '[]'",
@@ -55,7 +51,6 @@ export function createFacetRoutes(db: Database.Database): Hono {
     return c.json({
       data: {
         locations,
-        suggested_uses,
         tags: [...tagSet].sort(),
         people: [...peopleSet].sort(),
         moods: [...moodSet].sort(),

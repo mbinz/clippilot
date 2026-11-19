@@ -2,8 +2,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
 import { runMigrations } from '../../../../src/db/migrations/runner.js';
 import { ClipRepository } from '../../../../src/db/repositories/clip.repository.js';
+import { HighlightRepository } from '../../../../src/db/repositories/highlight.repository.js';
 import { ProjectRepository } from '../../../../src/db/repositories/project.repository.js';
 import { advancedSearch } from '../../../../src/core/search/advanced.js';
+
+let hlRepo: HighlightRepository;
 
 function seedClip(
   repo: ClipRepository,
@@ -13,8 +16,7 @@ function seedClip(
     keywords?: string;
     location?: string;
     recorded_at?: string;
-    quality?: number;
-    suggested_use?: string;
+    tier?: 'hero' | 'solid' | 'filler';
     tags?: string;
     people?: string;
     scenes?: string;
@@ -44,19 +46,12 @@ function seedClip(
   repo.updateAnalysis(clip.id, {
     ai_scenes: overrides.scenes ?? '[]',
     ai_summary: overrides.summary ?? 'Test clip',
-    ai_quality_stability: 4,
-    ai_quality_focus: 4,
-    ai_quality_exposure: 4,
-    ai_quality_composition: 3,
-    ai_quality_audio: 3,
-    ai_quality_overall: overrides.quality ?? 3.6,
-    ai_quality_issues: '[]',
-    ai_editorial_emotional: 4,
-    ai_editorial_storytelling: 3,
-    ai_editorial_uniqueness: 2,
-    ai_editorial_suggested_use: overrides.suggested_use ?? 'B-Roll',
     ai_visual_keywords: overrides.keywords ?? '[]',
   });
+
+  if (overrides.tier) {
+    hlRepo.replaceForClip(clip.id, [{ start_sec: 0, end_sec: 2, description: 'x', tier: overrides.tier }]);
+  }
 
   return clip;
 }
@@ -70,14 +65,14 @@ describe('advancedSearch', () => {
     db.pragma('foreign_keys = ON');
     runMigrations(db);
     clipRepo = new ClipRepository(db);
+    hlRepo = new HighlightRepository(db);
 
     seedClip(clipRepo, 'h1', {
       summary: 'Kinder spielen am Strand',
       keywords: '["Strand","Kinder","Sand"]',
       location: 'Mallorca',
       recorded_at: '2025-06-15T10:00:00Z',
-      quality: 4.0,
-      suggested_use: 'Hero Shot',
+      tier: 'hero',
       tags: '["urlaub","strand"]',
       people: '["Anna","Max"]',
       scenes: '[{"setting":"Beach","activity":"Playing","mood":"happy"}]',
@@ -88,8 +83,7 @@ describe('advancedSearch', () => {
       keywords: '["Sonnenuntergang","Meer"]',
       location: 'Mallorca',
       recorded_at: '2025-06-15T18:00:00Z',
-      quality: 4.5,
-      suggested_use: 'B-Roll',
+      tier: 'solid',
       tags: '["urlaub","abend"]',
       scenes: '[{"setting":"Beach","activity":"Watching","mood":"calm"}]',
     });
@@ -99,8 +93,7 @@ describe('advancedSearch', () => {
       keywords: '["Berg","Wanderung","Wald"]',
       location: 'Alpen',
       recorded_at: '2025-07-01T14:00:00Z',
-      quality: 2.5,
-      suggested_use: 'B-Roll',
+      tier: 'filler',
       tags: '["wanderung"]',
       people: '["Max"]',
       scenes: '[{"setting":"Mountain","activity":"Hiking","mood":"exciting"}]',
@@ -125,21 +118,16 @@ describe('advancedSearch', () => {
     expect(result.items).toHaveLength(2);
   });
 
-  it('filters by min quality', () => {
-    const result = advancedSearch(db, { min_quality: 4.0 });
-    expect(result.items).toHaveLength(2);
+  it('filters by min_tier: clip has a moment at or above the tier', () => {
+    expect(advancedSearch(db, { min_tier: 'hero' }).items.map((c) => c.file_hash)).toEqual(['h1']);
+    expect(advancedSearch(db, { min_tier: 'solid' }).items.map((c) => c.file_hash).sort()).toEqual(['h1', 'h2']);
+    expect(advancedSearch(db, { min_tier: 'filler' }).items).toHaveLength(3);
   });
 
-  it('filters by max quality', () => {
-    const result = advancedSearch(db, { max_quality: 3.0 });
-    expect(result.items).toHaveLength(1);
-    expect(result.items[0].file_hash).toBe('h3');
-  });
-
-  it('filters by suggested_use', () => {
-    const result = advancedSearch(db, { suggested_use: 'Hero Shot' });
-    expect(result.items).toHaveLength(1);
-    expect(result.items[0].file_hash).toBe('h1');
+  it('min_tier excludes clips without moments', () => {
+    seedClip(clipRepo, 'h9', { summary: 'no moments' });
+    expect(advancedSearch(db, { min_tier: 'filler' }).items.map((c) => c.file_hash)).not.toContain('h9');
+    expect(advancedSearch(db, {}).items).toHaveLength(4);
   });
 
   it('filters by date range', () => {
@@ -177,12 +165,6 @@ describe('advancedSearch', () => {
     expect(page2.items).toHaveLength(1);
   });
 
-  it('sorts by quality descending', () => {
-    const result = advancedSearch(db, { sort: 'quality', sort_dir: 'desc' });
-    expect(result.items[0].file_hash).toBe('h2'); // 4.5
-    expect(result.items[2].file_hash).toBe('h3'); // 2.5
-  });
-
   it('sorts by date ascending', () => {
     const result = advancedSearch(db, { sort: 'date', sort_dir: 'asc' });
     expect(result.items[0].file_hash).toBe('h1');
@@ -192,8 +174,8 @@ describe('advancedSearch', () => {
   it('combines multiple filters', () => {
     const result = advancedSearch(db, {
       location: 'Mallorca',
-      min_quality: 4.0,
-      suggested_use: 'B-Roll',
+      min_tier: 'solid',
+      tags: ['abend'],
     });
     expect(result.items).toHaveLength(1);
     expect(result.items[0].file_hash).toBe('h2');

@@ -9,7 +9,6 @@ function seedClip(db: Database.Database, hash: string, opts: {
   tags?: string;
   people?: string;
   scenes?: string;
-  suggested_use?: string;
 }) {
   const repo = new ClipRepository(db);
   const clip = repo.insert({
@@ -35,17 +34,6 @@ function seedClip(db: Database.Database, hash: string, opts: {
   repo.updateAnalysis(clip.id, {
     ai_scenes: opts.scenes ?? '[]',
     ai_summary: 'Test',
-    ai_quality_stability: 4,
-    ai_quality_focus: 4,
-    ai_quality_exposure: 4,
-    ai_quality_composition: 3,
-    ai_quality_audio: 3,
-    ai_quality_overall: 3.6,
-    ai_quality_issues: '[]',
-    ai_editorial_emotional: 4,
-    ai_editorial_storytelling: 3,
-    ai_editorial_uniqueness: 2,
-    ai_editorial_suggested_use: opts.suggested_use ?? 'B-Roll',
     ai_visual_keywords: '[]',
   });
 }
@@ -67,7 +55,6 @@ describe('Facets API Routes', () => {
 
     const body = await res.json();
     expect(body.data.locations).toEqual([]);
-    expect(body.data.suggested_uses).toEqual([]);
     expect(body.data.tags).toEqual([]);
     expect(body.data.people).toEqual([]);
     expect(body.data.moods).toEqual([]);
@@ -83,14 +70,10 @@ describe('Facets API Routes', () => {
     expect(body.data.locations).toEqual(['Beach', 'Mountain']);
   });
 
-  it('returns distinct suggested_uses', async () => {
-    seedClip(db, 'h1', { suggested_use: 'Hero Shot' });
-    seedClip(db, 'h2', { suggested_use: 'B-Roll' });
-
-    const res = await app.request('/');
-    const body = await res.json();
-    expect(body.data.suggested_uses).toContain('Hero Shot');
-    expect(body.data.suggested_uses).toContain('B-Roll');
+  it('no longer returns suggested_uses', async () => {
+    seedClip(db, 'h1', {});
+    const body = await (await app.request('/')).json();
+    expect('suggested_uses' in body.data).toBe(false);
   });
 
   it('extracts and deduplicates tags from JSON arrays', async () => {

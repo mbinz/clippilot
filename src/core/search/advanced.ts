@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3';
 import type { Clip } from '../../types/clip.js';
+import { tierRank, tierRankSql, type Tier } from '../tiers.js';
 
 export interface AdvancedSearchFilters {
   q?: string;
@@ -7,13 +8,11 @@ export interface AdvancedSearchFilters {
   location?: string;
   date_from?: string;
   date_to?: string;
-  min_quality?: number;
-  max_quality?: number;
+  min_tier?: Tier;
   tags?: string[];
   people?: string[];
-  suggested_use?: string;
   mood?: string;
-  sort?: 'quality' | 'date' | 'emotional' | 'duration';
+  sort?: 'date' | 'duration';
   sort_dir?: 'asc' | 'desc';
   page?: number;
   per_page?: number;
@@ -67,19 +66,11 @@ export function advancedSearch(
     params.push(filters.date_to);
   }
 
-  if (filters.min_quality !== undefined) {
-    whereConditions.push('clips.ai_quality_overall >= ?');
-    params.push(filters.min_quality);
-  }
-
-  if (filters.max_quality !== undefined) {
-    whereConditions.push('clips.ai_quality_overall <= ?');
-    params.push(filters.max_quality);
-  }
-
-  if (filters.suggested_use) {
-    whereConditions.push('clips.ai_editorial_suggested_use = ?');
-    params.push(filters.suggested_use);
+  if (filters.min_tier) {
+    whereConditions.push(
+      `EXISTS (SELECT 1 FROM highlights h WHERE h.clip_id = clips.id AND ${tierRankSql('h.tier')} >= ?)`,
+    );
+    params.push(tierRank(filters.min_tier));
   }
 
   if (filters.tags && filters.tags.length > 0) {
@@ -116,9 +107,7 @@ export function advancedSearch(
 
   // Sort
   const sortMap: Record<string, string> = {
-    quality: 'clips.ai_quality_overall',
     date: 'clips.recorded_at',
-    emotional: 'clips.ai_editorial_emotional',
     duration: 'clips.duration_sec',
   };
 
