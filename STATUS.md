@@ -347,7 +347,7 @@ Done when: red→green, typecheck + test:all green, page regenerated for the pil
 
 **M2.5c ✅** (45dce99) — full-width layout.
 
-### M2.6 — Taste calibration loop (user idea 2026-11-19, challenged & reshaped) — C1 ✅ a4e8b13 · C2 ✅ 34be4e0 · C3 ✅ (SKILL.md) · C4 ✅ 7f8379a (review page v2) · round 0 ✅ (P 0.89, missed 0.5/clip) · C5 ✅ e39aa1a (moments + slow-mo; 481 tests) · next: re-analyze pilot (user) → round 1
+### M2.6 — Taste calibration loop (user idea 2026-11-19, challenged & reshaped) — C1 ✅ a4e8b13 · C2 ✅ 34be4e0 · C3 ✅ (SKILL.md) · C4 ✅ 7f8379a (review page v2) · round 0 ✅ (P 0.89, missed 0.5/clip) · C5 ✅ e39aa1a (moments + slow-mo; 481 tests) · round 1 ✅ (P 0.50, missed 0.125/clip) · C6 moment tags, no clip scores in progress · then profile v1 → round 2
 Goal: before analyzing a whole project, calibrate highlight selection to the user's taste in a few short review rounds.
 Design decisions (planner, from the challenge):
 - **What is learned = a per-user taste profile**, not free prompt rewriting: `~/.clippilot/taste-profile.md` (short
@@ -466,6 +466,44 @@ talking→none stays 1); normalize carries speed; migration 011 + repository rou
 `S` toggles 1×, chip `5` → `["bad","speed"]`; `get-clip --json` includes the new fields; prompt text mentions slowmo.
 Manual after merge-ready: user re-analyzes the 33 pilot clips (`analyze --force`, ~US$0.33, user's terminal) → regenerate
 page → round 1. Done when: typecheck + test:all green; regenerated page shows slow-mo badges on a 50/100 fps action clip.
+
+#### C6 — Moment tags + tier, no clip scores (user decision 2026-11-19 after round 1)
+Evidence: clip `overall` spans only 2.8–3.8 over 33 pilot clips (avg 3.5; the poor no-highlight clip #30 = 3.6 like 👍
+clips); `suggested_use` = "B-Roll" for every clip in round 1; moment `quality` 1–10 is flat too (33 of 36 are 7 or 8).
+Absolute numbers from Gemini don't discriminate → replace with categorical, checkable facts per moment. User: remove clip
+scores entirely, **including DB columns** (no real data yet; pilot is re-analyzed after this slice).
+Round 1 (round_id 2, no profile): precision 0.50 (3 of 4 👎 = speed on kids' faces, clip 33), missed 0.125/clip.
+
+**Analysis schema + prompt**
+- Drop `technical_quality` and `editorial_value` from `ClipAnalysisResponseSchema` and the prompt. Keep `scenes`,
+  `clip_summary`, keywords etc.
+- `HighlightSchema`: replace `quality` (1–10) with `tier: "hero" | "solid" | "filler"`; add `shot: "wide" | "medium" |
+  "close" | "detail"`, `role: "establishing" | "action" | "reaction" | "detail" | "transition"`, `issues: ("shake" | "blur" |
+  "obstructed" | "overexposed" | "underexposed")[]` (default `[]`). Keep `slowmo` / `slowmo_reason`. Prompt (German, same
+  style): define each value in one line; tier = hero (would open or anchor a scene), solid (good usable shot), filler
+  (usable only to fill a gap); say explicitly to use the whole range and not default to "solid".
+- Migration `012`: drop `clips.ai_quality_*` (stability, focus, exposure, composition, audio, overall, issues) and
+  `clips.ai_editorial_*` (emotional, storytelling, uniqueness, suggested_use). `ai_editorial_suggested_use` is in `clips_fts`
+  and its triggers → recreate `clips_fts` + the 3 triggers without it and rebuild the index. `highlights`: drop `quality`,
+  add `tier TEXT NOT NULL DEFAULT 'solid'` (CHECK), `shot TEXT`, `role TEXT`, `issues TEXT NOT NULL DEFAULT '[]'` (JSON).
+  `highlight_verdicts`: keep its old `quality` snapshot (nullable) and add `tier`, `shot`, `role` snapshots.
+  Calibration score tables/fields (`clip_score_verdicts`, `clip_scores`, `suggested_use_wrong` in the export schema) stay so
+  old exports import — just nothing writes them any more.
+- Remove clip-score fields everywhere they're read: types (`src/types/clip.ts`, `web/src/api/types.ts`), clip repository,
+  `cli/json.ts` projection, table formatter, `search` (`--min-quality` → `--min-tier hero|solid|filler`: clip has ≥ 1 moment at
+  or above that tier), `search/advanced.ts` + server routes + facets (quality range / suggested-use filters and sorts →
+  `min_tier` filter; sort options for quality/emotional removed), similarity (best-take order → best moment tier, then
+  duration), csv/json exporters (drop score columns; add nothing), `summary.ts` (rank highlights by tier, then length),
+  sampling (`low_stability` reason → `shaky`: any moment with `shake` issue), web `ClipCard`/`ClipDetail`/`ClusterCard`/
+  filters (remove score UI; show moment tiers where scores were, keep it minimal).
+- Review page: clip card becomes one line (file · folder · duration · fps) + summary; no ring/bars/pills. Highlight card
+  shows tier pill, shot · role, issue tags, 🐢 badge — no quality dots. 👎 reasons unchanged. `review-data.ts` follows.
+- SKILL.md JSON-shape section + verb table: remove score fields, document tier/shot/role/issues and `--min-tier`.
+Tests first for each behavior (schema parse/reject, migration 012 incl. FTS still finds by summary/keywords after rebuild and
+columns gone, repository round-trip, `--min-tier` search, similarity order, summary order, sampling `shaky`, exporters'
+columns, review page jsdom, web type-check). Update/remove tests that encode clip scores and list them in the report.
+Done when: typecheck (incl. web) + test:all green; `grep -rn "ai_quality_\|ai_editorial_" src web/src` only hits migration
+001/012; then user re-analyzes the pilot (~US$0.33) and the page shows tiers.
 
 ### M2.7 — Pipeline fixes from pilot feedback (planned, not started)
 - Local camera-shake metric per highlight range (ffmpeg motion/vidstab) → drop or down-rank shaky highlights.
