@@ -10,6 +10,9 @@ export interface ReviewHighlight {
   end_sec: number;
   description: string;
   quality: number;
+  slowmo: string;
+  slowmo_reason: string;
+  suggested_speed: number;
 }
 
 export interface ReviewScores {
@@ -113,6 +116,9 @@ export function buildReviewData(
             end_sec: h.end_sec,
             description: h.description,
             quality: h.quality,
+            slowmo: h.slowmo,
+            slowmo_reason: h.slowmo_reason,
+            suggested_speed: h.suggested_speed,
           })),
       };
     });

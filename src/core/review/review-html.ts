@@ -43,32 +43,30 @@ const STYLE = `
   .keys{margin-left:auto}
   kbd{background:var(--panel2);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;font:12px ui-monospace,monospace;color:var(--text)}
   /* right */
-  .side{display:flex;flex-direction:column;gap:14px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .side{display:flex;flex-direction:column;gap:12px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
   .clipname{font-weight:600;font-size:15px}
   .clipmeta{color:var(--muted);font-size:12px;margin-top:2px}
   .summary{color:#c3c8d3;margin-top:8px;font-size:13px}
-  .scores{display:grid;grid-template-columns:96px 1fr;gap:16px;align-items:center}
-  .ring{position:relative;width:96px;height:96px}
-  .ring svg{transform:rotate(-90deg)}
+  .scores{display:grid;grid-template-columns:72px 1fr;gap:12px;align-items:center}
+  .ring{position:relative;width:72px;height:72px}
+  .ring svg{transform:rotate(-90deg);width:100%;height:100%}
   .ring .val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
-  .ring .val b{font-size:24px}
+  .ring .val b{font-size:20px}
   .ring .val small{color:var(--muted);font-size:11px}
-  .meter{display:grid;grid-template-columns:92px 1fr 22px;align-items:center;gap:8px;font-size:12px;color:var(--muted);padding:2px 4px;border-radius:6px}
+  .meter{display:grid;grid-template-columns:92px 1fr 22px;align-items:center;gap:8px;font-size:12px;color:var(--muted);padding:1px 4px;border-radius:6px}
   .bars{display:flex;gap:3px}
   .bars i{flex:1;height:8px;border-radius:2px;background:var(--seg)}
   .bars i.on{background:var(--c)}
   .meter .n{color:var(--text);text-align:right}
-  .group-title{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
+  .group-title{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:8px 0 4px}
   .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
   .tag{font-size:11px;padding:3px 8px;border-radius:999px;background:rgba(255,181,71,.12);color:var(--warn)}
   .tag.use{background:rgba(124,156,255,.14);color:var(--accent)}
-  .scorevote{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
-  .meter.pickable{cursor:pointer}
-  .meter.pickable:hover{background:var(--panel2)}
-  .meter.wrong{background:rgba(255,107,107,.12)}
-  .meter.wrong .n{color:var(--bad)}
-  .hint{font-size:12px;color:var(--bad);margin-top:6px}
+  .slowmo{font-size:12px;padding:2px 8px;border-radius:999px;background:rgba(124,156,255,.16);color:var(--accent);font-weight:600}
+  .spd{font-size:12px;padding:2px 8px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer}
+  .spd.on{border-color:var(--accent);color:var(--accent)}
+  .slowwhy{margin-top:4px;font-size:12px;color:var(--muted)}
   /* highlights */
   .hlist{display:flex;flex-direction:column;gap:8px}
   .h{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer}
@@ -102,10 +100,6 @@ const STYLE = `
 
   .empty{color:var(--muted);text-align:center;padding:22px 14px;border:1px dashed var(--line);border-radius:12px}
   .noproxy{display:flex;align-items:center;justify-content:center;height:240px;background:#000;border-radius:10px;color:var(--muted)}
-  .tag.use.pickable{cursor:pointer}
-  .tag.use.wrong{background:rgba(255,107,107,.16);color:var(--bad);text-decoration:line-through}
-  .meter i[data-step]{cursor:default}
-  .meter.pickable i[data-step]{cursor:pointer}
 `;
 
 // Page script: plain DOM code, no framework. Data comes from the #review-data JSON block.
@@ -113,15 +107,16 @@ const STYLE = `
 const SCRIPT = `
 var data = JSON.parse(document.getElementById('review-data').textContent);
 var STORAGE_KEY = 'clippilot-review-v2:' + data.project + ':' + data.generated_at;
-var REASONS = [['not_highlight', 'Not a highlight'], ['timing', 'Timing off'], ['description', 'Description wrong'], ['quality', 'Shaky / poor quality']];
+var REASONS = [['not_highlight', 'Not a highlight'], ['timing', 'Timing off'], ['description', 'Description wrong'], ['quality', 'Shaky / poor quality'], ['speed', 'Speed wrong']];
 var QUALITY_ROWS = [['stability', 'Stability'], ['focus', 'Focus'], ['exposure', 'Exposure'], ['composition', 'Composition'], ['audio', 'Audio']];
 var EDITORIAL_ROWS = [['emotional', 'Emotional'], ['storytelling', 'Storytelling'], ['uniqueness', 'Uniqueness']];
 
 // state.highlights[id] = { vote: 'good'|'bad'|null, reasons: { key: true }, note: '' }
-// state.scores[clip_id] = { vote: 'up'|'down'|null, fixed: { score: step } }
-// state.missed = [{ clip_id, at_sec, note }]; state.suggested_use_wrong[clip_id] = true; state.done[clip_id] = true
+// state.missed = [{ clip_id, at_sec, note }]; state.done[clip_id] = true
+// fullSpeed[highlight_id] = true while the user compares a slow-mo suggestion with 100 % (not persisted)
 var state = loadState();
 var cur = 0, sel = 0, range = null;
+var fullSpeed = {};
 var video = null;
 var stageEl, sideEl, headerEl;
 
@@ -129,9 +124,7 @@ function loadState() {
   var st = {};
   try { st = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch (e) { st = {}; }
   st.highlights = st.highlights || {};
-  st.scores = st.scores || {};
   st.missed = st.missed || [];
-  st.suggested_use_wrong = st.suggested_use_wrong || {};
   st.done = st.done || {};
   return st;
 }
@@ -141,10 +134,6 @@ function saveState() {
 function hlState(id) {
   if (!state.highlights[id]) state.highlights[id] = { vote: null, reasons: {}, note: '' };
   return state.highlights[id];
-}
-function scoreState(clipId) {
-  if (!state.scores[clipId]) state.scores[clipId] = { vote: null, fixed: {} };
-  return state.scores[clipId];
 }
 
 function el(tag, props, children) {
@@ -166,23 +155,6 @@ function color(n) { return n >= 4 ? '#3ecf8e' : n >= 3 ? '#ffb547' : '#ff6b6b'; 
 function clip() { return data.clips[cur]; }
 
 // ---- derived verdicts -------------------------------------------------------------
-function shownScores(c) {
-  var out = [];
-  QUALITY_ROWS.forEach(function (r) { out.push([r[0], c.scores.quality[r[0]]]); });
-  out.push(['overall', c.scores.quality.overall]);
-  EDITORIAL_ROWS.forEach(function (r) { out.push([r[0], c.scores.editorial[r[0]]]); });
-  return out.filter(function (s) { return s[1] !== null && s[1] !== undefined; });
-}
-function scoreVerdict(c, name, value) {
-  var ss = scoreState(c.clip_id);
-  if (ss.vote === 'up') return 'ok';
-  if (ss.vote === 'down') {
-    var fixed = ss.fixed[name];
-    if (fixed === undefined || fixed === value) return 'ok';
-    return fixed > value ? 'low' : 'high';   // AI too low / too high
-  }
-  return null;
-}
 function verdictsOf(id) {
   var st = hlState(id);
   if (st.vote === 'good') return ['good'];
@@ -193,8 +165,6 @@ function verdictsOf(id) {
 }
 function isTouched(c) {
   if (state.done[c.clip_id]) return true;
-  if (scoreState(c.clip_id).vote) return true;
-  if (state.suggested_use_wrong[c.clip_id]) return true;
   if (state.missed.some(function (m) { return m.clip_id === c.clip_id; })) return true;
   return c.highlights.some(function (h) { var st = hlState(h.highlight_id); return st.vote || st.note; });
 }
@@ -208,11 +178,6 @@ function buildExport() {
       var v = verdictsOf(h.highlight_id), st = hlState(h.highlight_id);
       if (v.length || st.note) out.highlights.push({ highlight_id: h.highlight_id, clip_id: c.clip_id, verdicts: v, note: st.note });
     });
-    shownScores(c).forEach(function (s) {
-      var verdict = scoreVerdict(c, s[0], s[1]);
-      if (verdict) out.clip_scores.push({ clip_id: c.clip_id, score: s[0], verdict: verdict });
-    });
-    if (state.suggested_use_wrong[c.clip_id]) out.suggested_use_wrong.push(c.clip_id);
     if (isTouched(c)) out.reviewed_clips.push(c.clip_id);
   });
   return out;
@@ -227,6 +192,20 @@ function downloadExport() {
 }
 
 // ---- playback -----------------------------------------------------------------------
+function applyRate() {
+  if (!video) return;
+  var h = range ? clip().highlights[sel] : null;
+  var slow = h && h.suggested_speed < 1 && !fullSpeed[h.highlight_id];
+  try { video.playbackRate = slow ? h.suggested_speed : 1; } catch (e) { /* ignore */ }
+}
+function toggleSpeed(i) {
+  var h = clip().highlights[i];
+  if (!h || !(h.suggested_speed < 1)) return;
+  if (fullSpeed[h.highlight_id]) delete fullSpeed[h.highlight_id]; else fullSpeed[h.highlight_id] = true;
+  sel = i;
+  applyRate();
+  renderSide();
+}
 function playHighlight(i) {
   var c = clip();
   var h = c.highlights[i];
@@ -235,6 +214,7 @@ function playHighlight(i) {
   range = { start: h.start_sec, end: h.end_sec };
   if (video) {
     video.currentTime = h.start_sec;
+    applyRate();
     try { var p = video.play(); if (p && p.catch) p.catch(function () { /* autoplay blocked */ }); } catch (e) { /* ignore */ }
   }
   renderSide();
@@ -267,15 +247,6 @@ function toggleReason(i, key) {
   if (st.reasons[key]) delete st.reasons[key]; else st.reasons[key] = true;
   saveState();
   renderSide();
-}
-function setScoreVote(val) {
-  var ss = scoreState(clip().clip_id);
-  ss.vote = ss.vote === val ? null : val;
-  ss.fixed = {};
-  if (ss.vote !== 'down') delete state.suggested_use_wrong[clip().clip_id];
-  saveState();
-  renderSide();
-  renderHeader();
 }
 function addMissed() {
   state.missed.push({ clip_id: clip().clip_id, at_sec: video ? video.currentTime : 0, note: '' });
@@ -332,31 +303,16 @@ function updateHead() {
   if (head && video) head.style.left = (video.currentTime / clip().duration_sec * 100) + '%';
 }
 
-function meterRow(c, name, label, value) {
-  var ss = scoreState(c.clip_id);
-  var editing = ss.vote === 'down';
-  var shown = editing && ss.fixed[name] !== undefined ? ss.fixed[name] : value;
-  var wrong = editing && ss.fixed[name] !== undefined && ss.fixed[name] !== value;
+function meterRow(name, label, value) {
   var bars = el('span', { class: 'bars' });
-  bars.style.setProperty('--c', color(shown === null ? 0 : shown));
+  bars.style.setProperty('--c', color(value === null ? 0 : value));
   for (var s = 1; s <= 5; s++) {
-    var seg = el('i', { class: shown !== null && s <= shown ? 'on' : '' });
-    seg.setAttribute('data-step', String(s));
-    bars.appendChild(seg);
+    bars.appendChild(el('i', { class: value !== null && s <= value ? 'on' : '' }));
   }
-  var row = el('div', { class: 'meter' + (editing && name !== 'overall' ? ' pickable' : '') + (wrong ? ' wrong' : '') }, [
-    el('span', { text: label }), bars, el('span', { class: 'n', text: shown === null ? '?' : String(shown) }),
+  var row = el('div', { class: 'meter' }, [
+    el('span', { text: label }), bars, el('span', { class: 'n', text: value === null ? '?' : String(value) }),
   ]);
   row.setAttribute('data-k', name);
-  if (editing && value !== null) {
-    bars.addEventListener('click', function (e) {
-      var step = e.target && e.target.getAttribute && e.target.getAttribute('data-step');
-      if (!step) return;
-      ss.fixed[name] = Number(step);
-      saveState();
-      renderSide();
-    });
-  }
   return row;
 }
 
@@ -366,7 +322,7 @@ function ringEl(overall) {
   var n = overall === null || overall === undefined ? 0 : overall;
   var off = (C * (1 - Math.max(0, Math.min(5, n)) / 5)).toFixed(1);
   var col = color(n);
-  wrap.innerHTML = '<svg width="96" height="96"><circle cx="48" cy="48" r="40" stroke="#2a2f3a" stroke-width="9" fill="none"/>' +
+  wrap.innerHTML = '<svg viewBox="0 0 96 96"><circle cx="48" cy="48" r="40" stroke="#2a2f3a" stroke-width="9" fill="none"/>' +
     '<circle cx="48" cy="48" r="40" stroke="' + col + '" stroke-width="9" fill="none" stroke-linecap="round" stroke-dasharray="' + C + '" stroke-dashoffset="' + off + '"/></svg>';
   wrap.appendChild(el('div', { class: 'val' }, [
     el('b', { text: overall === null || overall === undefined ? '?' : String(overall) }), el('small', { text: 'quality' }),
@@ -409,6 +365,17 @@ function highlightCard(h, i) {
     el('div', { class: 'desc', text: h.description }),
     reasons,
   ]);
+  if (h.suggested_speed < 1) {
+    var pct = Math.round(h.suggested_speed * 100);
+    var top = card.querySelector('.h-top');
+    var qnum = top.querySelector('.qnum');
+    var badge = el('span', { class: 'slowmo', text: '🐢 ' + pct + ' %', title: h.slowmo_reason || '' });
+    var spd = el('button', { class: 'spd' + (fullSpeed[h.highlight_id] ? ' on' : ''), text: '1×', title: 'Compare with 100 % speed (S)' });
+    spd.addEventListener('click', function (e) { e.stopPropagation(); toggleSpeed(i); });
+    top.insertBefore(badge, qnum.nextSibling);
+    top.insertBefore(spd, badge.nextSibling);
+    if (h.slowmo_reason) card.insertBefore(el('div', { class: 'slowwhy', text: h.slowmo_reason }), card.querySelector('.desc').nextSibling);
+  }
   card.setAttribute('data-i', String(i));
   card.addEventListener('click', function () { playHighlight(i); });
   return card;
@@ -416,42 +383,26 @@ function highlightCard(h, i) {
 
 function renderSide() {
   var c = clip();
-  var ss = scoreState(c.clip_id);
   var side = sideEl;
   side.textContent = '';
 
   var qm = el('div'), em = el('div');
-  QUALITY_ROWS.forEach(function (r) { qm.appendChild(meterRow(c, r[0], r[1], c.scores.quality[r[0]])); });
-  EDITORIAL_ROWS.forEach(function (r) { em.appendChild(meterRow(c, r[0], r[1], c.scores.editorial[r[0]])); });
+  QUALITY_ROWS.forEach(function (r) { qm.appendChild(meterRow(r[0], r[1], c.scores.quality[r[0]])); });
+  EDITORIAL_ROWS.forEach(function (r) { em.appendChild(meterRow(r[0], r[1], c.scores.editorial[r[0]])); });
   var tags = el('div', { class: 'tags' });
   if (c.scores.suggested_use) {
-    var pill = el('span', { class: 'tag use' + (ss.vote === 'down' ? ' pickable' : '') + (state.suggested_use_wrong[c.clip_id] ? ' wrong' : ''),
-      text: 'Suggested: ' + c.scores.suggested_use });
-    pill.addEventListener('click', function () {
-      if (scoreState(c.clip_id).vote !== 'down') return;
-      if (state.suggested_use_wrong[c.clip_id]) delete state.suggested_use_wrong[c.clip_id]; else state.suggested_use_wrong[c.clip_id] = true;
-      saveState();
-      renderSide();
-    });
+    var pill = el('span', { class: 'tag use', text: 'Suggested: ' + c.scores.suggested_use });
     tags.appendChild(pill);
   }
   c.scores.quality_issues.forEach(function (t) { tags.appendChild(el('span', { class: 'tag', text: t })); });
-  var sup = thumbBtn('up', ss.vote === 'up', { id: 'sup' });
-  var sdown = thumbBtn('down', ss.vote === 'down', { id: 'sdown' });
-  sup.addEventListener('click', function () { setScoreVote('up'); });
-  sdown.addEventListener('click', function () { setScoreVote('down'); });
-
   var clipCard = el('div', { class: 'card' }, [
     el('div', { class: 'clipname', text: c.file_name }),
     el('div', { class: 'clipmeta', text: (c.scene_hint || '(no scene hint)') + ' · ' + fmt(c.duration_sec) }),
     el('div', { class: 'summary', text: c.ai_summary || '' }),
-    el('div', { class: 'scores', style: 'margin-top:14px' }, [ringEl(c.scores.quality.overall), qm]),
+    el('div', { class: 'scores', style: 'margin-top:10px' }, [ringEl(c.scores.quality.overall), qm]),
     el('div', { class: 'group-title', text: 'Editorial' }),
     em,
     tags,
-    el('div', { class: 'scorevote' }, [document.createTextNode('Scores look right?'), el('span', { class: 'spacer' }), sup, sdown]),
-    el('div', { class: 'hint', style: 'display:' + (ss.vote === 'down' ? 'block' : 'none'),
-      text: 'Click the step where each wrong score should be.' + (c.scores.suggested_use ? ' Tap the suggested use if it is wrong.' : '') }),
   ]);
   side.appendChild(clipCard);
 
@@ -490,7 +441,7 @@ function showClip() {
       if (range && video.currentTime >= range.end) { video.currentTime = range.start; }   // loop the selected highlight
     });
     video.addEventListener('seeking', function () {
-      if (range && (video.currentTime < range.start - 0.3 || video.currentTime > range.end + 0.3)) range = null;
+      if (range && (video.currentTime < range.start - 0.3 || video.currentTime > range.end + 0.3)) { range = null; applyRate(); }
     });
     stageEl.appendChild(video);
   } else {
@@ -501,7 +452,7 @@ function showClip() {
     var blk = e.target.closest ? e.target.closest('.hl') : null;
     if (blk) { playHighlight(Number(blk.getAttribute('data-i'))); return; }
     var r = tl.getBoundingClientRect();
-    if (video && r.width > 0) { range = null; video.currentTime = (e.clientX - r.left) / r.width * clip().duration_sec; }
+    if (video && r.width > 0) { range = null; applyRate(); video.currentTime = (e.clientX - r.left) / r.width * clip().duration_sec; }
   });
   stageEl.appendChild(tl);
   stageEl.appendChild(el('div', { class: 'under' }, [
@@ -518,7 +469,7 @@ function keyHints() {
   function k(t) { out.push(el('kbd', { text: t })); }
   function s(t) { out.push(document.createTextNode(t)); }
   k('↑'); k('↓'); s(' highlight  '); k('Y'); s(' 👍  '); k('N'); s(' 👎  ');
-  k('M'); s(' missed  '); k('Space'); s(' play  '); k('⏎'); s(' next clip');
+  k('S'); s(' speed  '); k('M'); s(' missed  '); k('Space'); s(' play  '); k('⏎'); s(' next clip');
   return out;
 }
 
@@ -533,9 +484,10 @@ document.addEventListener('keydown', function (e) {
   else if (k === 'y') vote(sel, 'good');
   else if (k === 'n') vote(sel, 'bad');
   else if (k === 'm') addMissed();
+  else if (k === 's') toggleSpeed(sel);
   else if (k === ' ') { e.preventDefault(); togglePlay(); }
   else if (k === 'enter') { e.preventDefault(); goTo(cur + 1, true); }
-  else if (/^[1-4]$/.test(k)) toggleReason(sel, REASONS[Number(k) - 1][0]);
+  else if (/^[1-5]$/.test(k)) toggleReason(sel, REASONS[Number(k) - 1][0]);
 });
 
 function init() {

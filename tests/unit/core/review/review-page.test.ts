@@ -16,9 +16,9 @@ const data: ReviewData = {
         quality_issues: ['wind noise'], suggested_use: 'B-Roll',
       },
       highlights: [
-        { highlight_id: 11, start_sec: 3, end_sec: 5, description: 'first', quality: 8 },
-        { highlight_id: 12, start_sec: 10, end_sec: 12, description: 'second', quality: 7 },
-        { highlight_id: 13, start_sec: 20, end_sec: 22, description: 'third', quality: 9 },
+        { highlight_id: 11, start_sec: 3, end_sec: 5, description: 'first', quality: 8, slowmo: 'none', slowmo_reason: '', suggested_speed: 1 },
+        { highlight_id: 12, start_sec: 10, end_sec: 12, description: 'second', quality: 7, slowmo: 'light', slowmo_reason: 'waves rolling in', suggested_speed: 0.5 },
+        { highlight_id: 13, start_sec: 20, end_sec: 22, description: 'third', quality: 9, slowmo: 'strong', slowmo_reason: 'big splash', suggested_speed: 0.25 },
       ],
     },
     {
@@ -128,7 +128,7 @@ describe('review page v2', () => {
     expect(hl(p, 11)).toBeUndefined();
   });
 
-  it('keyboard: arrows select, Y/N vote, 1-4 toggle reasons, ignored while typing', () => {
+  it('keyboard: arrows select, Y/N vote, 1-5 toggle reasons, ignored while typing', () => {
     const p = load();
     p.key('ArrowDown');
     expect(p.doc.querySelector('.h.sel')?.getAttribute('data-i')).toBe('1');
@@ -136,12 +136,13 @@ describe('review page v2', () => {
     expect(hl(p, 12).verdicts).toEqual(['bad']);
     p.key('1');
     p.key('4');
-    expect(hl(p, 12).verdicts).toEqual(['bad', 'not_highlight', 'quality']);
+    p.key('5');
+    expect(hl(p, 12).verdicts).toEqual(['bad', 'not_highlight', 'quality', 'speed']);
     p.key('ArrowUp');
     p.key('y');
     expect(hl(p, 11).verdicts).toEqual(['good']);
     p.key('1'); // selected is now highlight 12 (auto-advance): bad, toggles reason off
-    expect(hl(p, 12).verdicts).toEqual(['bad', 'quality']);
+    expect(hl(p, 12).verdicts).toEqual(['bad', 'quality', 'speed']);
 
     p.click(`${card(0)} .thumb.down`);
     const input = p.doc.querySelector(`${card(0)} input.note`) as HTMLInputElement;
@@ -151,33 +152,64 @@ describe('review page v2', () => {
     expect(p.api.buildExport().missed).toEqual([]);
   });
 
-  it('score thumbs up marks every shown score ok', () => {
+  it('has no score-vote UI and exports no clip score verdicts', () => {
     const p = load();
-    p.click('#sup');
-    const scores = p.api.buildExport().clip_scores.filter((s: any) => s.clip_id === 1);
-    expect(scores.map((s: any) => s.score).sort()).toEqual([
-      'audio', 'composition', 'emotional', 'exposure', 'focus', 'overall', 'stability', 'storytelling', 'uniqueness',
-    ]);
-    expect(scores.every((s: any) => s.verdict === 'ok')).toBe(true);
+    expect(p.doc.querySelector('#sup')).toBeNull();
+    expect(p.doc.querySelector('#sdown')).toBeNull();
+    expect(p.doc.querySelector('.scorevote')).toBeNull();
+    expect(p.doc.body.textContent).not.toContain('Scores look right');
+    expect(p.all('.meter.pickable')).toHaveLength(0);
+    // read-only clip card still shows the scores
+    expect(p.all('.meter')).toHaveLength(8);
+    expect(p.doc.querySelector('.tag.use')?.textContent).toContain('B-Roll');
+    p.click('.tag.use');
+    p.click('.meter[data-k="stability"] i:last-child');
+    p.key('y');
+    const e = p.api.buildExport();
+    expect(e.clip_scores).toEqual([]);
+    expect(e.suggested_use_wrong).toEqual([]);
   });
 
-  it('score thumbs down: picking a step marks low/high, untouched stay ok; suggested use toggles', () => {
+  it('shows a slow-mo badge with reason only when suggested_speed < 1', () => {
     const p = load();
-    p.click('#sdown');
-    // stability is 3: should be 5 -> AI too low; audio is 2: should be 1 -> AI too high
-    p.click('.meter[data-k="stability"] i[data-step="5"]');
-    p.click('.meter[data-k="audio"] i[data-step="1"]');
-    const v = (name: string) => p.api.buildExport().clip_scores.find((s: any) => s.clip_id === 1 && s.score === name)?.verdict;
-    expect(v('stability')).toBe('low');
-    expect(v('audio')).toBe('high');
-    expect(v('focus')).toBe('ok');
-    p.click('.tag.use');
-    expect(p.api.buildExport().suggested_use_wrong).toEqual([1]);
-    p.click('.tag.use');
-    expect(p.api.buildExport().suggested_use_wrong).toEqual([]);
-    // clicking the active thumb again clears the score vote
-    p.click('#sdown');
-    expect(p.api.buildExport().clip_scores).toEqual([]);
+    expect(p.doc.querySelector(`${card(0)} .slowmo`)).toBeNull();
+    expect(p.doc.querySelector(`${card(0)} .spd`)).toBeNull();
+    expect(p.doc.querySelector(`${card(1)} .slowmo`)?.textContent).toContain('50 %');
+    expect(p.doc.querySelector(`${card(1)} .slowmo`)?.textContent).toContain('🐢');
+    expect(p.doc.querySelector(`${card(1)}`)?.textContent).toContain('waves rolling in');
+    expect(p.doc.querySelector(`${card(2)} .slowmo`)?.textContent).toContain('25 %');
+  });
+
+  it('playing a slow-mo highlight uses its suggested rate; S toggles to 1x and back; normal highlights play at 1', () => {
+    const p = load();
+    p.click(card(1));
+    expect(p.video().playbackRate).toBe(0.5);
+    p.key('s');
+    expect(p.video().playbackRate).toBe(1);
+    p.key('s');
+    expect(p.video().playbackRate).toBe(0.5);
+    p.click(`${card(1)} .spd`);
+    expect(p.video().playbackRate).toBe(1);
+    p.click(card(2));
+    expect(p.video().playbackRate).toBe(0.25);
+    p.click(card(0));
+    expect(p.video().playbackRate).toBe(1);
+    p.key('s'); // nothing to toggle on a normal-speed highlight
+    expect(p.video().playbackRate).toBe(1);
+  });
+
+  it('thumbs up on a highlight auto-advances into the next one at its suggested rate', () => {
+    const p = load();
+    p.click(`${card(0)} .thumb.up`);
+    expect(p.video().playbackRate).toBe(0.5);
+  });
+
+  it('reason chip 5 "Speed wrong" is always offered and exports as bad + speed', () => {
+    const p = load();
+    p.click(`${card(0)} .thumb.down`);
+    expect(p.doc.querySelector(`${card(0)} .chip[data-r="speed"]`)?.textContent).toContain('Speed wrong');
+    p.key('5');
+    expect(hl(p, 11).verdicts).toEqual(['bad', 'speed']);
   });
 
   it('M adds a missed moment at the playhead; it can get a note and be removed', () => {
@@ -218,7 +250,6 @@ describe('review page v2', () => {
   it('state survives a reload and the page opens on the first clip not done', () => {
     const p = load();
     p.key('y');
-    p.click('#sup');
     p.key('Enter');
     const p2 = load(p.storage());
     expect(Object.keys(p.storage())[0]).toMatch(/^clippilot-review-v2:/);
@@ -226,7 +257,6 @@ describe('review page v2', () => {
     const e = p2.api.buildExport();
     expect(e.highlights.find((h: any) => h.highlight_id === 11).verdicts).toEqual(['good']);
     expect(e.reviewed_clips).toEqual([1]);
-    expect(e.clip_scores.length).toBeGreaterThan(0);
   });
 
   it('export has the verdict-schema shape', () => {

@@ -19,7 +19,7 @@ function clip(overrides: Partial<Clip>): Clip {
 }
 
 function hl(id: number, clip_id: number, start: number): HighlightRecord {
-  return { id, clip_id, start_sec: start, end_sec: start + 2, description: `d${id}`, quality: 4, created_at: 't' };
+  return { id, clip_id, start_sec: start, end_sec: start + 2, description: `d${id}`, quality: 4, slowmo: 'light', slowmo_reason: 'waves', suggested_speed: 0.5, created_at: 't' };
 }
 
 const build = (clips: Clip[], highlights: HighlightRecord[] = []) =>
@@ -52,7 +52,7 @@ describe('buildReviewData', () => {
     const data = build([clip({ id: 1, ai_summary: 'sum' })], [hl(10, 1, 8), hl(11, 1, 2)]);
     const c = data.clips[0];
     expect(c.highlights.map((h) => h.highlight_id)).toEqual([11, 10]);
-    expect(c.highlights[0]).toEqual({ highlight_id: 11, start_sec: 2, end_sec: 4, description: 'd11', quality: 4 });
+    expect(c.highlights[0]).toEqual({ highlight_id: 11, start_sec: 2, end_sec: 4, description: 'd11', quality: 4, slowmo: 'light', slowmo_reason: 'waves', suggested_speed: 0.5 });
     expect(c.ai_summary).toBe('sum');
     expect(c.file_name).toBe('a.mp4');
     expect(c.file_path).toBe('/v/a.mp4');
