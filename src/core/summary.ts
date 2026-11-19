@@ -37,13 +37,10 @@ class NameCounter {
   private buckets = new Map<string, Bucket>();
 
   add(clipId: number, raw: unknown): void {
-    if (typeof raw !== 'string') return;
-    for (const part of raw.split(',')) this.addOne(clipId, part);
+    for (const name of splitTags(raw)) this.addOne(clipId, name);
   }
 
-  private addOne(clipId: number, raw: string): void {
-    const name = raw.trim();
-    if (!name) return;
+  private addOne(clipId: number, name: string): void {
     const key = name.toLowerCase();
     let b = this.buckets.get(key);
     if (!b) {
@@ -70,7 +67,13 @@ class NameCounter {
   }
 }
 
-function parseScenes(json: string | null): Array<{ setting?: unknown; activity?: unknown }> {
+/** Split a comma-separated tag string into trimmed, non-empty names (original case). */
+export function splitTags(raw: unknown): string[] {
+  if (typeof raw !== 'string') return [];
+  return raw.split(',').map((p) => p.trim()).filter(Boolean);
+}
+
+export function parseScenes(json: string | null): Array<{ setting?: unknown; activity?: unknown }> {
   if (!json) return [];
   try {
     const v = JSON.parse(json);
