@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ClipAnalysisResponseSchema } from '../../../../src/core/analyze/schema.js';
+import { ClipAnalysisResponseSchema, HighlightSchema } from '../../../../src/core/analyze/schema.js';
 
 const VALID_RESPONSE = {
   scenes: [
@@ -111,7 +111,7 @@ describe('ClipAnalysisResponseSchema highlights', () => {
       highlights: [{ start_sec: 2.5, end_sec: 6, description: 'Wave crashes on rocks', quality: 8 }],
     });
     expect(result.highlights).toEqual([
-      { start_sec: 2.5, end_sec: 6, description: 'Wave crashes on rocks', quality: 8 },
+      { start_sec: 2.5, end_sec: 6, description: 'Wave crashes on rocks', quality: 8, slowmo: 'none', slowmo_reason: '' },
     ]);
   });
 
@@ -128,5 +128,18 @@ describe('ClipAnalysisResponseSchema highlights', () => {
         }),
       ).toThrow();
     }
+  });
+});
+
+describe('HighlightSchema slowmo', () => {
+  const base = { start_sec: 1, end_sec: 3, description: 'd', quality: 7 };
+  it('defaults slowmo to none and reason to empty for old responses', () => {
+    const h = HighlightSchema.parse(base);
+    expect(h.slowmo).toBe('none');
+    expect(h.slowmo_reason).toBe('');
+  });
+  it('accepts light/strong and rejects other values', () => {
+    expect(HighlightSchema.parse({ ...base, slowmo: 'strong', slowmo_reason: 'waves' }).slowmo).toBe('strong');
+    expect(() => HighlightSchema.parse({ ...base, slowmo: 'extreme' })).toThrow();
   });
 });

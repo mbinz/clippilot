@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeHighlights } from '../../../../src/core/analyze/highlights.js';
+import { normalizeHighlights, suggestedSpeed } from '../../../../src/core/analyze/highlights.js';
 
 const h = (start_sec: number, end_sec: number, quality = 5) => ({
   start_sec,
@@ -40,5 +40,37 @@ describe('normalizeHighlights', () => {
     const out = normalizeHighlights([h(1.234, 3.456)], 13.0);
     expect(out[0].start_sec).toBe(1.23);
     expect(out[0].end_sec).toBe(3.46);
+  });
+});
+
+describe('suggestedSpeed', () => {
+  const table: [any, number | null, number][] = [
+    ['none', 25, 1], ['none', 50, 1], ['none', 100, 1],
+    ['light', 25, 1], ['light', 47.9, 1], ['light', 50, 0.5], ['light', 100, 0.5],
+    ['strong', 25, 1], ['strong', 50, 0.5], ['strong', 60, 0.5], ['strong', 89.9, 0.5], ['strong', 90, 0.25], ['strong', 100, 0.25],
+    ['strong', null, 1],
+  ];
+  for (const [slowmo, fps, want] of table) {
+    it(`${slowmo} @ ${fps} fps -> ${want}`, () => {
+      expect(suggestedSpeed(slowmo, fps)).toBe(want);
+    });
+  }
+});
+
+describe('normalizeHighlights speed', () => {
+  it('adds suggested_speed from slowmo and fps', () => {
+    const out = normalizeHighlights([{ ...h(1, 3), slowmo: 'strong' as const, slowmo_reason: 'splash' }], 13, 100);
+    expect(out[0].suggested_speed).toBe(0.25);
+    expect(out[0].slowmo).toBe('strong');
+    expect(out[0].slowmo_reason).toBe('splash');
+  });
+
+  it('talking (slowmo none) stays 1 even at 100 fps', () => {
+    const out = normalizeHighlights([{ ...h(1, 3), slowmo: 'none' as const, slowmo_reason: '' }], 13, 100);
+    expect(out[0].suggested_speed).toBe(1);
+  });
+
+  it('defaults to speed 1 without fps or slowmo', () => {
+    expect(normalizeHighlights([h(1, 3)], 13)[0].suggested_speed).toBe(1);
   });
 });

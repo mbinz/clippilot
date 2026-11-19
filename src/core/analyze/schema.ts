@@ -34,9 +34,12 @@ export const HighlightSchema = z.object({
   end_sec: z.number(),
   description: z.string(),
   quality: z.number().int().min(1).max(10),
+  slowmo: z.enum(['none', 'light', 'strong']).default('none'),
+  slowmo_reason: z.string().default(''),
 });
 
-export type HighlightResponse = z.infer<typeof HighlightSchema>;
+export type SlowmoLevel = z.infer<typeof HighlightSchema>['slowmo'];
+export type HighlightResponse = z.input<typeof HighlightSchema>;
 
 export const ClipAnalysisResponseSchema = z.object({
   scenes: z.array(SceneSchema),

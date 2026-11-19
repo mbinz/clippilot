@@ -19,4 +19,12 @@ describe("USER_PROMPT", () => {
     expect(USER_PROMPT).not.toContain('"Ort/Setting"');
     expect(USER_PROMPT).not.toContain('"Aktivität"');
   });
+
+  it("asks for a slowmo judgement per highlight with reason, none for speech", () => {
+    expect(USER_PROMPT).toMatch(/"slowmo": "none"/);
+    expect(USER_PROMPT).toMatch(/slowmo_reason/);
+    expect(USER_PROMPT).toMatch(/light/);
+    expect(USER_PROMPT).toMatch(/strong/);
+    expect(USER_PROMPT).toMatch(/Sprache/);
+  });
 });

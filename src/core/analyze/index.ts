@@ -69,7 +69,7 @@ export async function analyzeClips(
         clipRepo.updateAnalysis(clip.id, dbFields);
         highlightRepo?.replaceForClip(
           clip.id,
-          normalizeHighlights(analysis.highlights, clip.duration_sec),
+          normalizeHighlights(analysis.highlights, clip.duration_sec, clip.fps),
         );
         success++;
       } catch (err) {

@@ -1,14 +1,35 @@
-import type { HighlightResponse } from './schema.js';
+import type { HighlightResponse, SlowmoLevel } from './schema.js';
 
 const MIN_LENGTH_SEC = 0.5;
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-/** Clamp to [0, duration], drop too-short entries, sort by start, round to 0.01 s. */
+export interface NormalizedHighlight {
+  start_sec: number;
+  end_sec: number;
+  description: string;
+  quality: number;
+  slowmo: SlowmoLevel;
+  slowmo_reason: string;
+  suggested_speed: number;
+}
+
+/**
+ * Playback speed suggested for a moment. The model only judges whether slow motion suits the moment;
+ * whether the footage has enough frames for it is decided here (assumes a 25 fps timeline).
+ */
+export function suggestedSpeed(slowmo: SlowmoLevel, fps: number | null | undefined): number {
+  if (slowmo === 'none' || !fps || fps < 48) return 1;
+  if (slowmo === 'strong' && fps >= 90) return 0.25;
+  return 0.5;
+}
+
+/** Clamp to [0, duration], drop too-short entries, sort by start, round to 0.01 s, add suggested_speed. */
 export function normalizeHighlights(
   raw: HighlightResponse[],
   durationSec: number,
-): HighlightResponse[] {
+  fps?: number | null,
+): NormalizedHighlight[] {
   return raw
     .map((h) => ({
       ...h,
@@ -17,5 +38,16 @@ export function normalizeHighlights(
     }))
     .filter((h) => h.end_sec - h.start_sec >= MIN_LENGTH_SEC)
     .sort((a, b) => a.start_sec - b.start_sec)
-    .map((h) => ({ ...h, start_sec: round2(h.start_sec), end_sec: round2(h.end_sec) }));
+    .map((h) => {
+      const slowmo = h.slowmo ?? 'none';
+      return {
+        start_sec: round2(h.start_sec),
+        end_sec: round2(h.end_sec),
+        description: h.description,
+        quality: h.quality,
+        slowmo,
+        slowmo_reason: h.slowmo_reason ?? '',
+        suggested_speed: suggestedSpeed(slowmo, fps),
+      };
+    });
 }
