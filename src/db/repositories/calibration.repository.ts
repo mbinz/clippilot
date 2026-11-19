@@ -57,6 +57,9 @@ export class CalibrationRepository {
       const insNote = this.db.prepare('INSERT INTO clip_notes (round_id, clip_id, note, suggested_use_wrong) VALUES (?, ?, ?, ?)');
       for (const [clipId, n] of notes) insNote.run(roundId, clipId, n.note, n.wrong);
 
+      const insRev = this.db.prepare('INSERT OR IGNORE INTO calibration_reviewed_clips (round_id, clip_id) VALUES (?, ?)');
+      for (const clipId of data.reviewed_clips) insRev.run(roundId, clipId);
+
       return roundId;
     });
     const roundId = tx();
@@ -68,6 +71,7 @@ export class CalibrationRepository {
     const rows = this.db.prepare(`
       SELECT clip_id FROM highlight_verdicts UNION SELECT clip_id FROM missed_moments
       UNION SELECT clip_id FROM clip_score_verdicts UNION SELECT clip_id FROM clip_notes
+      UNION SELECT clip_id FROM calibration_reviewed_clips
     `).all() as { clip_id: number }[];
     return new Set(rows.map((r) => r.clip_id));
   }
@@ -99,6 +103,7 @@ export class CalibrationRepository {
     const notes = this.db.prepare('SELECT clip_id, note, suggested_use_wrong FROM clip_notes WHERE round_id = ?').all(roundId) as any[];
 
     const clips = new Set<number>();
+    for (const r of this.db.prepare('SELECT clip_id FROM calibration_reviewed_clips WHERE round_id = ?').all(roundId) as any[]) clips.add(r.clip_id);
     for (const h of hv) if (h.verdicts.length > 0 || h.note) clips.add(h.clip_id);
     for (const m of missed) clips.add(m.clip_id);
     for (const s of scores) clips.add(s.clip_id);

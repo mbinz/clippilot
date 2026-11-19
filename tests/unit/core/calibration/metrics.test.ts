@@ -19,7 +19,7 @@ describe('computeRoundMetrics', () => {
     expect(m.reviewed_highlights).toBe(4);
     expect(m.good_only).toBe(1);
     expect(m.precision).toBe(0.25);
-    expect(m.flags).toEqual({ timing: 2, description: 1, quality: 1 });
+    expect(m.flags).toEqual({ timing: 2, description: 1, quality: 1, not_highlight: 0 });
     expect(m.reviewed_clips).toBe(3);
   });
 
@@ -80,5 +80,16 @@ describe('computeRoundMetrics', () => {
       expect(m.precision).toBe(0.75);
       expect(m.stop_rule_met).toBe(false);
     });
+  });
+
+  it('counts not_highlight as its own flag, and ["bad"] alone is not good', () => {
+    const m = computeRoundMetrics(
+      [hl(1, 10, ['good']), hl(2, 10, ['bad']), hl(3, 10, ['bad', 'not_highlight']), hl(4, 10, ['bad', 'timing'])],
+      [],
+      [10],
+    );
+    expect(m.good_only).toBe(1);
+    expect(m.precision).toBe(0.25);
+    expect(m.flags).toEqual({ timing: 1, description: 0, quality: 0, not_highlight: 1 });
   });
 });

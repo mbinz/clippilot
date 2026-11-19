@@ -121,6 +121,27 @@ describe('CalibrationRepository', () => {
     expect(rounds[1].metrics.missed_moments).toBe(1);
     expect(rounds[1].metrics.reviewed_clips).toBe(2);
   });
+  it('stores reviewed_clips and counts them as reviewed with 0 missed', () => {
+    const { round_id, metrics } = repo.importRound(projectId, 1, parseVerdictExport({
+      project: 'Delfine', db_generated_at: 'x', reviewed_at: 'y',
+      highlights: [{ highlight_id: hlIds[0], clip_id: clipA, verdicts: ['good'], note: '' }],
+      missed: [], clip_notes: [], reviewed_clips: [clipA, clipB],
+    }));
+    expect(metrics.reviewed_clips).toBe(2);
+    expect(metrics.missed_per_clip).toBe(0);
+    const rows = db.prepare('SELECT clip_id FROM calibration_reviewed_clips WHERE round_id = ? ORDER BY clip_id').all(round_id);
+    expect(rows).toEqual([{ clip_id: clipA }, { clip_id: clipB }]);
+    expect(repo.reviewedClipIds()).toEqual(new Set([clipA, clipB]));
+  });
+
+});
+
+describe('parseVerdictExport reviewed_clips', () => {
+  const base = { project: 'x', db_generated_at: 'a', reviewed_at: 'b', highlights: [], missed: [], clip_notes: [] };
+  it('defaults reviewed_clips to [] and accepts a list', () => {
+    expect(parseVerdictExport(base).reviewed_clips).toEqual([]);
+    expect(parseVerdictExport({ ...base, reviewed_clips: [3, 4] }).reviewed_clips).toEqual([3, 4]);
+  });
 });
 
 describe('parseVerdictExport', () => {
@@ -149,4 +170,5 @@ describe('CalibrationRepository reviewed clips', () => {
     expect(repo.reviewedClipIds()).toEqual(new Set([11, 12, 13, 14]));
     expect(repo.roundCount()).toBe(2);
   });
+
 });

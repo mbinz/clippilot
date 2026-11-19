@@ -47,8 +47,10 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/cli-progress": "^3.11.6",
+    "@types/jsdom": "^30.0.0",
     "@types/node": "^25.5.0",
     "@types/uuid": "^10.0.0",
+    "jsdom": "^29.1.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.0"

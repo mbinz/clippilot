@@ -23,6 +23,8 @@ const VerdictExportSchema = z.object({
     verdict: z.enum(['low', 'ok', 'high']),
   })).default([]),
   suggested_use_wrong: z.array(z.number().int()).default([]),
+  // clips the user went through (review page v2); absent in older exports
+  reviewed_clips: z.array(z.number().int()).default([]),
 });
 
 export type VerdictExport = z.infer<typeof VerdictExportSchema>;
