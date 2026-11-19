@@ -9,93 +9,143 @@ function escapeJsonForScript(json: string): string {
 }
 
 const STYLE = `
-:root { color-scheme: light dark; --bg:#fafafa; --fg:#1d1d1f; --muted:#6b6b72; --card:#fff; --line:#d9d9de;
-  --accent:#2f6fed; --band:rgba(47,111,237,.55); --ok:#1f8f4e; --warn:#c2410c; }
-@media (prefers-color-scheme: dark) {
-  :root { --bg:#17171a; --fg:#ececf0; --muted:#9a9aa5; --card:#212126; --line:#3a3a42; --accent:#6c9cff;
-    --band:rgba(108,156,255,.6); --ok:#4cc27f; --warn:#f08a50; }
-}
-* { box-sizing: border-box; }
-body { margin:0; font:14px/1.45 system-ui, sans-serif; background:var(--bg); color:var(--fg); }
-header { position:sticky; top:0; z-index:5; display:flex; flex-wrap:wrap; gap:12px; align-items:center;
-  padding:10px 16px; background:var(--card); border-bottom:1px solid var(--line); }
-header h1 { font-size:16px; margin:0; }
-main { padding:16px; }
-h2 { font-size:13px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:28px 0 8px; }
-.clip { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; margin-bottom:16px; }
-.clip h3 { margin:0 0 4px; font-size:15px; }
-.meta, .tags { color:var(--muted); font-size:12px; margin:2px 0; }
-.clip-body { display:block; }
-@media (min-width: 1000px) {
-  .clip-body { display:grid; grid-template-columns: minmax(0, 1fr) 440px; gap:16px; align-items:start; }
-  .left { position:sticky; top:var(--header-h, 56px); }
-}
-.right > :first-child { margin-top:0; }
-video { width:100%; height:auto; object-fit:contain;
-  max-height:calc(100vh - var(--header-h, 56px) - 120px); background:#000; border-radius:4px; margin-top:8px; }
-.noproxy { padding:24px; text-align:center; color:var(--muted); border:1px dashed var(--line); margin-top:8px; }
-.bar { position:relative; height:18px; margin:6px 0; background:var(--bg); border:1px solid var(--line); border-radius:3px; }
-.band { position:absolute; top:0; bottom:0; min-width:3px; background:var(--band); cursor:pointer; border:0; padding:0; }
-.controls { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:4px 0 8px; }
-.hl { border-top:1px solid var(--line); padding:8px 0; }
-.hl-head { display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; }
-.verdicts { display:flex; gap:6px; flex-wrap:wrap; margin:6px 0; }
-button, select { font:inherit; color:inherit; background:var(--card); border:1px solid var(--line);
-  border-radius:4px; padding:2px 8px; cursor:pointer; }
-button.on { background:var(--accent); border-color:var(--accent); color:#fff; }
-button.on.bad { background:var(--warn); border-color:var(--warn); }
-button.on.good { background:var(--ok); border-color:var(--ok); }
-input[type=text], textarea { width:100%; font:inherit; color:inherit; background:var(--bg);
-  border:1px solid var(--line); border-radius:4px; padding:4px 6px; }
-.score-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:2px 0; }
-.score-row .name { width:100px; }
-.score-row .val { width:24px; text-align:right; font-weight:600; }
-.issues { margin:4px 0; padding-left:18px; color:var(--muted); font-size:12px; }
-.missed { display:flex; gap:8px; align-items:center; margin:4px 0; }
-.missed input { flex:1; }
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a;
+    --text:#e8eaf0; --muted:#8b93a3; --accent:#7c9cff;
+    --good:#3ecf8e; --bad:#ff6b6b; --warn:#ffb547; --seg:#3a4150;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif}
+  header{display:flex;align-items:center;gap:20px;padding:12px 24px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:5}
+  header h1{font-size:15px;margin:0;font-weight:600}
+  header .sub{color:var(--muted);font-size:13px}
+  .progress{display:flex;gap:4px;flex:1;max-width:420px}
+  .progress span{flex:1;height:6px;border-radius:3px;background:var(--seg)}
+  .progress span.done{background:var(--good)}
+  .progress span.cur{background:var(--accent)}
+  .btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px 14px;font:inherit;cursor:pointer}
+  .btn:hover{border-color:#3d4452}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#0b0d12;font-weight:600}
+  .spacer{flex:1}
+  main{display:grid;grid-template-columns:minmax(0,1fr) 440px;gap:20px;padding:20px 24px}
+  /* left */
+  .stage{position:sticky;top:76px;align-self:start}
+  video{width:100%;max-height:calc(100vh - 230px);background:#000;border-radius:10px;display:block}
+  .timeline{position:relative;height:34px;margin-top:12px;background:var(--panel);border-radius:6px;cursor:pointer}
+  .timeline .hl{position:absolute;top:6px;bottom:6px;border-radius:4px;background:#4a5366;border:1px solid transparent}
+  .timeline .hl.sel{outline:2px solid var(--accent);outline-offset:1px}
+  .timeline .hl.good{background:rgba(62,207,142,.55)}
+  .timeline .hl.bad{background:rgba(255,107,107,.55)}
+  .timeline .miss{position:absolute;top:0;bottom:0;width:3px;background:var(--warn);border-radius:2px}
+  .timeline .miss::after{content:"★";position:absolute;top:-16px;left:-5px;color:var(--warn);font-size:12px}
+  .timeline .head{position:absolute;top:-3px;bottom:-3px;width:2px;background:#fff;pointer-events:none}
+  .under{display:flex;align-items:center;gap:10px;margin-top:12px;color:var(--muted);font-size:13px}
+  .keys{margin-left:auto}
+  kbd{background:var(--panel2);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;font:12px ui-monospace,monospace;color:var(--text)}
+  /* right */
+  .side{display:flex;flex-direction:column;gap:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .clipname{font-weight:600;font-size:15px}
+  .clipmeta{color:var(--muted);font-size:12px;margin-top:2px}
+  .summary{color:#c3c8d3;margin-top:8px;font-size:13px}
+  .scores{display:grid;grid-template-columns:96px 1fr;gap:16px;align-items:center}
+  .ring{position:relative;width:96px;height:96px}
+  .ring svg{transform:rotate(-90deg)}
+  .ring .val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .ring .val b{font-size:24px}
+  .ring .val small{color:var(--muted);font-size:11px}
+  .meter{display:grid;grid-template-columns:92px 1fr 22px;align-items:center;gap:8px;font-size:12px;color:var(--muted);padding:2px 4px;border-radius:6px}
+  .bars{display:flex;gap:3px}
+  .bars i{flex:1;height:8px;border-radius:2px;background:var(--seg)}
+  .bars i.on{background:var(--c)}
+  .meter .n{color:var(--text);text-align:right}
+  .group-title{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
+  .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .tag{font-size:11px;padding:3px 8px;border-radius:999px;background:rgba(255,181,71,.12);color:var(--warn)}
+  .tag.use{background:rgba(124,156,255,.14);color:var(--accent)}
+  .scorevote{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
+  .meter.pickable{cursor:pointer}
+  .meter.pickable:hover{background:var(--panel2)}
+  .meter.wrong{background:rgba(255,107,107,.12)}
+  .meter.wrong .n{color:var(--bad)}
+  .hint{font-size:12px;color:var(--bad);margin-top:6px}
+  /* highlights */
+  .hlist{display:flex;flex-direction:column;gap:8px}
+  .h{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer}
+  .h.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+  .h.good{border-left:4px solid var(--good)}
+  .h.bad{border-left:4px solid var(--bad)}
+  .h-top{display:flex;align-items:center;gap:10px}
+  .time{font:12px ui-monospace,monospace;color:var(--muted)}
+  .qdots{display:flex;gap:2px;margin-left:4px}
+  .qdots i{width:5px;height:5px;border-radius:50%;background:var(--seg)}
+  .qdots i.on{background:var(--accent)}
+  .qnum{font-size:12px;color:var(--muted)}
+  .thumbs{margin-left:auto;display:flex;gap:6px}
+  .thumb{width:38px;height:34px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);font-size:16px;cursor:pointer;filter:grayscale(1);opacity:.75}
+  .thumb:hover{opacity:1;filter:none}
+  .thumb.up.on{background:rgba(62,207,142,.18);border-color:var(--good);filter:none;opacity:1}
+  .thumb.down.on{background:rgba(255,107,107,.18);border-color:var(--bad);filter:none;opacity:1}
+  .desc{margin-top:6px;font-size:13px;color:#d4d8e1}
+  .reasons{margin-top:10px;display:none;flex-wrap:wrap;gap:6px}
+  .h.bad .reasons{display:flex}
+  .chip{font-size:12px;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer}
+  .chip.on{background:var(--bad);border-color:var(--bad);color:#1a0b0b;font-weight:600}
+  .chip kbd{margin-right:4px}
+  .note{width:100%;margin-top:6px;background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--text);padding:7px 10px;font:inherit;font-size:13px}
+  .missed{background:var(--panel);border:1px dashed var(--warn);border-radius:12px;padding:10px 14px;display:flex;gap:10px;align-items:center;font-size:13px}
+  .missed .time{color:var(--warn)}
+  .missed input{flex:1;background:transparent;border:0;color:var(--text);font:inherit}
+  .footer{display:flex;gap:10px;position:sticky;bottom:0;padding:12px 0;background:linear-gradient(transparent,var(--bg) 30%)}
+  .footer .btn{flex:1}
+  @media (max-width:1000px){main{grid-template-columns:1fr}.stage{position:static}.keys{display:none}}
+
+  .empty{color:var(--muted);text-align:center;padding:22px 14px;border:1px dashed var(--line);border-radius:12px}
+  .noproxy{display:flex;align-items:center;justify-content:center;height:240px;background:#000;border-radius:10px;color:var(--muted)}
+  .tag.use.pickable{cursor:pointer}
+  .tag.use.wrong{background:rgba(255,107,107,.16);color:var(--bad);text-decoration:line-through}
+  .meter i[data-step]{cursor:default}
+  .meter.pickable i[data-step]{cursor:pointer}
 `;
 
 // Page script: plain DOM code, no framework. Data comes from the #review-data JSON block.
 // Note: this lives in a TS template literal, so it must not contain backticks or dollar-brace.
 const SCRIPT = `
 var data = JSON.parse(document.getElementById('review-data').textContent);
-var STORAGE_KEY = 'clippilot-review:' + data.project + ':' + data.generated_at;
-var VERDICTS = [['good', 'good'], ['timing', 'timing off'], ['description', 'description off'], ['quality', 'quality off']];
+var STORAGE_KEY = 'clippilot-review-v2:' + data.project + ':' + data.generated_at;
+var REASONS = [['not_highlight', 'Not a highlight'], ['timing', 'Timing off'], ['description', 'Description wrong'], ['quality', 'Shaky / poor quality']];
+var QUALITY_ROWS = [['stability', 'Stability'], ['focus', 'Focus'], ['exposure', 'Exposure'], ['composition', 'Composition'], ['audio', 'Audio']];
+var EDITORIAL_ROWS = [['emotional', 'Emotional'], ['storytelling', 'Storytelling'], ['uniqueness', 'Uniqueness']];
 
-// state.highlights[id] = { verdicts: [], note: '' }; state.missed = [{ clip_id, at_sec, note }]; state.clip_notes[id] = ''
-// state.clip_scores[id][score] = 'low'|'ok'|'high'; state.suggested_use_wrong[id] = true
+// state.highlights[id] = { vote: 'good'|'bad'|null, reasons: { key: true }, note: '' }
+// state.scores[clip_id] = { vote: 'up'|'down'|null, fixed: { score: step } }
+// state.missed = [{ clip_id, at_sec, note }]; state.suggested_use_wrong[clip_id] = true; state.done[clip_id] = true
 var state = loadState();
-var filter = 'all';
-var clipEls = [];   // { clip, el } so the filter can show/hide cards
-var progressEl, missedLists = {};
+var cur = 0, sel = 0, range = null;
+var video = null;
+var stageEl, sideEl, headerEl;
 
 function loadState() {
-  try {
-    var saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (saved) return withDefaults(saved);
-  } catch (e) { /* storage unavailable: start empty */ }
-  return withDefaults({});
-}
-// state saved by an older page version lacks the newer fields
-function withDefaults(st) {
+  var st = {};
+  try { st = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch (e) { st = {}; }
   st.highlights = st.highlights || {};
+  st.scores = st.scores || {};
   st.missed = st.missed || [];
-  st.clip_notes = st.clip_notes || {};
-  st.clip_scores = st.clip_scores || {};            // clip_scores[clip_id][score] = 'low' | 'ok' | 'high'
-  st.suggested_use_wrong = st.suggested_use_wrong || {};   // suggested_use_wrong[clip_id] = true
+  st.suggested_use_wrong = st.suggested_use_wrong || {};
+  st.done = st.done || {};
   return st;
 }
-function isScored(clipId) { return Object.keys(state.clip_scores[clipId] || {}).length > 0; }
 function saveState() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
-  updateProgress();
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* storage unavailable */ }
 }
 function hlState(id) {
-  if (!state.highlights[id]) state.highlights[id] = { verdicts: [], note: '' };
+  if (!state.highlights[id]) state.highlights[id] = { vote: null, reasons: {}, note: '' };
   return state.highlights[id];
 }
-function isReviewed(id) { return hlState(id).verdicts.length > 0; }
-function isFlagged(id) { return hlState(id).verdicts.some(function (v) { return v !== 'good'; }); }
+function scoreState(clipId) {
+  if (!state.scores[clipId]) state.scores[clipId] = { vote: null, fixed: {} };
+  return state.scores[clipId];
+}
 
 function el(tag, props, children) {
   var node = document.createElement(tag);
@@ -109,225 +159,66 @@ function el(tag, props, children) {
   return node;
 }
 function fmt(sec) {
-  var m = Math.floor(sec / 60), s = (sec % 60).toFixed(1);
-  return m + ':' + (s < 10 ? '0' : '') + s;
+  var s = Math.round(sec);
+  return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
 }
+function color(n) { return n >= 4 ? '#3ecf8e' : n >= 3 ? '#ffb547' : '#ff6b6b'; }
+function clip() { return data.clips[cur]; }
 
-function buildClip(clip) {
-  var video = clip.proxy_url ? el('video', { src: clip.proxy_url, controls: '', preload: 'metadata' }) : null;
-  var rate = 1, loop = false, range = null;   // range = { start, end } while a highlight is playing
-
-  function playRange(h) {
-    if (!video) return;
-    range = { start: h.start_sec, end: h.end_sec };
-    video.currentTime = h.start_sec;
-    video.playbackRate = rate;
-    video.play();
+// ---- derived verdicts -------------------------------------------------------------
+function shownScores(c) {
+  var out = [];
+  QUALITY_ROWS.forEach(function (r) { out.push([r[0], c.scores.quality[r[0]]]); });
+  out.push(['overall', c.scores.quality.overall]);
+  EDITORIAL_ROWS.forEach(function (r) { out.push([r[0], c.scores.editorial[r[0]]]); });
+  return out.filter(function (s) { return s[1] !== null && s[1] !== undefined; });
+}
+function scoreVerdict(c, name, value) {
+  var ss = scoreState(c.clip_id);
+  if (ss.vote === 'up') return 'ok';
+  if (ss.vote === 'down') {
+    var fixed = ss.fixed[name];
+    if (fixed === undefined || fixed === value) return 'ok';
+    return fixed > value ? 'low' : 'high';   // AI too low / too high
   }
-  if (video) {
-    video.addEventListener('timeupdate', function () {
-      if (!range || video.currentTime < range.end) return;
-      if (loop) video.currentTime = range.start; else { video.pause(); range = null; }
-    });
-    video.addEventListener('seeking', function () {
-      // user scrubbed outside the range: stop enforcing it
-      if (range && (video.currentTime < range.start - 0.3 || video.currentTime > range.end + 0.3)) range = null;
-    });
+  return null;
+}
+function verdictsOf(id) {
+  var st = hlState(id);
+  if (st.vote === 'good') return ['good'];
+  if (st.vote === 'bad') {
+    return ['bad'].concat(REASONS.filter(function (r) { return st.reasons[r[0]]; }).map(function (r) { return r[0]; }));
   }
-
-  var bar = el('div', { class: 'bar' });
-  clip.highlights.forEach(function (h) {
-    var band = el('button', { class: 'band', title: fmt(h.start_sec) + ' ' + h.description, onclick: function () { playRange(h); } });
-    band.style.left = (h.start_sec / clip.duration_sec * 100) + '%';
-    band.style.width = ((h.end_sec - h.start_sec) / clip.duration_sec * 100) + '%';
-    bar.appendChild(band);
-  });
-
-  var rateBtn = el('button', { text: '1x', onclick: function () {
-    rate = rate === 1 ? 0.5 : 1;
-    rateBtn.textContent = rate === 1 ? '1x' : '0.5x';
-    if (video) video.playbackRate = rate;
-  } });
-  var loopBox = el('input', { type: 'checkbox', onchange: function () { loop = loopBox.checked; } });
-  var controls = el('div', { class: 'controls' }, [
-    rateBtn,
-    el('label', {}, [loopBox, document.createTextNode(' loop range')]),
-    el('button', { text: '+ missed moment here', onclick: function () {
-      state.missed.push({ clip_id: clip.clip_id, at_sec: video ? video.currentTime : 0, note: '' });
-      saveState();
-      renderMissed(clip, video);
-    } }),
-  ]);
-
-  var left = el('div', { class: 'left' }, [
-    video || el('div', { class: 'noproxy', text: 'no proxy' }),
-    bar,
-    controls,
-  ]);
-  var right = el('div', { class: 'right' }, [
-    el('div', { class: 'tags', text: 'places: ' + (clip.places.join(', ') || '-') + ' | moments: ' + (clip.moments.join(', ') || '-') }),
-    el('div', { text: clip.ai_summary || '' }),
-    buildScores(clip),
-  ]);
-  if (clip.highlights.length === 0) right.appendChild(el('div', { class: 'meta', text: 'No highlights found for this clip.' }));
-  clip.highlights.forEach(function (h) { right.appendChild(buildHighlight(h, playRange)); });
-
-  missedLists[clip.clip_id] = el('div');
-  right.appendChild(missedLists[clip.clip_id]);
-  renderMissed(clip, video);
-
-  var note = el('input', { type: 'text', placeholder: 'clip note', value: state.clip_notes[clip.clip_id] || '',
-    oninput: function () { state.clip_notes[clip.clip_id] = note.value; saveState(); } });
-  right.appendChild(note);
-
-  var card = el('div', { class: 'clip' }, [
-    el('h3', { text: clip.file_name }),
-    el('div', { class: 'meta', text: (clip.scene_hint || '(no scene hint)') + ' - ' + fmt(clip.duration_sec) }),
-    el('div', { class: 'clip-body' }, [left, right]),
-  ]);
-  return card;
+  return [];
+}
+function isTouched(c) {
+  if (state.done[c.clip_id]) return true;
+  if (scoreState(c.clip_id).vote) return true;
+  if (state.suggested_use_wrong[c.clip_id]) return true;
+  if (state.missed.some(function (m) { return m.clip_id === c.clip_id; })) return true;
+  return c.highlights.some(function (h) { var st = hlState(h.highlight_id); return st.vote || st.note; });
 }
 
-var SCORE_ROWS = [
-  ['stability', 'quality'], ['focus', 'quality'], ['exposure', 'quality'], ['composition', 'quality'],
-  ['audio', 'quality'], ['overall', 'quality'],
-  ['emotional', 'editorial'], ['storytelling', 'editorial'], ['uniqueness', 'editorial'],
-];
-var SCORE_VERDICTS = [['low', 'too low'], ['ok', 'ok'], ['high', 'too high']];
-
-function buildScores(clip) {
-  var box = el('div', { class: 'scores' });
-  SCORE_ROWS.forEach(function (row) {
-    var name = row[0], value = clip.scores[row[1]][name];
-    var mine = state.clip_scores[clip.clip_id] || (state.clip_scores[clip.clip_id] = {});
-    var buttons = SCORE_VERDICTS.map(function (v) {
-      var b = el('button', { text: v[1], onclick: function () {
-        if (mine[name] === v[0]) delete mine[name]; else mine[name] = v[0];   // click again to unset
-        refresh();
-        saveState();
-      } });
-      b.dataset.verdict = v[0];
-      return b;
-    });
-    function refresh() {
-      buttons.forEach(function (b) { b.className = mine[name] === b.dataset.verdict ? 'on' : ''; });
-    }
-    refresh();
-    box.appendChild(el('div', { class: 'score-row' }, [
-      el('span', { class: 'name', text: name }),
-      el('span', { class: 'val', text: value === null ? '?' : String(value) }),
-    ].concat(buttons)));
-  });
-
-  var wrong = el('button', { text: 'suggested use wrong', onclick: function () {
-    if (state.suggested_use_wrong[clip.clip_id]) delete state.suggested_use_wrong[clip.clip_id];
-    else state.suggested_use_wrong[clip.clip_id] = true;
-    wrong.className = state.suggested_use_wrong[clip.clip_id] ? 'on bad' : '';
-    saveState();
-  } });
-  wrong.className = state.suggested_use_wrong[clip.clip_id] ? 'on bad' : '';
-  box.appendChild(el('div', { class: 'score-row' }, [
-    el('span', { text: 'suggested use: ' + (clip.scores.suggested_use || '-') }), wrong,
-  ]));
-
-  if (clip.scores.quality_issues.length) {
-    var list = el('ul', { class: 'issues' });
-    clip.scores.quality_issues.forEach(function (t) { list.appendChild(el('li', { text: t })); });
-    box.appendChild(list);
-  }
-  return box;
-}
-
-function buildHighlight(h, playRange) {
-  var st = hlState(h.highlight_id);
-  var buttons = VERDICTS.map(function (v) {
-    var b = el('button', { text: v[1], onclick: function () {
-      var i = st.verdicts.indexOf(v[0]);
-      if (i >= 0) st.verdicts.splice(i, 1); else st.verdicts.push(v[0]);
-      b.className = st.verdicts.indexOf(v[0]) >= 0 ? 'on ' + (v[0] === 'good' ? 'good' : 'bad') : '';
-      saveState();
-    } });
-    if (st.verdicts.indexOf(v[0]) >= 0) b.className = 'on ' + (v[0] === 'good' ? 'good' : 'bad');
-    return b;
-  });
-  var note = el('input', { type: 'text', placeholder: 'note', value: st.note,
-    oninput: function () { st.note = note.value; saveState(); } });
-  return el('div', { class: 'hl' }, [
-    el('div', { class: 'hl-head' }, [
-      el('button', { text: '\\u25B6 play range', onclick: function () { playRange(h); } }),
-      el('span', { text: fmt(h.start_sec) + ' - ' + fmt(h.end_sec) }),
-      el('span', { class: 'meta', text: 'quality ' + h.quality }),
-    ]),
-    el('div', { text: h.description }),
-    el('div', { class: 'verdicts' }, buttons),
-    note,
-  ]);
-}
-
-function renderMissed(clip, video) {
-  var box = missedLists[clip.clip_id];
-  box.textContent = '';
-  state.missed.forEach(function (m, index) {
-    if (m.clip_id !== clip.clip_id) return;
-    var note = el('input', { type: 'text', placeholder: 'what is missing here?', value: m.note,
-      oninput: function () { m.note = note.value; saveState(); } });
-    box.appendChild(el('div', { class: 'missed' }, [
-      el('button', { text: 'missed @ ' + fmt(m.at_sec), onclick: function () { if (video) video.currentTime = m.at_sec; } }),
-      note,
-      el('button', { text: 'remove', onclick: function () {
-        state.missed.splice(index, 1);
-        saveState();
-        renderMissed(clip, video);
-      } }),
-    ]));
-  });
-}
-
-function clipMatches(clip) {
-  var hasMissed = state.missed.some(function (m) { return m.clip_id === clip.clip_id; });
-  if (filter === 'unreviewed') {
-    // clips without highlights count as unreviewed until the user adds a note or a missed marker
-    if (clip.highlights.length === 0) return !state.clip_notes[clip.clip_id] && !hasMissed;
-    return clip.highlights.some(function (h) { return !isReviewed(h.highlight_id); });
-  }
-  if (filter === 'flagged') {
-    return clip.highlights.some(function (h) { return isFlagged(h.highlight_id); }) ||
-      hasMissed;
-  }
-  return true;
-}
-function applyFilter() {
-  clipEls.forEach(function (c) { c.el.style.display = clipMatches(c.clip) ? '' : 'none'; });
-}
-function updateProgress() {
-  var total = 0, reviewed = 0;
-  data.clips.forEach(function (c) {
-    c.highlights.forEach(function (h) { total++; if (isReviewed(h.highlight_id)) reviewed++; });
-  });
-  var scored = data.clips.filter(function (c) { return isScored(c.clip_id); }).length;
-  progressEl.textContent = 'reviewed ' + reviewed + ' / ' + total + ' highlights - scored clips ' +
-    scored + ' / ' + data.clips.length;
-}
-
-function exportVerdicts() {
+function buildExport() {
   var out = { project: data.project, db_generated_at: data.generated_at, reviewed_at: new Date().toISOString(),
-    highlights: [], missed: state.missed, clip_notes: [],
-    clip_scores: [], suggested_use_wrong: [] };
+    highlights: [], missed: state.missed.map(function (m) { return { clip_id: m.clip_id, at_sec: m.at_sec, note: m.note }; }),
+    clip_notes: [], clip_scores: [], suggested_use_wrong: [], reviewed_clips: [] };
   data.clips.forEach(function (c) {
     c.highlights.forEach(function (h) {
-      var st = hlState(h.highlight_id);
-      if (st.verdicts.length || st.note) {
-        out.highlights.push({ highlight_id: h.highlight_id, clip_id: c.clip_id, verdicts: st.verdicts, note: st.note });
-      }
+      var v = verdictsOf(h.highlight_id), st = hlState(h.highlight_id);
+      if (v.length || st.note) out.highlights.push({ highlight_id: h.highlight_id, clip_id: c.clip_id, verdicts: v, note: st.note });
     });
-    var scores = state.clip_scores[c.clip_id] || {};
-    Object.keys(scores).forEach(function (name) {
-      out.clip_scores.push({ clip_id: c.clip_id, score: name, verdict: scores[name] });
+    shownScores(c).forEach(function (s) {
+      var verdict = scoreVerdict(c, s[0], s[1]);
+      if (verdict) out.clip_scores.push({ clip_id: c.clip_id, score: s[0], verdict: verdict });
     });
     if (state.suggested_use_wrong[c.clip_id]) out.suggested_use_wrong.push(c.clip_id);
-    if (state.clip_notes[c.clip_id]) out.clip_notes.push({ clip_id: c.clip_id, note: state.clip_notes[c.clip_id] });
+    if (isTouched(c)) out.reviewed_clips.push(c.clip_id);
   });
-  var url = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' }));
+  return out;
+}
+function downloadExport() {
+  var url = URL.createObjectURL(new Blob([JSON.stringify(buildExport(), null, 2)], { type: 'application/json' }));
   var a = el('a', { href: url, download: 'review-verdicts.json' });
   document.body.appendChild(a);
   a.click();
@@ -335,32 +226,329 @@ function exportVerdicts() {
   URL.revokeObjectURL(url);
 }
 
-function init() {
-  progressEl = el('span');
-  var select = el('select', { onchange: function () { filter = select.value; applyFilter(); } }, [
-    el('option', { value: 'all', text: 'all' }),
-    el('option', { value: 'unreviewed', text: 'unreviewed' }),
-    el('option', { value: 'flagged', text: 'flagged' }),
-  ]);
-  document.getElementById('header').appendChild(el('h1', { text: 'Highlight review: ' + data.project }));
-  document.getElementById('header').appendChild(progressEl);
-  document.getElementById('header').appendChild(el('label', {}, [document.createTextNode('show '), select]));
-  document.getElementById('header').appendChild(el('button', { text: 'Export verdicts', onclick: exportVerdicts }));
+// ---- playback -----------------------------------------------------------------------
+function playHighlight(i) {
+  var c = clip();
+  var h = c.highlights[i];
+  if (!h) return;
+  sel = i;
+  range = { start: h.start_sec, end: h.end_sec };
+  if (video) {
+    video.currentTime = h.start_sec;
+    try { var p = video.play(); if (p && p.catch) p.catch(function () { /* autoplay blocked */ }); } catch (e) { /* ignore */ }
+  }
+  renderSide();
+  renderTimeline();
+}
+function selectOnly(i) { sel = i; renderSide(); renderTimeline(); }
+function togglePlay() {
+  if (!video) return;
+  if (video.paused) { var p = video.play(); if (p && p.catch) p.catch(function () { /* ignore */ }); } else video.pause();
+}
 
-  var main = document.getElementById('main');
-  var lastHint;
-  data.clips.forEach(function (clip) {
-    if (clip.scene_hint !== lastHint) {
-      main.appendChild(el('h2', { text: clip.scene_hint || '(no scene hint)' }));
-      lastHint = clip.scene_hint;
-    }
-    var card = buildClip(clip);
-    clipEls.push({ clip: clip, el: card });
-    main.appendChild(card);
+// ---- actions ------------------------------------------------------------------------
+function vote(i, val) {
+  var h = clip().highlights[i];
+  if (!h) return;
+  var st = hlState(h.highlight_id);
+  if (st.vote === val) { st.vote = null; st.reasons = {}; saveState(); sel = i; renderSide(); renderTimeline(); renderHeader(); return; }
+  st.vote = val;
+  if (val === 'good') st.reasons = {};
+  saveState();
+  renderHeader();
+  if (val === 'good' && i < clip().highlights.length - 1) playHighlight(i + 1);
+  else { sel = i; renderSide(); renderTimeline(); }
+}
+function toggleReason(i, key) {
+  var h = clip().highlights[i];
+  if (!h) return;
+  var st = hlState(h.highlight_id);
+  if (st.vote !== 'bad') return;
+  if (st.reasons[key]) delete st.reasons[key]; else st.reasons[key] = true;
+  saveState();
+  renderSide();
+}
+function setScoreVote(val) {
+  var ss = scoreState(clip().clip_id);
+  ss.vote = ss.vote === val ? null : val;
+  ss.fixed = {};
+  if (ss.vote !== 'down') delete state.suggested_use_wrong[clip().clip_id];
+  saveState();
+  renderSide();
+  renderHeader();
+}
+function addMissed() {
+  state.missed.push({ clip_id: clip().clip_id, at_sec: video ? video.currentTime : 0, note: '' });
+  saveState();
+  renderSide();
+  renderTimeline();
+  renderHeader();
+}
+function goTo(idx, markDone) {
+  if (markDone) { state.done[clip().clip_id] = true; saveState(); }
+  cur = Math.max(0, Math.min(data.clips.length - 1, idx));
+  showClip();
+}
+
+// ---- rendering ----------------------------------------------------------------------
+function renderHeader() {
+  headerEl.textContent = '';
+  var prog = el('div', { class: 'progress' });
+  data.clips.forEach(function (c, i) {
+    prog.appendChild(el('span', { class: i === cur ? 'cur' : (state.done[c.clip_id] ? 'done' : '') }));
   });
-  updateProgress();
-  // the sticky video column sits just below the sticky header
-  document.documentElement.style.setProperty('--header-h', document.getElementById('header').offsetHeight + 'px');
+  headerEl.appendChild(el('h1', { text: 'ClipPilot review' }));
+  headerEl.appendChild(el('span', { class: 'sub', text: data.project + ' · clip ' + (cur + 1) + ' of ' + data.clips.length }));
+  headerEl.appendChild(prog);
+  headerEl.appendChild(el('span', { class: 'spacer' }));
+  headerEl.appendChild(el('button', { class: 'btn primary', id: 'export', text: 'Export verdicts', onclick: downloadExport }));
+}
+
+function renderTimeline() {
+  var c = clip();
+  var tl = document.getElementById('tl');
+  if (!tl) return;
+  tl.textContent = '';
+  c.highlights.forEach(function (h, i) {
+    var st = hlState(h.highlight_id);
+    var d = el('div', { class: 'hl' + (i === sel ? ' sel' : '') + (st.vote ? ' ' + st.vote : ''), title: h.description });
+    d.setAttribute('data-i', String(i));
+    d.style.left = (h.start_sec / c.duration_sec * 100) + '%';
+    d.style.width = ((h.end_sec - h.start_sec) / c.duration_sec * 100) + '%';
+    tl.appendChild(d);
+  });
+  state.missed.forEach(function (m) {
+    if (m.clip_id !== c.clip_id) return;
+    var d = el('div', { class: 'miss' });
+    d.style.left = (m.at_sec / c.duration_sec * 100) + '%';
+    tl.appendChild(d);
+  });
+  var head = el('div', { class: 'head', id: 'head' });
+  tl.appendChild(head);
+  updateHead();
+}
+function updateHead() {
+  var head = document.getElementById('head');
+  if (head && video) head.style.left = (video.currentTime / clip().duration_sec * 100) + '%';
+}
+
+function meterRow(c, name, label, value) {
+  var ss = scoreState(c.clip_id);
+  var editing = ss.vote === 'down';
+  var shown = editing && ss.fixed[name] !== undefined ? ss.fixed[name] : value;
+  var wrong = editing && ss.fixed[name] !== undefined && ss.fixed[name] !== value;
+  var bars = el('span', { class: 'bars' });
+  bars.style.setProperty('--c', color(shown === null ? 0 : shown));
+  for (var s = 1; s <= 5; s++) {
+    var seg = el('i', { class: shown !== null && s <= shown ? 'on' : '' });
+    seg.setAttribute('data-step', String(s));
+    bars.appendChild(seg);
+  }
+  var row = el('div', { class: 'meter' + (editing && name !== 'overall' ? ' pickable' : '') + (wrong ? ' wrong' : '') }, [
+    el('span', { text: label }), bars, el('span', { class: 'n', text: shown === null ? '?' : String(shown) }),
+  ]);
+  row.setAttribute('data-k', name);
+  if (editing && value !== null) {
+    bars.addEventListener('click', function (e) {
+      var step = e.target && e.target.getAttribute && e.target.getAttribute('data-step');
+      if (!step) return;
+      ss.fixed[name] = Number(step);
+      saveState();
+      renderSide();
+    });
+  }
+  return row;
+}
+
+function ringEl(overall) {
+  var wrap = el('div', { class: 'ring' });
+  var C = 251.3;
+  var n = overall === null || overall === undefined ? 0 : overall;
+  var off = (C * (1 - Math.max(0, Math.min(5, n)) / 5)).toFixed(1);
+  var col = color(n);
+  wrap.innerHTML = '<svg width="96" height="96"><circle cx="48" cy="48" r="40" stroke="#2a2f3a" stroke-width="9" fill="none"/>' +
+    '<circle cx="48" cy="48" r="40" stroke="' + col + '" stroke-width="9" fill="none" stroke-linecap="round" stroke-dasharray="' + C + '" stroke-dashoffset="' + off + '"/></svg>';
+  wrap.appendChild(el('div', { class: 'val' }, [
+    el('b', { text: overall === null || overall === undefined ? '?' : String(overall) }), el('small', { text: 'quality' }),
+  ]));
+  return wrap;
+}
+
+function thumbBtn(kind, on, extra) {
+  var b = el('button', { class: 'thumb ' + (kind === 'up' ? 'up' : 'down') + (on ? ' on' : ''), text: kind === 'up' ? '👍' : '👎' });
+  for (var k in (extra || {})) b.setAttribute(k, extra[k]);
+  return b;
+}
+
+function highlightCard(h, i) {
+  var st = hlState(h.highlight_id);
+  var dots = el('span', { class: 'qdots' });
+  for (var k = 1; k <= 10; k++) dots.appendChild(el('i', { class: k <= h.quality ? 'on' : '' }));
+  var up = thumbBtn('up', st.vote === 'good');
+  var down = thumbBtn('down', st.vote === 'bad');
+  up.addEventListener('click', function (e) { e.stopPropagation(); vote(i, 'good'); });
+  down.addEventListener('click', function (e) { e.stopPropagation(); vote(i, 'bad'); });
+  var reasons = el('div', { class: 'reasons' });
+  REASONS.forEach(function (r, ri) {
+    var chip = el('span', { class: 'chip' + (st.reasons[r[0]] ? ' on' : '') }, [el('kbd', { text: String(ri + 1) }), document.createTextNode(r[1])]);
+    chip.setAttribute('data-r', r[0]);
+    chip.addEventListener('click', function (e) { e.stopPropagation(); toggleReason(i, r[0]); });
+    reasons.appendChild(chip);
+  });
+  var note = el('input', { class: 'note', type: 'text', placeholder: 'Optional note…', value: st.note });
+  note.addEventListener('input', function () { st.note = note.value; saveState(); });
+  note.addEventListener('click', function (e) { e.stopPropagation(); });
+  reasons.appendChild(note);
+  var card = el('div', { class: 'h' + (i === sel ? ' sel' : '') + (st.vote ? ' ' + st.vote : '') }, [
+    el('div', { class: 'h-top' }, [
+      el('span', { class: 'time', text: fmt(h.start_sec) + '–' + fmt(h.end_sec) }),
+      dots,
+      el('span', { class: 'qnum', text: h.quality + '/10' }),
+      el('span', { class: 'thumbs' }, [up, down]),
+    ]),
+    el('div', { class: 'desc', text: h.description }),
+    reasons,
+  ]);
+  card.setAttribute('data-i', String(i));
+  card.addEventListener('click', function () { playHighlight(i); });
+  return card;
+}
+
+function renderSide() {
+  var c = clip();
+  var ss = scoreState(c.clip_id);
+  var side = sideEl;
+  side.textContent = '';
+
+  var qm = el('div'), em = el('div');
+  QUALITY_ROWS.forEach(function (r) { qm.appendChild(meterRow(c, r[0], r[1], c.scores.quality[r[0]])); });
+  EDITORIAL_ROWS.forEach(function (r) { em.appendChild(meterRow(c, r[0], r[1], c.scores.editorial[r[0]])); });
+  var tags = el('div', { class: 'tags' });
+  if (c.scores.suggested_use) {
+    var pill = el('span', { class: 'tag use' + (ss.vote === 'down' ? ' pickable' : '') + (state.suggested_use_wrong[c.clip_id] ? ' wrong' : ''),
+      text: 'Suggested: ' + c.scores.suggested_use });
+    pill.addEventListener('click', function () {
+      if (scoreState(c.clip_id).vote !== 'down') return;
+      if (state.suggested_use_wrong[c.clip_id]) delete state.suggested_use_wrong[c.clip_id]; else state.suggested_use_wrong[c.clip_id] = true;
+      saveState();
+      renderSide();
+    });
+    tags.appendChild(pill);
+  }
+  c.scores.quality_issues.forEach(function (t) { tags.appendChild(el('span', { class: 'tag', text: t })); });
+  var sup = thumbBtn('up', ss.vote === 'up', { id: 'sup' });
+  var sdown = thumbBtn('down', ss.vote === 'down', { id: 'sdown' });
+  sup.addEventListener('click', function () { setScoreVote('up'); });
+  sdown.addEventListener('click', function () { setScoreVote('down'); });
+
+  var clipCard = el('div', { class: 'card' }, [
+    el('div', { class: 'clipname', text: c.file_name }),
+    el('div', { class: 'clipmeta', text: (c.scene_hint || '(no scene hint)') + ' · ' + fmt(c.duration_sec) }),
+    el('div', { class: 'summary', text: c.ai_summary || '' }),
+    el('div', { class: 'scores', style: 'margin-top:14px' }, [ringEl(c.scores.quality.overall), qm]),
+    el('div', { class: 'group-title', text: 'Editorial' }),
+    em,
+    tags,
+    el('div', { class: 'scorevote' }, [document.createTextNode('Scores look right?'), el('span', { class: 'spacer' }), sup, sdown]),
+    el('div', { class: 'hint', style: 'display:' + (ss.vote === 'down' ? 'block' : 'none'),
+      text: 'Click the step where each wrong score should be.' + (c.scores.suggested_use ? ' Tap the suggested use if it is wrong.' : '') }),
+  ]);
+  side.appendChild(clipCard);
+
+  var list = el('div', { class: 'hlist' });
+  if (c.highlights.length === 0) {
+    list.appendChild(el('div', { class: 'empty', text: 'No highlights — press M for anything it missed, then ⏎' }));
+  }
+  c.highlights.forEach(function (h, i) { list.appendChild(highlightCard(h, i)); });
+  state.missed.forEach(function (m, mi) {
+    if (m.clip_id !== c.clip_id) return;
+    var note = el('input', { type: 'text', placeholder: 'What did it miss? (optional)', value: m.note });
+    note.addEventListener('input', function () { m.note = note.value; saveState(); });
+    var rm = el('span', { text: '✕', style: 'cursor:pointer;color:var(--muted)' });
+    rm.setAttribute('data-rm', String(mi));
+    rm.addEventListener('click', function () { state.missed.splice(mi, 1); saveState(); renderSide(); renderTimeline(); renderHeader(); });
+    list.appendChild(el('div', { class: 'missed' }, [el('span', { class: 'time', text: '★ ' + fmt(m.at_sec) }), note, rm]));
+  });
+  side.appendChild(list);
+
+  side.appendChild(el('div', { class: 'footer' }, [
+    el('button', { class: 'btn', id: 'prev', text: '← Prev', onclick: function () { goTo(cur - 1, false); } }),
+    el('button', { class: 'btn primary', id: 'next', text: 'Next clip ⏎', onclick: function () { goTo(cur + 1, true); } }),
+  ]));
+}
+
+function showClip() {
+  var c = clip();
+  sel = 0;
+  range = null;
+  stageEl.textContent = '';
+  video = null;
+  if (c.proxy_url) {
+    video = el('video', { id: 'v', controls: '', muted: '', preload: 'metadata', src: c.proxy_url });
+    video.addEventListener('timeupdate', function () {
+      updateHead();
+      if (range && video.currentTime >= range.end) { video.currentTime = range.start; }   // loop the selected highlight
+    });
+    video.addEventListener('seeking', function () {
+      if (range && (video.currentTime < range.start - 0.3 || video.currentTime > range.end + 0.3)) range = null;
+    });
+    stageEl.appendChild(video);
+  } else {
+    stageEl.appendChild(el('div', { class: 'noproxy', text: 'no proxy' }));
+  }
+  var tl = el('div', { class: 'timeline', id: 'tl' });
+  tl.addEventListener('click', function (e) {
+    var blk = e.target.closest ? e.target.closest('.hl') : null;
+    if (blk) { playHighlight(Number(blk.getAttribute('data-i'))); return; }
+    var r = tl.getBoundingClientRect();
+    if (video && r.width > 0) { range = null; video.currentTime = (e.clientX - r.left) / r.width * clip().duration_sec; }
+  });
+  stageEl.appendChild(tl);
+  stageEl.appendChild(el('div', { class: 'under' }, [
+    el('button', { class: 'btn', id: 'missbtn', text: '★ Missed a moment here', onclick: addMissed }),
+    el('span', { class: 'keys' }, keyHints()),
+  ]));
+  renderHeader();
+  renderSide();
+  renderTimeline();
+  window.scrollTo(0, 0);
+}
+function keyHints() {
+  var out = [];
+  function k(t) { out.push(el('kbd', { text: t })); }
+  function s(t) { out.push(document.createTextNode(t)); }
+  k('↑'); k('↓'); s(' highlight  '); k('Y'); s(' 👍  '); k('N'); s(' 👎  ');
+  k('M'); s(' missed  '); k('Space'); s(' play  '); k('⏎'); s(' next clip');
+  return out;
+}
+
+document.addEventListener('keydown', function (e) {
+  var t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  var k = String(e.key).toLowerCase();
+  var n = clip().highlights.length;
+  if (k === 'arrowdown') { e.preventDefault(); if (n) playHighlight(Math.min(sel + 1, n - 1)); }
+  else if (k === 'arrowup') { e.preventDefault(); if (n) playHighlight(Math.max(sel - 1, 0)); }
+  else if (k === 'y') vote(sel, 'good');
+  else if (k === 'n') vote(sel, 'bad');
+  else if (k === 'm') addMissed();
+  else if (k === ' ') { e.preventDefault(); togglePlay(); }
+  else if (k === 'enter') { e.preventDefault(); goTo(cur + 1, true); }
+  else if (/^[1-4]$/.test(k)) toggleReason(sel, REASONS[Number(k) - 1][0]);
+});
+
+function init() {
+  headerEl = document.getElementById('header');
+  var main = document.getElementById('main');
+  stageEl = el('section', { class: 'stage' });
+  sideEl = el('aside', { class: 'side' });
+  main.appendChild(stageEl);
+  main.appendChild(sideEl);
+  window.clippilotReview = { buildExport: buildExport };
+  if (!data.clips.length) { headerEl.textContent = 'No clips to review.'; return; }
+  for (var i = 0; i < data.clips.length; i++) { if (!state.done[data.clips[i].clip_id]) { cur = i; break; } }
+  showClip();
 }
 init();
 `;
