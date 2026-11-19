@@ -90,3 +90,15 @@ describe('buildProjectSummary', () => {
     expect(r.places).toEqual([]);
   });
 });
+
+describe('buildProjectSummary comma-separated tags', () => {
+  it('splits comma lists into separate tags, one count per clip', () => {
+    const cs = [
+      clip({ id: 1, ai_scenes: scenes(['marina, boat', 'sailing, Sailing']) }),
+      clip({ id: 2, ai_scenes: scenes(['Marina', 'sailing']) }),
+    ];
+    const s = buildProjectSummary(cs, [], { top: 5 });
+    expect(s.places).toEqual([{ name: 'marina', clips: 2 }, { name: 'boat', clips: 1 }]);
+    expect(s.moments).toEqual([{ name: 'sailing', clips: 2 }]);
+  });
+});

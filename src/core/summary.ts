@@ -38,6 +38,10 @@ class NameCounter {
 
   add(clipId: number, raw: unknown): void {
     if (typeof raw !== 'string') return;
+    for (const part of raw.split(',')) this.addOne(clipId, part);
+  }
+
+  private addOne(clipId: number, raw: string): void {
     const name = raw.trim();
     if (!name) return;
     const key = name.toLowerCase();

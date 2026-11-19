@@ -198,4 +198,12 @@ export class ClipRepository {
     }
     return this.db.prepare("UPDATE clips SET analysis_status = 'pending'").run().changes;
   }
+
+  resetErrors(projectId?: number): number {
+    const set = "UPDATE clips SET analysis_status = 'pending', analysis_error = NULL WHERE analysis_status = 'error'";
+    if (projectId !== undefined) {
+      return this.db.prepare(`${set} AND project_id = ?`).run(projectId).changes;
+    }
+    return this.db.prepare(set).run().changes;
+  }
 }

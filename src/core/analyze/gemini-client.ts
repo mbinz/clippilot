@@ -6,15 +6,39 @@ import { SYSTEM_PROMPT, USER_PROMPT } from './prompts.js';
 import { GeminiApiError } from '../../utils/errors.js';
 
 const MAX_RETRIES = 5;
+const MAX_PARSE_ATTEMPTS = 3;
 const INITIAL_BACKOFF_MS = 1000;
 
 export class GeminiClient {
   private ai: GoogleGenAI;
   private model: string;
 
-  constructor(config: AppConfig) {
+  private generate: (videoBase64: string) => Promise<string>;
+
+  constructor(config: AppConfig, generate?: (videoBase64: string) => Promise<string>) {
     this.ai = new GoogleGenAI({ apiKey: config.gemini_api_key });
     this.model = config.gemini_model;
+    this.generate = generate ?? ((videoBase64) => this.generateViaApi(videoBase64));
+  }
+
+  private async generateViaApi(base64Video: string): Promise<string> {
+    const response = await this.ai.models.generateContent({
+      model: this.model,
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { inlineData: { mimeType: 'video/mp4', data: base64Video } },
+            { text: USER_PROMPT },
+          ],
+        },
+      ],
+      config: {
+        systemInstruction: SYSTEM_PROMPT,
+        responseMimeType: 'application/json',
+      },
+    });
+    return response.text ?? '';
   }
 
   async analyzeVideo(proxyPath: string): Promise<ClipAnalysisResponse> {
@@ -22,35 +46,14 @@ export class GeminiClient {
     const base64Video = videoBuffer.toString('base64');
 
     let lastError: Error | null = null;
+    let attemptsMade = 0;
+    let parseAttempts = 0;
 
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      attemptsMade++;
+      let text: string;
       try {
-        const response = await this.ai.models.generateContent({
-          model: this.model,
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                {
-                  inlineData: {
-                    mimeType: 'video/mp4',
-                    data: base64Video,
-                  },
-                },
-                { text: USER_PROMPT },
-              ],
-            },
-          ],
-          config: {
-            systemInstruction: SYSTEM_PROMPT,
-            responseMimeType: 'application/json',
-          },
-        });
-
-        const text = response.text ?? '';
-        const parsed = JSON.parse(text);
-        const validated = ClipAnalysisResponseSchema.parse(parsed);
-        return validated;
+        text = await this.generate(base64Video);
       } catch (err: any) {
         lastError = err;
 
@@ -65,10 +68,18 @@ export class GeminiClient {
         // Don't retry on other errors
         break;
       }
+
+      try {
+        return ClipAnalysisResponseSchema.parse(JSON.parse(text));
+      } catch (err: any) {
+        // Malformed or schema-invalid output: retry immediately, up to a cap
+        lastError = err;
+        if (++parseAttempts >= MAX_PARSE_ATTEMPTS) break;
+      }
     }
 
     throw new GeminiApiError(
-      `Analysis failed after ${MAX_RETRIES} attempts: ${lastError?.message ?? 'Unknown error'}`,
+      `Analysis failed after ${attemptsMade} attempt${attemptsMade === 1 ? '' : 's'}: ${lastError?.message ?? 'Unknown error'}`,
     );
   }
 }

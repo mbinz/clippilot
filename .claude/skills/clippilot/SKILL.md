@@ -48,7 +48,7 @@ on success. Always pass `--json` so output is parseable.
 |---|---|
 | `clippilot stats --json` | **Always run first.** See "Cold-start flow" above. |
 | `clippilot ingest <path> [--project <name>] [--location <l>] [--no-proxy] [--skip-analysis]` | Import a folder of video files. Confirm the path with the user first. |
-| `clippilot analyze [--project <name>] [--force]` | Run Gemini analysis on pending clips. Requires a Gemini key. |
+| `clippilot analyze [--project <name>] [--force] [--retry-errors]` | Run Gemini analysis on pending clips. Requires a Gemini key. `--retry-errors` re-queues clips that previously failed. |
 | `clippilot config show` / `clippilot config set gemini_api_key <key>` | Inspect or set the Gemini API key. |
 | `clippilot search "<query>" --json [--min-quality N] [--limit N]` | User asks "find me clips about X". FTS over scenes, summary, keywords, location, people. |
 | `clippilot get-clip <id>` | User asks about one specific clip in detail (you already have its ID). |

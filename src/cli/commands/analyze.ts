@@ -3,6 +3,7 @@ import chalk from 'chalk';
 import { createDb } from '../../db/connection.js';
 import { runMigrations } from '../../db/migrations/runner.js';
 import { ClipRepository } from '../../db/repositories/clip.repository.js';
+import { ProjectRepository } from '../../db/repositories/project.repository.js';
 import { HighlightRepository } from '../../db/repositories/highlight.repository.js';
 import { resolveDbPath } from '../../utils/fs.js';
 import { loadConfig } from '../../core/config/manager.js';
@@ -15,6 +16,7 @@ export function registerAnalyzeCommand(parent: Command): void {
     .description('Run AI analysis on pending clips (uses proxies)')
     .option('--project <name>', 'Only analyze clips from this project')
     .option('--force', 'Re-analyze already analyzed clips', false)
+    .option('--retry-errors', 'Reset clips that failed analysis to pending before analyzing', false)
     .action(async (options) => {
       const basePath = process.cwd();
       const config = await loadConfig(basePath);
@@ -32,6 +34,12 @@ export function registerAnalyzeCommand(parent: Command): void {
 
       if (options.force) {
         clipRepo.resetAnalysis();
+      }
+
+      if (options.retryErrors) {
+        const project = options.project ? new ProjectRepository(db).findByName(options.project) : null;
+        const reset = options.project && !project ? 0 : clipRepo.resetErrors(project?.id);
+        console.log(`Reset ${reset} errored clips to pending.`);
       }
 
       const pending = clipRepo.findPending();

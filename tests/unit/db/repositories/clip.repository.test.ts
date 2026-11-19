@@ -192,4 +192,25 @@ describe('ClipRepository', () => {
     repo.updateAnalysisStatus(done.id, 'done');
     expect(repo.findPending().map((x) => x.id)).toEqual([c.id]);
   });
+
+  it('resetErrors flips only error clips of the given project and clears analysis_error', () => {
+    const projects = new ProjectRepository(db);
+    const p1 = projects.findOrCreate('p1');
+    const p2 = projects.findOrCreate('p2');
+    const a = repo.insert(makeClip({ file_hash: 'ra', project_id: p1.id }));
+    const b = repo.insert(makeClip({ file_hash: 'rb', project_id: p2.id }));
+    const c = repo.insert(makeClip({ file_hash: 'rc', project_id: p1.id }));
+    repo.updateAnalysisError(a.id, 'boom');
+    repo.updateAnalysisError(b.id, 'boom');
+    repo.updateAnalysisStatus(c.id, 'done');
+
+    expect(repo.resetErrors(p1.id)).toBe(1);
+    expect(repo.findById(a.id)!.analysis_status).toBe('pending');
+    expect(repo.findById(a.id)!.analysis_error).toBeNull();
+    expect(repo.findById(b.id)!.analysis_status).toBe('error');
+    expect(repo.findById(c.id)!.analysis_status).toBe('done');
+
+    expect(repo.resetErrors()).toBe(1);
+    expect(repo.findById(b.id)!.analysis_status).toBe('pending');
+  });
 });
