@@ -9,26 +9,27 @@ bin/clippilot.ts           # entry — defers to src/cli
 src/
   cli/
     index.ts               # Commander setup, registers commands
-    commands/              # 12 subcommands (ingest, analyze, search,
+    commands/              # 13 subcommands (ingest, analyze, search,
                            #   contact-sheet, get-clip, similar, mark-best,
-                           #   tag, export, stats, config, ui)
+                           #   tag, export, stats, summary, config, ui)
     json.ts                # shared clip-projection for --json output
     formatters/            # human-facing pretty print
   core/
     ingest/                # scanner, probe (ffprobe), proxy (ffmpeg),
-                           #   thumbnail, hasher
-    analyze/               # gemini-client + schema (Zod) + prompts
+                           #   thumbnail, hasher, scene-hint
+    analyze/               # gemini-client + schema (Zod) + prompts + highlights (normalize)
     search/                # engine (FTS) + advanced (filtered search for web)
     similarity/            # union-find clustering
     export/                # otio (primary), fcpxml, csv, json, edl; timeline-plan (shared frame/TC math), fcpxml-rates
     contact-sheet.ts       # labeled grid PNG via sharp
+    summary.ts             # buildProjectSummary ("what's in here")
     server/                # Hono routes backing the web UI
     config/                # manager + defaults
   db/
     connection.ts          # better-sqlite3 handle
     index.ts               # public DB surface
-    migrations/            # 001..006 + runner
-    repositories/          # clip, project, similarity, story, thumbnail
+    migrations/            # 001..008 + runner
+    repositories/          # clip, project, similarity, story, thumbnail, highlight
   types/, utils/, constants.ts
 tests/{unit,integration,fixtures}
 web/                       # React 19 + Tailwind + Vite — primary UI (kept; storyboard view lands here in M4)
@@ -36,8 +37,8 @@ web/                       # React 19 + Tailwind + Vite — primary UI (kept; st
 
 ## Data flow
 
-1. **Ingest** — `scanner` walks a folder → `probe` (ffprobe) reads metadata → `hasher` content-hashes → `proxy` renders 720p MP4 → `thumbnail` extracts stills. All rows land in SQLite via `clip.repository`. Originals never mutated.
-2. **Analyze** — `gemini-client` sends each clip's thumbnails + metadata to Gemini 2.5 Flash with a Zod-typed `schema` → structured fields (scene, quality, editorial, keywords) stored on the clip row.
+1. **Ingest** — `scanner` walks a folder → fast skip if `file_path`+`file_size` already known (resume without re-hashing) → `probe` (ffprobe) reads metadata → `hasher` content-hashes (fallback dedupe) → `proxy` renders 720p MP4 to `<hash>.partial.mp4`, renamed on success → `thumbnail` extracts stills. One row per clip, committed per clip, with `scene_hint` = parent folder relative to the ingest root. Originals never mutated.
+2. **Analyze** — `gemini-client` sends each clip's 720p **proxy video** inline (base64, ~20 MB request cap) to Gemini 2.5 Flash with a Zod-typed `schema` → structured fields (scene, quality, editorial, keywords) on the clip row + 0–5 **highlights** (start/end sec, English description, quality 1–10) clamped to the clip duration and stored in `highlights` (replaced per clip on re-analysis). Malformed JSON is retried; `analyzing` clips from an interrupted run count as pending.
 3. **Query** — `search/engine.ts` runs FTS over analysis output; `similarity/` clusters via union-find over location/time/keywords/scene.
 4. **Export** — `export/{csv,json,edl,fcpxml}` writes a DaVinci-importable file from a clip-ID list. `fcpxml-rates` handles frame-rate quirks for Resolve.
 5. **Chat surface** — Claude calls CLI commands with `--json`, reads thumbnails/contact-sheets as images, decides which clips to mark or export.
@@ -51,7 +52,7 @@ ingest (resumable) → analyze proxy video → highlights (timestamped moments)
   → export one timeline per cut (+ scene markers) → free Resolve
 ```
 
-- **Highlights** are the unit the storyboard reasons about (clip_id + start/end + description + quality), not whole clips. New table in M2.
+- **Highlights** are the unit the storyboard reasons about (clip_id + start/end + description + quality), not whole clips. `highlights` table since M2 (migration 008). Timestamps are ~1 s precise (Gemini samples ~1 fps) — a starting point to trim, not frame-accurate.
 - **Panels** = `story_segments` gaining `scene_id`, `intent`, `state`, `speed`; candidates are a child table of panel → highlight. M3.
 - **Fillers** are files on disk ingested like any clip, tagged with a source (`library | generated | stock | ai`). Exporters never special-case.
 
@@ -67,9 +68,9 @@ ingest (resumable) → analyze proxy video → highlights (timestamped moments)
 
 ## Persistence
 
-- SQLite via `better-sqlite3`, single file per project (path resolved by `config/manager`).
+- SQLite via `better-sqlite3`, single file per project at `<cwd>/.clippilot/clippilot.db` (`resolveDbPath` in `utils/fs`) — the working directory picks the project DB.
 - One repository per entity. No ORM.
-- Migrations are forward-only TS files (`001_initial.ts` … `006_has_audio_video.ts`) run by `migrations/runner.ts` at startup.
+- Migrations are forward-only TS files (`001_initial.ts` … `008_highlights.ts`) run by `migrations/runner.ts` at startup.
 
 ## Key decisions
 
@@ -86,7 +87,7 @@ ingest (resumable) → analyze proxy video → highlights (timestamped moments)
 - `vitest`, layout `tests/{unit,integration,fixtures}`.
 - Unit covers pure modules (search engine, similarity union-find, exporters, schema, hasher, probe, scanner, JSON projection, contact-sheet layout, migration runner).
 - Integration covers ingest end-to-end against fixture media.
-- Module-by-module coverage map lives in `STATUS.md`. Network-touching code (`gemini-client`) is deliberately untested.
+- Module-by-module coverage map lives in `STATUS.md`. `gemini-client` is tested through an injected `generate` function; the real API call is deliberately untested.
 
 ## What's external
 - Gemini API (`@google/genai`) — analysis.

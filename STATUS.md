@@ -5,7 +5,7 @@ Update this file whenever the answer to any of those questions shifts.
 
 ## Version & state
 
-`v0.1.0` — usable for browse/search/analyze; export to Resolve unreliable (see M1). No story/storyboard workflow yet.
+`v0.1.0` — ingest (resumable) / analyze with timestamped highlights / search / summary; OTIO + FCPXML export verified in free Resolve (M1). No story/storyboard workflow yet (M3).
 Solo project, MIT. Run via `tsx`, no compiled binary.
 
 **Direction:** data pipeline + web UI (primary interactive surface) + CLI skill (AI/scripting surface).
@@ -14,16 +14,18 @@ Web UI is committed — Phase C deletion plan cancelled. See [PRD.md](PRD.md) fo
 ## Implemented
 
 - **Ingest** — recursive scan, ffprobe metadata, ffmpeg 720p proxies, thumbnails, content hashing → SQLite
-- **Analyze** — Gemini 2.5 Flash structured analysis (scene, quality, editorial) via `@google/genai`, Zod-validated
+- **Analyze** — Gemini 2.5 Flash on the 720p proxy **video** (inline, ≤ ~20 MB) via `@google/genai`, Zod-validated: scene, quality, editorial + **timestamped highlights** (`highlights` table). Retries malformed JSON (3×); `--retry-errors` re-runs only failed clips; interrupted `analyzing` clips are picked up again.
+- **Resumable ingest** — fast skip on same path+size (no re-hash), atomic proxies (`.partial.mp4` → rename), `clips.scene_hint` = source subfolder.
+- **Summary** — `clippilot summary --json`: counts, per-scene-hint stats, places, moments, best highlights.
 - **Search** — FTS engine (`src/core/search/`); CLI `search --json`
 - **Similarity** — duplicate/near-dup detection via union-find on location/time/keywords/scene
 - **Export** — CSV, JSON, EDL, FCPXML. CLI `export --story <id>` or `--clips <ids>`. Cut points (`start_sec`/`end_sec`), same clip multiple times, and timecode handling are all implemented in the data layer and exporters. Known defects with mixed fps / formats / TC; never verified in Resolve (see M1).
 - **Contact sheet** — `clippilot contact-sheet` renders a labeled grid PNG (default 4×6) for visual scanning by humans or Claude. Uses `sharp`.
-- **Skill surface** — `.claude/skills/clippilot/SKILL.md` documents the verbs Claude should use (`search`, `get-clip`, `similar`, `mark-best`, `tag`, `contact-sheet`, `export`, `stats`) — all emit JSON.
+- **Skill surface** — `.claude/skills/clippilot/SKILL.md` documents the verbs Claude should use (`search`, `get-clip`, `summary`, `similar`, `mark-best`, `tag`, `contact-sheet`, `export`, `stats`) — all emit JSON.
 - **Story data layer** — `stories` + `story_segments` tables (migration 002), `StoryRepository` with full CRUD. Currently flat (no scene layer). Cut points (`start_sec`/`end_sec`) and multiple instances of the same clip are supported. Scene layer, routes, UI → M3/M4.
 - **Web UI** — Hono server (`clippilot ui`), Vite frontend in `web/`. Primary interactive surface (browse, filters, clip detail with proxy playback, similarity clusters). Storyboard view not built yet (M4).
 - **Tag / Stats / Config** — CLI with `--json`
-- **DB migrations** — runner with versioning, migrations 001–006 applied: `001_initial`, `002_stories`, `003_similarity`, `004_timecode` (clips.start_timecode), `005_nb_frames` (clips.nb_frames), `006_has_audio_video` (clips.has_video/has_audio)
+- **DB migrations** — runner with versioning, migrations 001–008 applied: `001_initial`, `002_stories`, `003_similarity`, `004_timecode` (clips.start_timecode), `005_nb_frames` (clips.nb_frames), `006_has_audio_video` (clips.has_video/has_audio), `007_scene_hint` (clips.scene_hint), `008_highlights` (highlights table)
 
 ## Re-plan 2026-11-18
 
@@ -121,7 +123,7 @@ What Resolve actually writes (the facts M1.1/M1.2 must reproduce):
 
 Done when: M1.1 + M1.2 green, M1.3 checklist passes for at least one format. ✅ — OTIO re-import confirmed linked audio/video.
 
-### M2 — Understand the footage  ← IN PROGRESS (2026-11-18)
+### M2 — Understand the footage ✅ 2026-11-19
 - Resumable / incremental ingest (survive interruption on a 123 GB trip); capture folder as scene hint.
 - Gemini analysis of the proxy **video** → timestamped highlights table. Pilot on `03 Arrifana/Delfine`
   (33 clips, 457 s total, 9.2 GB) to judge quality + cost before running all 508.
@@ -246,12 +248,36 @@ Tests first:
   `boat` 1.
 Done when: red→green, typecheck + test:all green; `analyze --retry-errors` on the pilot re-analyzes only C0586.
 
-**M2.4 — Pilot on Delfine (planner, with user)**
+**M2.1 ✅ · M2.2 ✅ · M2.2b ✅ · M2.2c ✅ · M2.3 ✅** (implementer, reviewed by planner; 352 → 392 tests)
+
+**M2.4 — Pilot on Delfine ✅ 2026-11-19** — results:
+- Pilot dir `~/Video/ClipPilot M2 Pilot/` (own DB + proxies; Portugal DB untouched). Ingest 33/33, all `scene_hint=Delfine`;
+  re-ingest skips all 33 in 0.7 s (no re-hash).
+- 3 Gemini passes (run 1 original prompt, run 2 after M2.2b, then C0586 only via `--retry-errors`). Final: 33/33 done,
+  36 highlights, quality 6–9 (avg 7.4); places group (`open sea` 15, `marina` 8, `boat` 6); moments `boat trip` 9,
+  `dolphin watching` 3. User judged the highlights useful.
+- Cost ≈ US$0.30 per full pass over 33 clips / 457 s → full Portugal (508 clips) roughly US$5 per pass.
+- Caveat: Gemini samples ~1 fps, so 1–2 s moments are the least reliable — run 1 and run 3 placed the C0586 dolphin
+  leap at different times (14 s vs 0 s). Treat highlight in/out as a starting point to trim in the storyboard (M4).
+
+M2 deferred (not done here):
+- **Files API for proxies > ~20 MB** — largest Delfine proxy is 19.4 MB; longer Portugal clips will exceed the inline
+  limit. Needed before the full 508-clip analyze.
+- **Full Portugal ingest + analyze** — not run on purpose (user constraint); do it after the Files API item.
+- `analyze --project` / `--force` ignore the project (pre-existing); only `--retry-errors` is project-scoped.
+- Synonym tags don't merge (`boat trip` / `boat ride` / `boating`, `sea` / `open sea`).
+- Highlight descriptions are not in FTS (search finds clips via summary/keywords, then returns their highlights) →
+  highlight-level search belongs with M3 candidates.
+- Stale highlights stay when a re-analysis errors (only replaced on success).
+- No CLI-level tests for `summary` / `--retry-errors` wiring (pure logic + repo are tested).
+- Pilot pass log (original plan text below kept for history).
+
+**M2.4 plan (planner, with user)**
 - Working dir `~/Video/ClipPilot M2 Pilot/`; `ingest "~/Video/Portugal/Src /Import/03 Arrifana/Delfine"`; user OK on
   cost before `analyze`; show ~8 highlights with timestamps for the user to judge; `summary --json`.
 Done when: user judges highlights useful (or the prompt is tuned until they do).
 
-### M3 — Storyboard model + CLI
+### M3 — Storyboard model + CLI  ← NEXT
 - Migration: `scenes`, cut brief, panel `intent` / `state` (filled | candidates | gap) / `speed`, panel candidates.
 - Scenes seeded from source folders.
 - CLI verbs for cut / brief / scene / panel; Claude drafts a Portugal storyboard in chat from a brief.
@@ -286,23 +312,24 @@ Done when: user judges highlights useful (or the prompt is tuned until they do).
 
 ## Quality / test coverage map
 
-`npm run test:all` runs 26 test files / 213 tests. State per module:
+`npm run test:all` runs 36 test files / 392 tests. State per module:
 
 | Module | Source | Tests | Coverage |
 |---|---|---|---|
-| `core/ingest` | hasher, probe, scanner, proxy, thumbnail | hasher, probe, scanner + 1 integration | **partial** (proxy/thumbnail via integration only) |
-| `core/analyze` | schema, gemini-client, prompts | schema | **partial** (Gemini client untested — network) |
+| `core/ingest` | hasher, probe, scanner, scene-hint, proxy, thumbnail | hasher, probe, scanner, scene-hint + 3 integration | **partial** (proxy/thumbnail via integration only) |
+| `core/analyze` | schema, gemini-client, prompts, highlights, index | schema, highlights, prompts, analyze-clips, gemini-client (fake `generate`) | **good** (real API call untested by design) |
+| `core/summary` | buildProjectSummary | summary | **good** |
 | `core/search` | engine, advanced | engine, advanced-search | **good** (advanced is used by the web server's clips route — kept) |
 | `core/similarity` | union-find, engine | union-find, engine | **good** |
 | `core/export` | csv, json, edl, fcpxml | all four | **good** |
 | `core/contact-sheet` | layout + sharp render | layout (unit) | **partial** (sharp render is library-tested) |
 | `core/server/routes` | clips, facets, projects, similarity | clips, facets, similarity | **partial** (projects untested; cut/scene routes → M3) |
 | `core/config` | manager, defaults | — | **none** |
-| `db/repositories` | clip, project, similarity, story, thumbnail | clip, project, similarity, story | **partial** (thumbnail untested) |
-| `db/migrations` | 001–006 + runner | migrations runner | **good** (004–006 are single-column ALTERs, covered transitively) |
+| `db/repositories` | clip, project, similarity, story, thumbnail, highlight | clip, project, similarity, story, highlight | **partial** (thumbnail untested) |
+| `db/migrations` | 001–008 + runner | migrations runner | **good** (004–006 are single-column ALTERs, covered transitively) |
 | `utils` | fs, timecode, concurrency, errors, logger | fs, timecode | **partial** |
 | `cli/json` | clip projection | full unit | **good** |
-| `cli/commands` | 12 commands (analyze, config, contact-sheet, export, get-clip, ingest, mark-best, search, similar, stats, tag, ui) | — | **none** (manual smoke only) |
+| `cli/commands` | 13 commands (analyze, config, contact-sheet, export, get-clip, ingest, mark-best, search, similar, stats, summary, tag, ui) | — | **none** (manual smoke only) |
 
 Type checking: `npm run typecheck` (strict TS, no errors expected).
 
