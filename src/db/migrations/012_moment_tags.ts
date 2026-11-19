@@ -67,8 +67,29 @@ export function migration012(db: Database.Database): void {
     ALTER TABLE highlights ADD COLUMN role TEXT;
     ALTER TABLE highlights ADD COLUMN issues TEXT NOT NULL DEFAULT '[]';
 
-    ALTER TABLE highlight_verdicts ADD COLUMN tier TEXT;
-    ALTER TABLE highlight_verdicts ADD COLUMN shot TEXT;
-    ALTER TABLE highlight_verdicts ADD COLUMN role TEXT;
+
+    -- quality snapshot becomes nullable (old rounds keep theirs); rebuild because SQLite cannot drop NOT NULL
+    CREATE TABLE highlight_verdicts_new (
+      round_id INTEGER NOT NULL REFERENCES calibration_rounds(id) ON DELETE CASCADE,
+      highlight_id INTEGER NOT NULL,
+      clip_id INTEGER NOT NULL,
+      verdicts TEXT NOT NULL,
+      note TEXT NOT NULL DEFAULT '',
+      start_sec REAL NOT NULL,
+      end_sec REAL NOT NULL,
+      description TEXT NOT NULL,
+      quality INTEGER,
+      suggested_speed REAL,
+      tier TEXT,
+      shot TEXT,
+      role TEXT,
+      PRIMARY KEY (round_id, highlight_id)
+    );
+    INSERT INTO highlight_verdicts_new
+      (round_id, highlight_id, clip_id, verdicts, note, start_sec, end_sec, description, quality, suggested_speed)
+      SELECT round_id, highlight_id, clip_id, verdicts, note, start_sec, end_sec, description, quality, suggested_speed
+      FROM highlight_verdicts;
+    DROP TABLE highlight_verdicts;
+    ALTER TABLE highlight_verdicts_new RENAME TO highlight_verdicts;
   `);
 }

@@ -93,4 +93,21 @@ describe('migration 012 — moment tags, no clip scores', () => {
     runMigrations(db);
     expect(db.prepare('SELECT tier, issues FROM highlights').get()).toEqual({ tier: 'solid', issues: '[]' });
   });
+
+  it('keeps old highlight_verdicts rows and their quality snapshot, quality is now nullable', () => {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    db.exec(`CREATE TABLE _migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL DEFAULT (datetime('now')))`);
+    [migration001, migration002, migration003, migration004, migration005, migration006,
+      migration007, migration008, migration009, migration010, migration011].forEach((m, i) => {
+      m(db);
+      db.prepare('INSERT INTO _migrations (version, name) VALUES (?, ?)').run(i + 1, `m${i + 1}`);
+    });
+    db.prepare('INSERT INTO calibration_rounds (profile_version) VALUES (1)').run();
+    db.prepare("INSERT INTO highlight_verdicts (round_id, highlight_id, clip_id, verdicts, start_sec, end_sec, description, quality, suggested_speed) VALUES (1,5,2,'[\"bad\"]',0,1,'d',8,0.5)").run();
+    runMigrations(db);
+    expect(db.prepare('SELECT quality, suggested_speed, tier FROM highlight_verdicts').get()).toEqual({ quality: 8, suggested_speed: 0.5, tier: null });
+    db.prepare("INSERT INTO highlight_verdicts (round_id, highlight_id, clip_id, verdicts, start_sec, end_sec, description, tier, shot, role) VALUES (1,6,2,'[]',0,1,'d','hero','wide','action')").run();
+    expect(db.prepare('SELECT quality, tier FROM highlight_verdicts WHERE highlight_id = 6').get()).toEqual({ quality: null, tier: 'hero' });
+  });
 });

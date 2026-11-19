@@ -27,4 +27,16 @@ describe("USER_PROMPT", () => {
     expect(USER_PROMPT).toMatch(/strong/);
     expect(USER_PROMPT).toMatch(/Sprache/);
   });
+
+  it("asks for tier/shot/role/issues per moment and no clip scores", () => {
+    expect(USER_PROMPT).toMatch(/"tier": "hero \| solid \| filler"/);
+    expect(USER_PROMPT).toMatch(/"shot"/);
+    expect(USER_PROMPT).toMatch(/"role"/);
+    expect(USER_PROMPT).toMatch(/"issues"/);
+    for (const w of ['hero', 'solid', 'filler', 'wide', 'medium', 'close', 'detail', 'establishing', 'action', 'reaction', 'transition', 'shake', 'blur', 'obstructed', 'overexposed', 'underexposed']) {
+      expect(USER_PROMPT).toContain(w);
+    }
+    expect(USER_PROMPT).toMatch(/gesamte Bandbreite/);
+    expect(USER_PROMPT).not.toMatch(/technical_quality|editorial_value|suggested_use|"quality"|Bewertungsskala/);
+  });
 });

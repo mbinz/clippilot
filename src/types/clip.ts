@@ -1,3 +1,5 @@
+import type { Tier } from '../core/tiers.js';
+
 export interface Clip {
   id: number;
   project_id: number | null;
@@ -23,17 +25,6 @@ export interface Clip {
   people: string | null;
   ai_scenes: string | null;
   ai_summary: string | null;
-  ai_quality_stability: number | null;
-  ai_quality_focus: number | null;
-  ai_quality_exposure: number | null;
-  ai_quality_composition: number | null;
-  ai_quality_audio: number | null;
-  ai_quality_overall: number | null;
-  ai_quality_issues: string | null;
-  ai_editorial_emotional: number | null;
-  ai_editorial_storytelling: number | null;
-  ai_editorial_uniqueness: number | null;
-  ai_editorial_suggested_use: string | null;
   ai_visual_keywords: string | null;
   analysis_profile_version: number | null;
 }
@@ -77,26 +68,14 @@ export interface InsertClip {
 export interface ClipAnalysis {
   ai_scenes: string;
   ai_summary: string;
-  ai_quality_stability: number;
-  ai_quality_focus: number;
-  ai_quality_exposure: number;
-  ai_quality_composition: number;
-  ai_quality_audio: number;
-  ai_quality_overall: number;
-  ai_quality_issues: string;
-  ai_editorial_emotional: number;
-  ai_editorial_storytelling: number;
-  ai_editorial_uniqueness: number;
-  ai_editorial_suggested_use: string;
   ai_visual_keywords: string;
   analysis_profile_version?: number | null;
 }
 
 export interface SearchFilters {
   project_id?: number;
-  min_quality?: number;
-  suggested_use?: string;
+  min_tier?: Tier;
   location?: string;
-  sort?: 'quality' | 'date' | 'emotional' | 'duration';
+  sort?: 'date' | 'duration';
   limit?: number;
 }

@@ -1,11 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { normalizeHighlights, suggestedSpeed } from '../../../../src/core/analyze/highlights.js';
 
-const h = (start_sec: number, end_sec: number, quality = 5) => ({
+const h = (start_sec: number, end_sec: number, tier: 'hero' | 'solid' | 'filler' = 'solid') => ({
   start_sec,
   end_sec,
   description: 'd',
-  quality,
+  tier,
+  shot: 'medium' as const,
+  role: 'action' as const,
+  issues: [] as ('shake' | 'blur')[],
 });
 
 describe('normalizeHighlights', () => {
@@ -32,7 +35,7 @@ describe('normalizeHighlights', () => {
   });
 
   it('sorts by start_sec', () => {
-    const out = normalizeHighlights([h(8, 10, 1), h(1, 3, 2), h(4, 6, 3)], 13.0);
+    const out = normalizeHighlights([h(8, 10, 'hero'), h(1, 3, 'filler'), h(4, 6, 'solid')], 13.0);
     expect(out.map((x) => x.start_sec)).toEqual([1, 4, 8]);
   });
 
@@ -72,5 +75,13 @@ describe('normalizeHighlights speed', () => {
 
   it('defaults to speed 1 without fps or slowmo', () => {
     expect(normalizeHighlights([h(1, 3)], 13)[0].suggested_speed).toBe(1);
+  });
+});
+
+describe('normalizeHighlights tags', () => {
+  it('carries tier, shot, role and issues through', () => {
+    const out = normalizeHighlights([{ ...h(1, 3, 'hero'), shot: 'close' as const, role: 'reaction' as const, issues: ['shake', 'blur'] }], 13);
+    expect(out[0]).toMatchObject({ tier: 'hero', shot: 'close', role: 'reaction', issues: ['shake', 'blur'] });
+    expect((out[0] as Record<string, unknown>).quality).toBeUndefined();
   });
 });

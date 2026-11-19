@@ -13,14 +13,8 @@ const validResponse = JSON.stringify({
       visual_keywords: ['water'],
     },
   ],
-  technical_quality: {
-    stability: 4, focus: 4, exposure: 3, composition: 4, audio_quality: 3, overall_score: 4, issues: [],
-  },
-  editorial_value: {
-    emotional_impact: 3, storytelling_potential: 4, uniqueness: 2, suggested_use: 'B-Roll',
-  },
   clip_summary: 'A boat docks in a marina.',
-  highlights: [{ start_sec: 1, end_sec: 3, description: 'Boat arrives', quality: 7 }],
+  highlights: [{ start_sec: 1, end_sec: 3, description: 'Boat arrives', tier: 'solid', shot: 'medium', role: 'action' }],
 });
 
 describe('GeminiClient parse retries', () => {

@@ -8,7 +8,10 @@ export interface NormalizedHighlight {
   start_sec: number;
   end_sec: number;
   description: string;
-  quality: number;
+  tier: HighlightResponse['tier'];
+  shot: HighlightResponse['shot'];
+  role: HighlightResponse['role'];
+  issues: NonNullable<HighlightResponse['issues']>;
   slowmo: SlowmoLevel;
   slowmo_reason: string;
   suggested_speed: number;
@@ -44,7 +47,10 @@ export function normalizeHighlights(
         start_sec: round2(h.start_sec),
         end_sec: round2(h.end_sec),
         description: h.description,
-        quality: h.quality,
+        tier: h.tier,
+        shot: h.shot,
+        role: h.role,
+        issues: h.issues ?? [],
         slowmo,
         slowmo_reason: h.slowmo_reason ?? '',
         suggested_speed: suggestedSpeed(slowmo, fps),

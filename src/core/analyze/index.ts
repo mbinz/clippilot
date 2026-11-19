@@ -26,17 +26,6 @@ function analysisToDbFields(analysis: ClipAnalysisResponse) {
   return {
     ai_scenes: JSON.stringify(analysis.scenes),
     ai_summary: analysis.clip_summary,
-    ai_quality_stability: analysis.technical_quality.stability,
-    ai_quality_focus: analysis.technical_quality.focus,
-    ai_quality_exposure: analysis.technical_quality.exposure,
-    ai_quality_composition: analysis.technical_quality.composition,
-    ai_quality_audio: analysis.technical_quality.audio_quality,
-    ai_quality_overall: analysis.technical_quality.overall_score,
-    ai_quality_issues: JSON.stringify(analysis.technical_quality.issues),
-    ai_editorial_emotional: analysis.editorial_value.emotional_impact,
-    ai_editorial_storytelling: analysis.editorial_value.storytelling_potential,
-    ai_editorial_uniqueness: analysis.editorial_value.uniqueness,
-    ai_editorial_suggested_use: analysis.editorial_value.suggested_use,
     ai_visual_keywords: JSON.stringify(uniqueKeywords),
   };
 }

@@ -12,28 +12,14 @@ export const SceneSchema = z.object({
   visual_keywords: z.array(z.string()),
 });
 
-export const TechnicalQualitySchema = z.object({
-  stability: z.number().min(1).max(5),
-  focus: z.number().min(1).max(5),
-  exposure: z.number().min(1).max(5),
-  composition: z.number().min(1).max(5),
-  audio_quality: z.number().min(1).max(5),
-  overall_score: z.number().min(1).max(5),
-  issues: z.array(z.string()),
-});
-
-export const EditorialValueSchema = z.object({
-  emotional_impact: z.number().min(1).max(5),
-  storytelling_potential: z.number().min(1).max(5),
-  uniqueness: z.number().min(1).max(5),
-  suggested_use: z.enum(['Hero Shot', 'B-Roll', 'Establishing', 'Transition', 'Skip']),
-});
-
 export const HighlightSchema = z.object({
   start_sec: z.number(),
   end_sec: z.number(),
   description: z.string(),
-  quality: z.number().int().min(1).max(10),
+  tier: z.enum(['hero', 'solid', 'filler']),
+  shot: z.enum(['wide', 'medium', 'close', 'detail']),
+  role: z.enum(['establishing', 'action', 'reaction', 'detail', 'transition']),
+  issues: z.array(z.enum(['shake', 'blur', 'obstructed', 'overexposed', 'underexposed'])).default([]),
   slowmo: z.enum(['none', 'light', 'strong']).default('none'),
   slowmo_reason: z.string().default(''),
 });
@@ -43,8 +29,6 @@ export type HighlightResponse = z.input<typeof HighlightSchema>;
 
 export const ClipAnalysisResponseSchema = z.object({
   scenes: z.array(SceneSchema),
-  technical_quality: TechnicalQualitySchema,
-  editorial_value: EditorialValueSchema,
   clip_summary: z.string(),
   highlights: z.array(HighlightSchema).default([]),
 });

@@ -22,12 +22,6 @@ function response(highlights: ClipAnalysisResponse['highlights']): ClipAnalysisR
         visual_keywords: ['Strand'],
       },
     ],
-    technical_quality: {
-      stability: 4, focus: 4, exposure: 4, composition: 4, audio_quality: 3, overall_score: 4, issues: [],
-    },
-    editorial_value: {
-      emotional_impact: 3, storytelling_potential: 3, uniqueness: 3, suggested_use: 'B-Roll',
-    },
     clip_summary: 'Strand',
     highlights,
   };
@@ -57,15 +51,16 @@ describe('analyzeClips with highlights', () => {
   it('stores normalized highlights, sets status done, and replaces on re-run', async () => {
     const clip = insertClip();
 
-    const first = { analyzeVideo: async () => response([{ start_sec: 3.5, end_sec: 9, description: 'Wave', quality: 8 }]) };
+    const first = { analyzeVideo: async () => response([{ start_sec: 3.5, end_sec: 9, description: 'Wave', tier: 'hero', shot: 'wide', role: 'action', issues: ['shake'] }]) };
     const r1 = await analyzeClips([clip], DEFAULT_CONFIG, clipRepo, () => {}, hlRepo, first);
     expect(r1).toEqual({ success: 1, errors: 0 });
     expect(clipRepo.findById(clip.id)!.analysis_status).toBe('done');
     const stored = hlRepo.findByClip(clip.id);
     expect(stored).toHaveLength(1);
-    expect(stored[0]).toMatchObject({ start_sec: 3.5, end_sec: 4.3, description: 'Wave', quality: 8 });
+    expect(stored[0]).toMatchObject({ start_sec: 3.5, end_sec: 4.3, description: 'Wave', tier: 'hero', shot: 'wide', role: 'action' });
+    expect(JSON.parse(stored[0].issues)).toEqual(['shake']);
 
-    const second = { analyzeVideo: async () => response([{ start_sec: 0.5, end_sec: 2, description: 'Gull', quality: 6 }]) };
+    const second = { analyzeVideo: async () => response([{ start_sec: 0.5, end_sec: 2, description: 'Gull', tier: 'filler', shot: 'close', role: 'detail' }]) };
     await analyzeClips([clip], DEFAULT_CONFIG, clipRepo, () => {}, hlRepo, second);
     const after = hlRepo.findByClip(clip.id);
     expect(after.map((h) => h.description)).toEqual(['Gull']);

@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3';
+import { tierRank, tierRankSql } from '../../core/tiers.js';
 import type { Clip, InsertClip, ClipAnalysis, SearchFilters } from '../../types/clip.js';
 
 export class ClipRepository {
@@ -37,17 +38,6 @@ export class ClipRepository {
         analysis_status = 'done',
         ai_scenes = @ai_scenes,
         ai_summary = @ai_summary,
-        ai_quality_stability = @ai_quality_stability,
-        ai_quality_focus = @ai_quality_focus,
-        ai_quality_exposure = @ai_quality_exposure,
-        ai_quality_composition = @ai_quality_composition,
-        ai_quality_audio = @ai_quality_audio,
-        ai_quality_overall = @ai_quality_overall,
-        ai_quality_issues = @ai_quality_issues,
-        ai_editorial_emotional = @ai_editorial_emotional,
-        ai_editorial_storytelling = @ai_editorial_storytelling,
-        ai_editorial_uniqueness = @ai_editorial_uniqueness,
-        ai_editorial_suggested_use = @ai_editorial_suggested_use,
         ai_visual_keywords = @ai_visual_keywords,
         analysis_profile_version = @analysis_profile_version
       WHERE id = @id
@@ -144,14 +134,9 @@ export class ClipRepository {
       params.push(filters.project_id);
     }
 
-    if (filters?.min_quality !== undefined) {
-      sql += ' AND clips.ai_quality_overall >= ?';
-      params.push(filters.min_quality);
-    }
-
-    if (filters?.suggested_use) {
-      sql += ' AND clips.ai_editorial_suggested_use = ?';
-      params.push(filters.suggested_use);
+    if (filters?.min_tier) {
+      sql += ` AND EXISTS (SELECT 1 FROM highlights h WHERE h.clip_id = clips.id AND ${tierRankSql('h.tier')} >= ?)`;
+      params.push(tierRank(filters.min_tier));
     }
 
     if (filters?.location) {
@@ -160,9 +145,7 @@ export class ClipRepository {
     }
 
     const sortMap: Record<string, string> = {
-      quality: 'clips.ai_quality_overall DESC',
       date: 'clips.recorded_at ASC',
-      emotional: 'clips.ai_editorial_emotional DESC',
       duration: 'clips.duration_sec ASC',
     };
 

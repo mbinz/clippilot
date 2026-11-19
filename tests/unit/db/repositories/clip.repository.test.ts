@@ -81,24 +81,13 @@ describe('ClipRepository', () => {
     repo.updateAnalysis(clip.id, {
       ai_scenes: '[]',
       ai_summary: 'Test summary',
-      ai_quality_stability: 4,
-      ai_quality_focus: 5,
-      ai_quality_exposure: 4,
-      ai_quality_composition: 3,
-      ai_quality_audio: 2,
-      ai_quality_overall: 3.6,
-      ai_quality_issues: '["wind noise"]',
-      ai_editorial_emotional: 4,
-      ai_editorial_storytelling: 3,
-      ai_editorial_uniqueness: 2,
-      ai_editorial_suggested_use: 'B-Roll',
       ai_visual_keywords: '["beach","sand"]',
     });
 
     const updated = repo.findById(clip.id)!;
     expect(updated.analysis_status).toBe('done');
     expect(updated.ai_summary).toBe('Test summary');
-    expect(updated.ai_quality_overall).toBe(3.6);
+    expect(Object.keys(updated).filter((k) => /^ai_(quality|editorial)_/.test(k))).toEqual([]);
   });
 
   it('updates analysis error', () => {
@@ -136,17 +125,6 @@ describe('ClipRepository', () => {
     repo.updateAnalysis(clip.id, {
       ai_scenes: '[]',
       ai_summary: 'Kinder spielen am Strand',
-      ai_quality_stability: 4,
-      ai_quality_focus: 5,
-      ai_quality_exposure: 4,
-      ai_quality_composition: 3,
-      ai_quality_audio: 2,
-      ai_quality_overall: 3.6,
-      ai_quality_issues: '[]',
-      ai_editorial_emotional: 4,
-      ai_editorial_storytelling: 3,
-      ai_editorial_uniqueness: 2,
-      ai_editorial_suggested_use: 'B-Roll',
       ai_visual_keywords: '["Strand","Kinder"]',
     });
 
@@ -160,17 +138,6 @@ describe('ClipRepository', () => {
     repo.updateAnalysis(clip.id, {
       ai_scenes: '[]',
       ai_summary: 'Beach scene',
-      ai_quality_stability: 4,
-      ai_quality_focus: 5,
-      ai_quality_exposure: 4,
-      ai_quality_composition: 3,
-      ai_quality_audio: 2,
-      ai_quality_overall: 3.6,
-      ai_quality_issues: '[]',
-      ai_editorial_emotional: 4,
-      ai_editorial_storytelling: 3,
-      ai_editorial_uniqueness: 2,
-      ai_editorial_suggested_use: 'B-Roll',
       ai_visual_keywords: '["beach"]',
     });
 
@@ -230,5 +197,25 @@ describe('ClipRepository', () => {
 
     expect(repo.resetErrors()).toBe(1);
     expect(repo.findById(b.id)!.analysis_status).toBe('pending');
+  });
+
+  it('search --min-tier keeps clips with at least one moment at or above the tier', async () => {
+    const { HighlightRepository } = await import('../../../../src/db/repositories/highlight.repository.js');
+    const hl = new HighlightRepository(db);
+    const mk = (hash: string, tier: 'hero' | 'solid' | 'filler') => {
+      const c = repo.insert(makeClip({ file_hash: hash, file_path: `/v/${hash}.mp4` }));
+      repo.updateAnalysis(c.id, { ai_scenes: '[]', ai_summary: 'Strand Wellen', ai_visual_keywords: '[]' });
+      hl.replaceForClip(c.id, [{ start_sec: 0, end_sec: 2, description: 'x', tier }]);
+      return c.id;
+    };
+    const hero = mk('h', 'hero');
+    const solid = mk('s', 'solid');
+    const filler = mk('f', 'filler');
+    const ids = (min?: 'hero' | 'solid' | 'filler') =>
+      repo.search('Strand', min ? { min_tier: min } : undefined).map((c) => c.id).sort();
+    expect(ids()).toEqual([hero, solid, filler].sort());
+    expect(ids('filler')).toEqual([hero, solid, filler].sort());
+    expect(ids('solid')).toEqual([hero, solid].sort());
+    expect(ids('hero')).toEqual([hero]);
   });
 });

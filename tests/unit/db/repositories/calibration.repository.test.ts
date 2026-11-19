@@ -31,10 +31,10 @@ describe('CalibrationRepository', () => {
     clipB = mk('/v/b.mp4', 'hb');
     hlRepo = new HighlightRepository(db);
     hlRepo.replaceForClip(clipA, [
-      { start_sec: 2, end_sec: 5, description: 'Dolphin jumps', quality: 9 },
-      { start_sec: 10, end_sec: 12, description: 'Boat wake', quality: 4 },
+      { start_sec: 2, end_sec: 5, description: 'Dolphin jumps', tier: 'hero', shot: 'wide', role: 'action' },
+      { start_sec: 10, end_sec: 12, description: 'Boat wake', tier: 'filler' },
     ]);
-    hlRepo.replaceForClip(clipB, [{ start_sec: 1, end_sec: 3, description: 'Face close-up', quality: 7 }]);
+    hlRepo.replaceForClip(clipB, [{ start_sec: 1, end_sec: 3, description: 'Face close-up', tier: 'solid' }]);
     hlIds = hlRepo.listByProject(projectId).map((h) => h.id);
     repo = new CalibrationRepository(db);
   });
@@ -65,7 +65,7 @@ describe('CalibrationRepository', () => {
     expect(metrics.score_verdicts).toEqual({ stability: { low: 1, ok: 0, high: 0 } });
 
     const snap = db.prepare('SELECT * FROM highlight_verdicts WHERE round_id = ? AND highlight_id = ?').get(round_id, hlIds[0]) as any;
-    expect(snap).toMatchObject({ clip_id: clipA, start_sec: 2, end_sec: 5, description: 'Dolphin jumps', quality: 9, note: 'great' });
+    expect(snap).toMatchObject({ clip_id: clipA, start_sec: 2, end_sec: 5, description: 'Dolphin jumps', tier: 'hero', shot: 'wide', role: 'action', quality: null, note: 'great' });
     expect(JSON.parse(snap.verdicts)).toEqual(['good']);
     const missed = db.prepare('SELECT * FROM missed_moments WHERE round_id = ?').all(round_id) as any[];
     expect(missed).toMatchObject([{ clip_id: clipB, at_sec: 7.5, note: 'person waves' }]);
@@ -80,7 +80,7 @@ describe('CalibrationRepository', () => {
 
   it('snapshots suggested_speed of each highlight at import', () => {
     hlRepo.replaceForClip(clipA, [
-      { start_sec: 2, end_sec: 5, description: 'Dolphin jumps', quality: 9, slowmo: 'light', slowmo_reason: 'water', suggested_speed: 0.5 },
+      { start_sec: 2, end_sec: 5, description: 'Dolphin jumps', tier: 'hero', slowmo: 'light', slowmo_reason: 'water', suggested_speed: 0.5 },
     ]);
     const id = hlRepo.findByClip(clipA)[0].id;
     const data = parseVerdictExport({
@@ -179,7 +179,7 @@ describe('CalibrationRepository reviewed clips', () => {
     expect(repo.roundCount()).toBe(0);
     expect(repo.reviewedClipIds()).toEqual(new Set());
     for (const t of [1, 2]) db.prepare('INSERT INTO calibration_rounds (profile_version) VALUES (0)').run();
-    db.prepare("INSERT INTO highlight_verdicts (round_id, highlight_id, clip_id, verdicts, note, start_sec, end_sec, description, quality) VALUES (1, 100, 11, '[]', '', 0, 1, 'd', 5)").run();
+    db.prepare("INSERT INTO highlight_verdicts (round_id, highlight_id, clip_id, verdicts, note, start_sec, end_sec, description) VALUES (1, 100, 11, '[]', '', 0, 1, 'd')").run();
     db.prepare("INSERT INTO missed_moments VALUES (1, 12, 3, '')").run();
     db.prepare("INSERT INTO clip_score_verdicts VALUES (2, 13, 'focus', 'ok')").run();
     db.prepare("INSERT INTO clip_notes VALUES (2, 14, 'n', 0)").run();

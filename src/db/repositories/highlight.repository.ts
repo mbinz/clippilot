@@ -1,4 +1,8 @@
 import type Database from 'better-sqlite3';
+import type { Tier } from '../../core/tiers.js';
+
+export type Shot = 'wide' | 'medium' | 'close' | 'detail';
+export type Role = 'establishing' | 'action' | 'reaction' | 'detail' | 'transition';
 
 export interface HighlightRecord {
   id: number;
@@ -6,7 +10,10 @@ export interface HighlightRecord {
   start_sec: number;
   end_sec: number;
   description: string;
-  quality: number;
+  tier: Tier;
+  shot: Shot | null;
+  role: Role | null;
+  issues: string; // JSON array
   slowmo: 'none' | 'light' | 'strong';
   slowmo_reason: string;
   suggested_speed: number;
@@ -17,7 +24,10 @@ export interface InsertHighlight {
   start_sec: number;
   end_sec: number;
   description: string;
-  quality: number;
+  tier: Tier;
+  shot?: Shot | null;
+  role?: Role | null;
+  issues?: string[];
   slowmo?: 'none' | 'light' | 'strong';
   slowmo_reason?: string;
   suggested_speed?: number;
@@ -32,7 +42,7 @@ export class HighlightRepository {
   constructor(private db: Database.Database) {
     this.stmtDelete = db.prepare('DELETE FROM highlights WHERE clip_id = ?');
     this.stmtInsert = db.prepare(
-      'INSERT INTO highlights (clip_id, start_sec, end_sec, description, quality, slowmo, slowmo_reason, suggested_speed) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO highlights (clip_id, start_sec, end_sec, description, tier, shot, role, issues, slowmo, slowmo_reason, suggested_speed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     );
     this.stmtFindByClip = db.prepare(
       'SELECT * FROM highlights WHERE clip_id = ? ORDER BY start_sec ASC, id ASC',
@@ -49,7 +59,8 @@ export class HighlightRepository {
     this.db.transaction(() => {
       this.stmtDelete.run(clipId);
       for (const h of items) {
-        this.stmtInsert.run(clipId, h.start_sec, h.end_sec, h.description, h.quality,
+        this.stmtInsert.run(clipId, h.start_sec, h.end_sec, h.description, h.tier,
+          h.shot ?? null, h.role ?? null, JSON.stringify(h.issues ?? []),
           h.slowmo ?? 'none', h.slowmo_reason ?? '', h.suggested_speed ?? 1);
       }
     })();
