@@ -347,7 +347,7 @@ Done when: red→green, typecheck + test:all green, page regenerated for the pil
 
 **M2.5c ✅** (45dce99) — full-width layout.
 
-### M2.6 — Taste calibration loop (user idea 2026-11-19, challenged & reshaped) — C1 ✅ a4e8b13 · C2 ✅ 34be4e0 · C3 ✅ (SKILL.md) · C4 ✅ 7f8379a (review page v2) · round 0 ✅ (P 0.89, missed 0.5/clip) · C5 ✅ e39aa1a (moments + slow-mo; 481 tests) · round 1 ✅ (P 0.50, missed 0.125/clip) · C6 moment tags, no clip scores in progress · then profile v1 → round 2
+### M2.6 — Taste calibration loop (user idea 2026-11-19, challenged & reshaped) — C1 ✅ a4e8b13 · C2 ✅ 34be4e0 · C3 ✅ (SKILL.md) · C4 ✅ 7f8379a (review page v2) · round 0 ✅ (P 0.89, missed 0.5/clip) · C5 ✅ e39aa1a (moments + slow-mo; 481 tests) · round 1 ✅ (P 0.50, missed 0.125/clip) · C6 ✅ c3fdd12 (moment tags + tier, clip scores dropped incl. columns; 498 tests; pilot DB migrated, backup `clippilot.pre-012.db`) · then profile v1 → round 2
 Goal: before analyzing a whole project, calibrate highlight selection to the user's taste in a few short review rounds.
 Design decisions (planner, from the challenge):
 - **What is learned = a per-user taste profile**, not free prompt rewriting: `~/.clippilot/taste-profile.md` (short
@@ -467,7 +467,7 @@ talking→none stays 1); normalize carries speed; migration 011 + repository rou
 Manual after merge-ready: user re-analyzes the 33 pilot clips (`analyze --force`, ~US$0.33, user's terminal) → regenerate
 page → round 1. Done when: typecheck + test:all green; regenerated page shows slow-mo badges on a 50/100 fps action clip.
 
-#### C6 — Moment tags + tier, no clip scores (user decision 2026-11-19 after round 1)
+#### C6 — Moment tags + tier, no clip scores (user decision 2026-11-19 after round 1) — ✅ 0ec54a8…c3fdd12. Deferred: unused `quality_weights` config; move `highlightsToJson` out of cli/ (server imports it)
 Evidence: clip `overall` spans only 2.8–3.8 over 33 pilot clips (avg 3.5; the poor no-highlight clip #30 = 3.6 like 👍
 clips); `suggested_use` = "B-Roll" for every clip in round 1; moment `quality` 1–10 is flat too (33 of 36 are 7 or 8).
 Absolute numbers from Gemini don't discriminate → replace with categorical, checkable facts per moment. User: remove clip
