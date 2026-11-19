@@ -277,6 +277,43 @@ M2 deferred (not done here):
   cost before `analyze`; show ~8 highlights with timestamps for the user to judge; `summary --json`.
 Done when: user judges highlights useful (or the prompt is tuned until they do).
 
+**M2.5 — Highlight review page (implementer)** — user wants to review the pilot analysis in detail before the full
+Portugal run. Reusable for the full trip later.
+Behavior:
+- New command `clippilot review-highlights [-o <path>]` (default `.clippilot/review.html` in the project dir) writes
+  **one self-contained HTML file** (inline CSS/JS, no CDN, no network) and prints `{ "output": <path>, "clips": n,
+  "highlights": m }` as JSON.
+- Pure `buildReviewData(clips, highlights)` in `src/core/review/review-data.ts` → `{ project, generated_at, clips: [{
+  clip_id, file_name, file_path, scene_hint, duration_sec, proxy_url, ai_summary, places: string[], moments: string[],
+  quality_overall, highlights: [{ highlight_id, start_sec, end_sec, description, quality }] }] }`.
+  - **All analyzed clips are included, also those with 0 highlights** (to spot missed moments); sorted by scene_hint, then
+    file_name; highlights by start_sec.
+  - `proxy_url` = `file://` URL of the proxy (percent-encoded like the FCPXML exporter's `pathToFileUri`); clips without a
+    proxy get `null` (page shows "no proxy").
+  - places/moments from `ai_scenes` setting/activity, split on commas, trimmed, lowercased, deduped (reuse the summary's
+    tag logic rather than duplicating it).
+- Pure `renderReviewHtml(data)` in `src/core/review/review-html.ts` embeds the data as JSON inside
+  `<script type="application/json" id="review-data">`, escaped so `</script>` / `<!--` / U+2028 in descriptions can't
+  break out.
+- Page behaviour (manual check, not unit-tested): per clip card — `<video>` of the proxy with a custom bar under it showing
+  each highlight as a band (click = jump + play range); playback-rate toggle 1× / 0.5×; tags + summary.
+  Per highlight — "▶ play range" (seek to start, pause at end, optional loop), description, quality, verdict toggles
+  `good` / `timing off` / `description off` / `quality off` (multi-select), notes field.
+  Per clip — "＋ missed moment here" (records current video time, with a note), clip note field.
+  Header — progress (`reviewed highlights / total`), filter (all / unreviewed / flagged), **Export** button downloading
+  `review-verdicts.json` = `{ project, db_generated_at, reviewed_at, highlights: [{ highlight_id, clip_id, verdicts:[],
+  note }], missed: [{ clip_id, at_sec, note }], clip_notes: [{ clip_id, note }] }`. State autosaves to `localStorage`
+  (key includes project + generated_at; wrap in try/catch) so a reload keeps progress.
+- Plain readable styling, light/dark via `prefers-color-scheme`. No framework.
+Tests first:
+- `tests/unit/core/review/review-data.test.ts` with literal clip rows + literal highlights: clip without highlights is
+  included; sort order; highlight order; `proxy_url` for a path with spaces and a trailing-space folder
+  (`/x/Src /a b.mp4` → `file:///x/Src%20/a%20b.mp4`); null proxy → null; tags split/dedupe (`"marina, boat"` + `"Marina"`).
+- `tests/unit/core/review/review-html.test.ts`: output contains the data script tag; a description containing
+  `</script><script>alert(1)</script>` does not produce a second `<script` opening after the data block; parsing the
+  embedded JSON back yields the input data.
+Done when: red→green, typecheck + test:all green, `review-highlights` run in `~/Video/ClipPilot M2 Pilot/` writes the page.
+
 ### M3 — Storyboard model + CLI  ← NEXT
 - Migration: `scenes`, cut brief, panel `intent` / `state` (filled | candidates | gap) / `speed`, panel candidates.
 - Scenes seeded from source folders.
