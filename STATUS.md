@@ -347,7 +347,7 @@ Done when: red→green, typecheck + test:all green, page regenerated for the pil
 
 **M2.5c ✅** (45dce99) — full-width layout.
 
-### M2.6 — Taste calibration loop (user idea 2026-11-19, challenged & reshaped) — C1 ✅ a4e8b13 · C2 ✅ 34be4e0 · C3 ✅ (SKILL.md) · C4 review v2 in progress · round 0 pending
+### M2.6 — Taste calibration loop (user idea 2026-11-19, challenged & reshaped) — C1 ✅ a4e8b13 · C2 ✅ 34be4e0 · C3 ✅ (SKILL.md) · C4 ✅ 7f8379a (review page v2) · round 0 pending
 Goal: before analyzing a whole project, calibrate highlight selection to the user's taste in a few short review rounds.
 Design decisions (planner, from the challenge):
 - **What is learned = a per-user taste profile**, not free prompt rewriting: `~/.clippilot/taste-profile.md` (short
@@ -395,7 +395,7 @@ camera (resolution+fps), weighted towards hard: people/face tags in ai_scenes, `
 `--clips --force` → review page → import → read metrics + notes → propose profile diff (only taste rules; route
 shake/timing to M2.7) → user approves → write new version → next round.
 
-#### C4 — Review page v2: fast thumbs review (user feedback 2026-11-19, mockup `mockups/review-v2.html` approved)
+#### C4 — Review page v2: fast thumbs review (user feedback 2026-11-19, mockup `mockups/review-v2.html` approved) — ✅ 4ed5e84, 7f8379a; 454 tests; checked in browser (layout, 👍 auto-advance, 👎 reasons). Deferred: clickable progress segments; v1 `places`/`moments` fields unused by the page
 User: the v1 page is confusing, too many toggles. Goal: fast, intuitive pass through ~8 clips.
 Rebuild `src/core/review/review-html.ts` (inline script, same data from `review-data.ts`) to match the mockup:
 - **One clip at a time.** Header: "clip i of N", segmented progress bar (done = green, current = accent), Export verdicts.
