@@ -20,18 +20,19 @@ body { margin:0; font:14px/1.45 system-ui, sans-serif; background:var(--bg); col
 header { position:sticky; top:0; z-index:5; display:flex; flex-wrap:wrap; gap:12px; align-items:center;
   padding:10px 16px; background:var(--card); border-bottom:1px solid var(--line); }
 header h1 { font-size:16px; margin:0; }
-main { max-width:960px; margin:0 auto; padding:16px; }
+main { padding:16px; }
 h2 { font-size:13px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:28px 0 8px; }
 .clip { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; margin-bottom:16px; }
 .clip h3 { margin:0 0 4px; font-size:15px; }
 .meta, .tags { color:var(--muted); font-size:12px; margin:2px 0; }
 .clip-body { display:block; }
 @media (min-width: 1000px) {
-  .clip-body { display:grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap:16px; align-items:start; }
+  .clip-body { display:grid; grid-template-columns: minmax(0, 1fr) 440px; gap:16px; align-items:start; }
   .left { position:sticky; top:var(--header-h, 56px); }
 }
 .right > :first-child { margin-top:0; }
-video { width:100%; max-height:420px; background:#000; border-radius:4px; margin-top:8px; }
+video { width:100%; height:auto; object-fit:contain;
+  max-height:calc(100vh - var(--header-h, 56px) - 120px); background:#000; border-radius:4px; margin-top:8px; }
 .noproxy { padding:24px; text-align:center; color:var(--muted); border:1px dashed var(--line); margin-top:8px; }
 .bar { position:relative; height:18px; margin:6px 0; background:var(--bg); border:1px solid var(--line); border-radius:3px; }
 .band { position:absolute; top:0; bottom:0; min-width:3px; background:var(--band); cursor:pointer; border:0; padding:0; }
