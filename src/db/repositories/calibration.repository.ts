@@ -63,6 +63,19 @@ export class CalibrationRepository {
     return { round_id: roundId, metrics: this.metricsFor(roundId) };
   }
 
+  /** Clips that appear in any calibration round (never re-sample these). */
+  reviewedClipIds(): Set<number> {
+    const rows = this.db.prepare(`
+      SELECT clip_id FROM highlight_verdicts UNION SELECT clip_id FROM missed_moments
+      UNION SELECT clip_id FROM clip_score_verdicts UNION SELECT clip_id FROM clip_notes
+    `).all() as { clip_id: number }[];
+    return new Set(rows.map((r) => r.clip_id));
+  }
+
+  roundCount(): number {
+    return (this.db.prepare('SELECT COUNT(*) AS n FROM calibration_rounds').get() as { n: number }).n;
+  }
+
   /** Rounds newest first, optionally restricted to a project. */
   listRounds(projectId?: number): RoundSummary[] {
     const rows = (projectId === undefined

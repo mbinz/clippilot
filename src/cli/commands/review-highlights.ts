@@ -8,6 +8,7 @@ import { HighlightRepository } from '../../db/repositories/highlight.repository.
 import { ProjectRepository } from '../../db/repositories/project.repository.js';
 import { resolveClippilotDir, resolveDbPath } from '../../utils/fs.js';
 import { buildReviewData } from '../../core/review/review-data.js';
+import { parseClipIds } from '../../core/calibration/sampling.js';
 import { renderReviewHtml } from '../../core/review/review-html.js';
 
 export function registerReviewHighlightsCommand(parent: Command): void {
@@ -15,6 +16,7 @@ export function registerReviewHighlightsCommand(parent: Command): void {
     .command('review-highlights')
     .description('Write a self-contained HTML page for reviewing clips and their highlights')
     .option('--project <name>', 'Project name (default: the only project)')
+    .option('--clips <ids>', 'Only show these clip ids (comma-separated)')
     .option('-o, --output <path>', 'Output file (default: .clippilot/review.html)')
     .action(async (options) => {
       const db = createDb(resolveDbPath(process.cwd()));
@@ -45,6 +47,7 @@ export function registerReviewHighlightsCommand(parent: Command): void {
           new ClipRepository(db).listByProject(project.id),
           new HighlightRepository(db).listByProject(project.id),
           { project: project.name, generated_at: new Date().toISOString() },
+          options.clips ? parseClipIds(options.clips) : undefined,
         );
         const output = path.resolve(options.output ?? path.join(resolveClippilotDir(process.cwd()), 'review.html'));
         await mkdir(path.dirname(output), { recursive: true });

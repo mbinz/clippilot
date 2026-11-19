@@ -101,4 +101,14 @@ describe('buildReviewData', () => {
     expect(none.quality).toEqual({ stability: null, focus: null, exposure: null, composition: null, audio: null, overall: null });
     expect(none.editorial).toEqual({ emotional: null, storytelling: null, uniqueness: null });
   });
+
+  it('restricts to the given clip ids when provided', () => {
+    const data = buildReviewData(
+      [clip({ id: 1 }), clip({ id: 2, file_path: '/v/b.mp4' }), clip({ id: 3, file_path: '/v/c.mp4' })],
+      [],
+      { project: 'P', generated_at: 'x' },
+      [3, 1],
+    );
+    expect(data.clips.map((c) => c.clip_id).sort()).toEqual([1, 3]);
+  });
 });

@@ -98,11 +98,13 @@ export class ClipRepository {
     return stmt.all(...ids) as Clip[];
   }
 
-  findPending(projectId?: number): Clip[] {
-    if (projectId !== undefined) {
-      return this.stmtFindPendingByProject.all(projectId) as Clip[];
-    }
-    return this.stmtFindPending.all() as Clip[];
+  findPending(projectId?: number, clipIds?: number[]): Clip[] {
+    const rows = projectId !== undefined
+      ? (this.stmtFindPendingByProject.all(projectId) as Clip[])
+      : (this.stmtFindPending.all() as Clip[]);
+    if (!clipIds) return rows;
+    const only = new Set(clipIds);
+    return rows.filter((c) => only.has(c.id));
   }
 
   updateAnalysis(id: number, analysis: ClipAnalysis): void {
@@ -193,7 +195,15 @@ export class ClipRepository {
     };
   }
 
-  resetAnalysis(projectId?: number): number {
+  resetAnalysis(projectId?: number, clipIds?: number[]): number {
+    if (clipIds) {
+      if (clipIds.length === 0) return 0;
+      const marks = clipIds.map(() => '?').join(',');
+      const scope = projectId !== undefined ? ' AND project_id = ?' : '';
+      return this.db
+        .prepare(`UPDATE clips SET analysis_status = 'pending' WHERE id IN (${marks})${scope}`)
+        .run(...clipIds, ...(projectId !== undefined ? [projectId] : [])).changes;
+    }
     if (projectId !== undefined) {
       return this.db.prepare("UPDATE clips SET analysis_status = 'pending' WHERE project_id = ?").run(projectId).changes;
     }

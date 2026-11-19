@@ -57,7 +57,10 @@ on success. Always pass `--json` so output is parseable.
 | `clippilot mark-best <id> [--group <gid>]` | User picks the best take among similar clips. Defaults to all groups containing the clip. |
 | `clippilot tag <id> [-l <location>] [-t a,b,c] [--people n,m] --json` | User adds metadata. |
 | `clippilot contact-sheet [--query <q>] [--project <name>] [--ids 1,2,3] [--cols 4 --rows 6] [-o /tmp/sheet.png]` | User wants to *see* a batch of clips. Render the PNG, then `Read` it. |
-| `clippilot export --clips 1,5,12 --format fcpxml --output ./final.fcpxml --json` | User is ready to take a selection to DaVinci. Formats: csv, json, edl, fcpxml. |
+| `clippilot export --clips 1,5,12 --format otio --output ./final.otio --json` | User is ready to take a selection to DaVinci. **`otio` is primary** (keeps markers, linked audio); `fcpxml` secondary; also csv, json, edl. |
+| `clippilot review-highlights [--clips 1,2,3] [-o <path>]` | Writes a local HTML review page (video + highlights + score/verdict toggles + Export). Open it with `open <path>`. |
+| `clippilot review import <review-verdicts.json> [--project <name>]` | Stores the user's exported verdicts as a calibration round; prints metrics. |
+| `clippilot calibrate sample [--n 8] [--seed N] [--project <name>]` / `calibrate status --json` | Pick fresh, hard clips for the next calibration round / list rounds with metrics. |
 
 All other behavior — search, contact-sheet, get-clip, similar, mark-best,
 tag, export — is conversational and you should use it freely.
@@ -81,6 +84,34 @@ For most conversational requests:
    `clippilot export --clips <ids> --format fcpxml --output <path> --json`
    then tell them the path. DaVinci Resolve is where the visual edit
    actually happens.
+
+## Taste calibration (before analyzing a whole project)
+
+Highlight selection is tuned to the user via a **taste profile**: short explicit rules in
+`~/.clippilot/taste-profile.v<N>.md` (highest N wins; `CLIPPILOT_HOME` overrides the dir), appended to
+the Gemini prompt. It is per user and carries across projects. Run a few rounds when the user starts a
+new project or says highlights don't match their taste:
+
+1. **Sample.** `clippilot calibrate sample --n 8 --json` → `clip_ids` (fresh, never-reviewed, biased to
+   hard clips: people, low stability, long, no highlights). Tell the user which clips and why (`reasons`).
+2. **Analyze with the current profile.** Confirm cost (~US$0.01/clip), then
+   `clippilot analyze --clips <ids> --force`.
+3. **Review.** `clippilot review-highlights --clips <ids> -o <abs path>` and `open` it. The user marks
+   verdicts, score toggles, missed moments, notes, then clicks **Export verdicts**.
+4. **Import.** `clippilot review import <export path> --json` → `metrics` (precision, flags, missed per
+   clip, score verdicts, `stop_rule_met`).
+5. **Learn — propose, don't apply.** Read the metrics and every note / missed-moment note (and
+   `get-clip` the flagged clips). Propose a **diff** to the newest profile: add, sharpen or remove
+   rules. Rules must be concrete and checkable ("people: prefer genuine laughter or reactions with eyes
+   visible; avoid mid-sentence talking"), and the profile stays short (≈ 15 rules max — merge, don't
+   pile up). **Only taste goes into the profile.** Route these elsewhere instead of writing rules:
+   camera shake (Gemini samples ~1 fps and can't see it → pipeline fix, STATUS M2.7) and sub-second
+   timing precision (trim in the storyboard).
+6. **On approval** write the next version `taste-profile.v<N+1>.md` (never edit an old version), and
+   tell the user the new version number.
+7. **Repeat** from step 1 on fresh clips. Stop when `stop_rule_met` (precision ≥ 0.8 and ≤ 0.3 missed
+   moments per reviewed clip) or after 3 rounds; then offer the full `analyze` of the project.
+   `clippilot calibrate status --json` shows the trend across rounds — show it to the user.
 
 ## JSON shape (read once, then trust)
 
@@ -109,10 +140,9 @@ the AI fields are populated; `pending`/`error` means they aren't yet.
   leave empty cells.
 - **Originals are never touched.** Exports reference original file paths.
   Proxies and thumbnails live under `.clippilot/`.
-- **No story builder.** "Propose a sequence" means *you* reason about
+- **No story builder yet (M3).** "Propose a sequence" means *you* reason about
   ordering using `get-clip` data, then call `export --clips <id,id,...>`
-  in your chosen order. There is no `propose-sequence` command and no
-  persistent story state.
+  in your chosen order. Persistent cuts/scenes/panels arrive with M3.
 
 ## Notes on slow / side-effecty commands
 

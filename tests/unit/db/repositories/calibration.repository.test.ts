@@ -132,3 +132,21 @@ describe('parseVerdictExport', () => {
     })).toThrow();
   });
 });
+
+describe('CalibrationRepository reviewed clips', () => {
+  it('lists clips present in any round table, and counts rounds', () => {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    runMigrations(db);
+    const repo = new CalibrationRepository(db);
+    expect(repo.roundCount()).toBe(0);
+    expect(repo.reviewedClipIds()).toEqual(new Set());
+    for (const t of [1, 2]) db.prepare('INSERT INTO calibration_rounds (profile_version) VALUES (0)').run();
+    db.prepare("INSERT INTO highlight_verdicts VALUES (1, 100, 11, '[]', '', 0, 1, 'd', 5)").run();
+    db.prepare("INSERT INTO missed_moments VALUES (1, 12, 3, '')").run();
+    db.prepare("INSERT INTO clip_score_verdicts VALUES (2, 13, 'focus', 'ok')").run();
+    db.prepare("INSERT INTO clip_notes VALUES (2, 14, 'n', 0)").run();
+    expect(repo.reviewedClipIds()).toEqual(new Set([11, 12, 13, 14]));
+    expect(repo.roundCount()).toBe(2);
+  });
+});

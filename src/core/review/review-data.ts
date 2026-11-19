@@ -79,7 +79,9 @@ export function buildReviewData(
   clips: Clip[],
   highlights: HighlightRecord[],
   meta: { project: string; generated_at: string },
+  clipIds?: number[],
 ): ReviewData {
+  const only = clipIds ? new Set(clipIds) : null;
   const byClip = new Map<number, HighlightRecord[]>();
   for (const h of highlights) {
     const list = byClip.get(h.clip_id) ?? [];
@@ -88,7 +90,7 @@ export function buildReviewData(
   }
 
   const reviewClips = clips
-    .filter((c) => c.analysis_status === 'done')
+    .filter((c) => c.analysis_status === 'done' && (!only || only.has(c.id)))
     .map((c): ReviewClip => {
       const scenes = parseScenes(c.ai_scenes);
       return {

@@ -193,6 +193,24 @@ describe('ClipRepository', () => {
     expect(repo.findPending().map((x) => x.id)).toEqual([c.id]);
   });
 
+  it('findPending restricts to the given clip ids', () => {
+    const a = repo.insert(makeClip({ file_hash: 'fa', file_path: '/videos/fa.mp4' }));
+    repo.insert(makeClip({ file_hash: 'fb', file_path: '/videos/fb.mp4' }));
+    const c = repo.insert(makeClip({ file_hash: 'fc', file_path: '/videos/fc.mp4' }));
+    expect(repo.findPending(undefined, [a.id, c.id]).map((x) => x.id).sort()).toEqual([a.id, c.id].sort());
+    expect(repo.findPending(undefined, [])).toEqual([]);
+  });
+
+  it('resetAnalysis with clip ids resets only those clips', () => {
+    const a = repo.insert(makeClip({ file_hash: 'ga', file_path: '/videos/ga.mp4' }));
+    const b = repo.insert(makeClip({ file_hash: 'gb', file_path: '/videos/gb.mp4' }));
+    repo.updateAnalysisStatus(a.id, 'done');
+    repo.updateAnalysisStatus(b.id, 'done');
+    expect(repo.resetAnalysis(undefined, [a.id])).toBe(1);
+    expect(repo.findById(a.id)!.analysis_status).toBe('pending');
+    expect(repo.findById(b.id)!.analysis_status).toBe('done');
+  });
+
   it('resetErrors flips only error clips of the given project and clears analysis_error', () => {
     const projects = new ProjectRepository(db);
     const p1 = projects.findOrCreate('p1');

@@ -8,6 +8,7 @@ import { HighlightRepository } from '../../db/repositories/highlight.repository.
 import { resolveDbPath } from '../../utils/fs.js';
 import { loadConfig } from '../../core/config/manager.js';
 import { analyzeClips } from '../../core/analyze/index.js';
+import { parseClipIds } from '../../core/calibration/sampling.js';
 import { createProgressBar } from '../formatters/progress.js';
 
 export function registerAnalyzeCommand(parent: Command): void {
@@ -16,9 +17,17 @@ export function registerAnalyzeCommand(parent: Command): void {
     .description('Run AI analysis on pending clips (uses proxies)')
     .option('--project <name>', 'Only analyze clips from this project')
     .option('--force', 'Re-analyze already analyzed clips', false)
+    .option('--clips <ids>', 'Only analyze these clip ids (comma-separated); works with --force')
     .option('--retry-errors', 'Reset clips that failed analysis to pending before analyzing', false)
     .action(async (options) => {
       const basePath = process.cwd();
+      let clipIds: number[] | undefined;
+      try {
+        clipIds = options.clips ? parseClipIds(options.clips) : undefined;
+      } catch (err) {
+        console.error(chalk.red(err instanceof Error ? err.message : String(err)));
+        process.exit(1);
+      }
       const config = await loadConfig(basePath);
 
       if (!config.gemini_api_key) {
@@ -33,7 +42,7 @@ export function registerAnalyzeCommand(parent: Command): void {
       const highlightRepo = new HighlightRepository(db);
 
       if (options.force) {
-        clipRepo.resetAnalysis();
+        clipRepo.resetAnalysis(undefined, clipIds);
       }
 
       if (options.retryErrors) {
@@ -42,7 +51,7 @@ export function registerAnalyzeCommand(parent: Command): void {
         console.log(`Reset ${reset} errored clips to pending.`);
       }
 
-      const pending = clipRepo.findPending();
+      const pending = clipRepo.findPending(undefined, clipIds);
       if (pending.length === 0) {
         console.log(chalk.yellow('No clips pending analysis.'));
         db.close();
