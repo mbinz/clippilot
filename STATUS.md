@@ -347,7 +347,7 @@ Done when: red→green, typecheck + test:all green, page regenerated for the pil
 
 **M2.5c ✅** (45dce99) — full-width layout.
 
-### M2.6 — Taste calibration loop (user idea 2026-11-19, challenged & reshaped) — C1 ✅ a4e8b13 · C2 ✅ 34be4e0 · C3 ✅ (SKILL.md) · round 0 pending
+### M2.6 — Taste calibration loop (user idea 2026-11-19, challenged & reshaped) — C1 ✅ a4e8b13 · C2 ✅ 34be4e0 · C3 ✅ (SKILL.md) · C4 review v2 in progress · round 0 pending
 Goal: before analyzing a whole project, calibrate highlight selection to the user's taste in a few short review rounds.
 Design decisions (planner, from the challenge):
 - **What is learned = a per-user taste profile**, not free prompt rewriting: `~/.clippilot/taste-profile.md` (short
@@ -394,6 +394,40 @@ camera (resolution+fps), weighted towards hard: people/face tags in ai_scenes, `
 **C3 — Skill loop (planner)** — `.claude/skills/clippilot/SKILL.md` gets the calibration procedure: sample → analyze
 `--clips --force` → review page → import → read metrics + notes → propose profile diff (only taste rules; route
 shake/timing to M2.7) → user approves → write new version → next round.
+
+#### C4 — Review page v2: fast thumbs review (user feedback 2026-11-19, mockup `mockups/review-v2.html` approved)
+User: the v1 page is confusing, too many toggles. Goal: fast, intuitive pass through ~8 clips.
+Rebuild `src/core/review/review-html.ts` (inline script, same data from `review-data.ts`) to match the mockup:
+- **One clip at a time.** Header: "clip i of N", segmented progress bar (done = green, current = accent), Export verdicts.
+  Prev / Next clip buttons; opens on the first clip not yet done. No all/unreviewed/flagged filter, no clip notes box.
+- **Left:** big video; timeline strip under it (highlights as blocks, green/red once voted, missed markers ★, playhead);
+  clicking a block selects + plays that highlight looping; clicking elsewhere seeks. "★ Missed a moment here" button.
+- **Right (440px):** clip card — name, folder · duration, summary; overall-quality ring (1–5, colour green ≥4 / amber ≥3 / red);
+  5-step bars for stability, focus, exposure, composition, audio; editorial bars for emotional, storytelling, uniqueness;
+  pills for suggested use and quality issues. "Scores look right? 👍 👎".
+  Then highlight cards: time range, quality as 10 dots + "n/10", description, 👍 👎.
+- **Highlight vote:** 👍 → `verdicts: ["good"]`, then auto-select + play the next highlight. 👎 → `["bad"]` and reveals reason
+  chips (multi-select) + optional note: `not_highlight` "Not a highlight", `timing` "Timing off", `description` "Description
+  wrong", `quality` "Shaky / poor quality" → `["bad", ...reasons]`. Clicking the active thumb again clears the vote.
+- **Score vote:** 👍 → every shown score gets `ok`. 👎 → bars become editable: user clicks the step where the score *should*
+  be; AI too high → `high`, AI too low → `low`, scores not touched → `ok`. In 👎 mode tapping the suggested-use pill toggles
+  `suggested_use_wrong`. (Existing `clip_scores` / `suggested_use_wrong` export fields, no schema change for these.)
+- **Missed:** button or `M` adds `{clip_id, at_sec: video.currentTime}`, listed as a card with optional note and ✕ remove.
+- **Keys** (ignored while typing in an input): ↑/↓ select highlight, `Y` 👍, `N` 👎, `1`–`4` toggle reasons on a 👎'd
+  highlight, `M` missed, Space play/pause, Enter next clip. Shown as a key hint row under the video.
+- **Clip done:** leaving a clip with Next/Enter marks it done. Zero-highlight clips show an empty state ("No highlights —
+  press M for anything it missed, then ⏎"). Export gains `reviewed_clips: number[]` = done or touched clips.
+- localStorage key prefix `clippilot-review-v2:` (no migration of v1 state). Narrow screens (<1000px) stack to one column.
+- **Import / metrics:** `reviewed_clips` optional (default `[]`) in `verdict-schema.ts`; migration `010` adds
+  `calibration_reviewed_clips(round_id, clip_id, PK)`; `importRound` stores it; `metricsFor` and `reviewedClipIds` include
+  it (so a clip viewed with nothing to flag counts as reviewed with 0 missed). `metrics.flags` gains `not_highlight`.
+  Precision unchanged (good_only / voted). Old exports still import.
+Tests first: metrics (`not_highlight` flag; `["bad"]` not good), schema (`reviewed_clips` default), repository (reviewed
+clips counted + excluded from sampling), and the page behaviour in jsdom (dev dep OK): run the rendered HTML with
+scripts, drive clicks/keys, assert on the export object (expose it via `window.clippilotReview.buildExport()`):
+👍 → good + next selected; 👎 + reasons; score 👍 all ok; score 👎 + clicked step → low/high; missed via M; Next marks
+clip done → in `reviewed_clips`; state survives reload via localStorage. Keep the existing self-contained/escaping tests.
+Done when: typecheck + test:all green, page regenerated for the pilot opens in a browser and matches the mockup.
 
 ### M2.7 — Pipeline fixes from pilot feedback (planned, not started)
 - Local camera-shake metric per highlight range (ffmpeg motion/vidstab) → drop or down-rank shaky highlights.

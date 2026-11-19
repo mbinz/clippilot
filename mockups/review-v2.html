@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Review mockup v2</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a;
+    --text:#e8eaf0; --muted:#8b93a3; --accent:#7c9cff;
+    --good:#3ecf8e; --bad:#ff6b6b; --warn:#ffb547; --seg:#3a4150;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif}
+  header{display:flex;align-items:center;gap:20px;padding:12px 24px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:5}
+  header h1{font-size:15px;margin:0;font-weight:600}
+  header .sub{color:var(--muted);font-size:13px}
+  .progress{display:flex;gap:4px;flex:1;max-width:420px}
+  .progress span{flex:1;height:6px;border-radius:3px;background:var(--seg)}
+  .progress span.done{background:var(--good)}
+  .progress span.cur{background:var(--accent)}
+  .btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px 14px;font:inherit;cursor:pointer}
+  .btn:hover{border-color:#3d4452}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#0b0d12;font-weight:600}
+  .spacer{flex:1}
+  main{display:grid;grid-template-columns:minmax(0,1fr) 440px;gap:20px;padding:20px 24px}
+  /* left */
+  .stage{position:sticky;top:76px;align-self:start}
+  video{width:100%;max-height:calc(100vh - 230px);background:#000;border-radius:10px;display:block}
+  .timeline{position:relative;height:34px;margin-top:12px;background:var(--panel);border-radius:6px;cursor:pointer}
+  .timeline .hl{position:absolute;top:6px;bottom:6px;border-radius:4px;background:#4a5366;border:1px solid transparent}
+  .timeline .hl.sel{outline:2px solid var(--accent);outline-offset:1px}
+  .timeline .hl.good{background:rgba(62,207,142,.55)}
+  .timeline .hl.bad{background:rgba(255,107,107,.55)}
+  .timeline .miss{position:absolute;top:0;bottom:0;width:3px;background:var(--warn);border-radius:2px}
+  .timeline .miss::after{content:"★";position:absolute;top:-16px;left:-5px;color:var(--warn);font-size:12px}
+  .timeline .head{position:absolute;top:-3px;bottom:-3px;width:2px;background:#fff;pointer-events:none}
+  .under{display:flex;align-items:center;gap:10px;margin-top:12px;color:var(--muted);font-size:13px}
+  .keys{margin-left:auto}
+  kbd{background:var(--panel2);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;font:12px ui-monospace,monospace;color:var(--text)}
+  /* right */
+  .side{display:flex;flex-direction:column;gap:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .clipname{font-weight:600;font-size:15px}
+  .clipmeta{color:var(--muted);font-size:12px;margin-top:2px}
+  .summary{color:#c3c8d3;margin-top:8px;font-size:13px}
+  .scores{display:grid;grid-template-columns:96px 1fr;gap:16px;align-items:center}
+  .ring{position:relative;width:96px;height:96px}
+  .ring svg{transform:rotate(-90deg)}
+  .ring .val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .ring .val b{font-size:24px}
+  .ring .val small{color:var(--muted);font-size:11px}
+  .meter{display:grid;grid-template-columns:92px 1fr 22px;align-items:center;gap:8px;font-size:12px;color:var(--muted);padding:2px 4px;border-radius:6px}
+  .bars{display:flex;gap:3px}
+  .bars i{flex:1;height:8px;border-radius:2px;background:var(--seg)}
+  .bars i.on{background:var(--c)}
+  .meter .n{color:var(--text);text-align:right}
+  .group-title{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
+  .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .tag{font-size:11px;padding:3px 8px;border-radius:999px;background:rgba(255,181,71,.12);color:var(--warn)}
+  .tag.use{background:rgba(124,156,255,.14);color:var(--accent)}
+  .scorevote{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
+  .meter.pickable{cursor:pointer}
+  .meter.pickable:hover{background:var(--panel2)}
+  .meter.wrong{background:rgba(255,107,107,.12)}
+  .meter.wrong .n{color:var(--bad)}
+  .hint{font-size:12px;color:var(--bad);margin-top:6px}
+  /* highlights */
+  .hlist{display:flex;flex-direction:column;gap:8px}
+  .h{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer}
+  .h.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+  .h.good{border-left:4px solid var(--good)}
+  .h.bad{border-left:4px solid var(--bad)}
+  .h-top{display:flex;align-items:center;gap:10px}
+  .time{font:12px ui-monospace,monospace;color:var(--muted)}
+  .qdots{display:flex;gap:2px;margin-left:4px}
+  .qdots i{width:5px;height:5px;border-radius:50%;background:var(--seg)}
+  .qdots i.on{background:var(--accent)}
+  .qnum{font-size:12px;color:var(--muted)}
+  .thumbs{margin-left:auto;display:flex;gap:6px}
+  .thumb{width:38px;height:34px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);font-size:16px;cursor:pointer;filter:grayscale(1);opacity:.75}
+  .thumb:hover{opacity:1;filter:none}
+  .thumb.up.on{background:rgba(62,207,142,.18);border-color:var(--good);filter:none;opacity:1}
+  .thumb.down.on{background:rgba(255,107,107,.18);border-color:var(--bad);filter:none;opacity:1}
+  .desc{margin-top:6px;font-size:13px;color:#d4d8e1}
+  .reasons{margin-top:10px;display:none;flex-wrap:wrap;gap:6px}
+  .h.bad .reasons{display:flex}
+  .chip{font-size:12px;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer}
+  .chip.on{background:var(--bad);border-color:var(--bad);color:#1a0b0b;font-weight:600}
+  .chip kbd{margin-right:4px}
+  .note{width:100%;margin-top:6px;background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--text);padding:7px 10px;font:inherit;font-size:13px}
+  .missed{background:var(--panel);border:1px dashed var(--warn);border-radius:12px;padding:10px 14px;display:flex;gap:10px;align-items:center;font-size:13px}
+  .missed .time{color:var(--warn)}
+  .missed input{flex:1;background:transparent;border:0;color:var(--text);font:inherit}
+  .footer{display:flex;gap:10px;position:sticky;bottom:0;padding:12px 0;background:linear-gradient(transparent,var(--bg) 30%)}
+  .footer .btn{flex:1}
+  @media (max-width:1000px){main{grid-template-columns:1fr}.stage{position:static}.keys{display:none}}
+  .callout{position:fixed;right:24px;bottom:24px;max-width:300px;background:#262b36;border:1px solid var(--accent);border-radius:10px;padding:12px 14px;font-size:12px;color:#c9cfdb;z-index:9}
+  .callout b{color:var(--text)}
+</style>
+</head>
+<body>
+<header>
+  <h1>ClipPilot review</h1>
+  <span class="sub">Calibration round 1 · clip <b id="clipno">3</b> of 8</span>
+  <div class="progress" id="progress"></div>
+  <span class="spacer"></span>
+  <button class="btn primary">Export verdicts</button>
+</header>
+
+<main>
+  <section class="stage">
+    <video id="v" controls muted src="file:///Users/michaelbinz/Video/ClipPilot%20M2%20Pilot/.clippilot/proxies/a945d1476a53a5e2bff384dc782706352c6de27ad2b8363257231a2bb144b188.mp4"></video>
+    <div class="timeline" id="tl"><div class="head" id="head"></div></div>
+    <div class="under">
+      <button class="btn" id="missbtn">★ Missed a moment here</button>
+      <span class="keys">
+        <kbd>↑</kbd><kbd>↓</kbd> highlight &nbsp; <kbd>Y</kbd> 👍 &nbsp; <kbd>N</kbd> 👎 &nbsp; <kbd>M</kbd> missed &nbsp; <kbd>Space</kbd> play &nbsp; <kbd>⏎</kbd> next clip
+      </span>
+    </div>
+  </section>
+
+  <aside class="side">
+    <div class="card">
+      <div class="clipname">C0580.MP4</div>
+      <div class="clipmeta">03 Arrifana / Delfine · 0:36 · Sony</div>
+      <div class="summary">A joyful family boat trip on a sunny day, focusing on the happy reactions of children and adults wearing life vests.</div>
+
+      <div class="scores" style="margin-top:14px">
+        <div class="ring">
+          <svg width="96" height="96"><circle cx="48" cy="48" r="40" stroke="#2a2f3a" stroke-width="9" fill="none"/>
+            <circle cx="48" cy="48" r="40" stroke="#ffb547" stroke-width="9" fill="none" stroke-linecap="round" stroke-dasharray="251.3" stroke-dashoffset="90.5"/></svg>
+          <div class="val"><b>3.2</b><small>quality</small></div>
+        </div>
+        <div id="qmeters"></div>
+      </div>
+      <div class="group-title">Editorial</div>
+      <div id="emeters"></div>
+      <div class="tags">
+        <span class="tag use">Suggested: B-Roll</span>
+        <span class="tag">Strong wind noise</span>
+        <span class="tag">Some camera shake</span>
+      </div>
+      <div class="scorevote">
+        Scores look right?
+        <span class="spacer"></span>
+        <button class="thumb up" id="sup">👍</button>
+        <button class="thumb down" id="sdown">👎</button>
+      </div>
+      <div class="hint" id="shint" style="display:none">Tap the scores that are wrong.</div>
+    </div>
+
+    <div class="hlist" id="hlist"></div>
+
+    <div class="footer">
+      <button class="btn">← Prev</button>
+      <button class="btn primary">Next clip ⏎</button>
+    </div>
+  </aside>
+</main>
+
+<div class="callout"><b>Mockup.</b> Video, scores and highlights are real (clip #21). Buttons work; nothing is saved.</div>
+
+<script>
+var DUR = 36;
+var Q = [["Stability",3],["Focus",4],["Exposure",4],["Composition",3],["Audio",2]];
+var E = [["Emotional",4],["Storytelling",3],["Uniqueness",2]];
+var H = [
+  {s:3,e:5,d:"The girl's initial surprised look transforming into a wide, happy smile.",q:8},
+  {s:6,e:9,d:"Both children smiling and looking around, with the younger one peeking from behind.",q:7},
+  {s:17,e:19,d:"The girl's full, infectious smile directly at the camera.",q:9},
+  {s:27,e:30,d:"The girl and woman both smiling broadly while enjoying the boat ride.",q:8}
+];
+var REASONS = ["Not a highlight","Timing off","Description wrong","Shaky / poor quality"];
+var state = H.map(function(){return {v:null,r:{},note:""}});
+var missed = [];
+var sel = 0, scoreVote = null, wrong = {};
+var v = document.getElementById('v');
+
+function color(n){return n>=4?'#3ecf8e':n>=3?'#ffb547':'#ff6b6b'}
+function meters(id, arr){
+  document.getElementById(id).innerHTML = arr.map(function(m){
+    var b=''; for(var i=1;i<=5;i++) b+='<i class="'+(i<=m[1]?'on':'')+'"></i>';
+    return '<div class="meter'+(scoreVote==='down'?' pickable':'')+(wrong[m[0]]?' wrong':'')+'" data-k="'+m[0]+'"><span>'+m[0]+'</span><span class="bars" style="--c:'+color(m[1])+'">'+b+'</span><span class="n">'+(wrong[m[0]]?'✕':m[1])+'</span></div>';
+  }).join('');
+}
+function fmt(s){s=Math.round(s);return Math.floor(s/60)+':'+('0'+s%60).slice(-2)}
+function render(){
+  meters('qmeters',Q); meters('emeters',E);
+  document.getElementById('sup').className='thumb up'+(scoreVote==='up'?' on':'');
+  document.getElementById('sdown').className='thumb down'+(scoreVote==='down'?' on':'');
+  document.getElementById('shint').style.display=scoreVote==='down'?'block':'none';
+  var html='';
+  H.forEach(function(h,i){
+    var st=state[i], dots='';
+    for(var k=1;k<=10;k++) dots+='<i class="'+(k<=h.q?'on':'')+'"></i>';
+    html+='<div class="h'+(i===sel?' sel':'')+(st.v?' '+st.v:'')+'" data-i="'+i+'">'+
+      '<div class="h-top"><span class="time">'+fmt(h.s)+'–'+fmt(h.e)+'</span><span class="qdots">'+dots+'</span><span class="qnum">'+h.q+'/10</span>'+
+      '<span class="thumbs"><button class="thumb up'+(st.v==='good'?' on':'')+'" data-a="good">👍</button><button class="thumb down'+(st.v==='bad'?' on':'')+'" data-a="bad">👎</button></span></div>'+
+      '<div class="desc">'+h.d+'</div>'+
+      '<div class="reasons">'+REASONS.map(function(r,ri){return '<span class="chip'+(st.r[r]?' on':'')+'" data-r="'+r+'"><kbd>'+(ri+1)+'</kbd>'+r+'</span>'}).join('')+
+      '<input class="note" placeholder="Optional note…" value="'+st.note+'"></div></div>';
+  });
+  missed.forEach(function(m,mi){
+    html+='<div class="missed"><span class="time">★ '+fmt(m)+'</span><input placeholder="What did it miss? (optional)"><span style="cursor:pointer;color:var(--muted)" data-rm="'+mi+'">✕</span></div>';
+  });
+  document.getElementById('hlist').innerHTML=html;
+  var tl=document.getElementById('tl'), head=document.getElementById('head');
+  tl.innerHTML='';
+  H.forEach(function(h,i){var d=document.createElement('div');d.className='hl'+(i===sel?' sel':'')+(state[i].v?' '+state[i].v:'');d.style.left=(h.s/DUR*100)+'%';d.style.width=((h.e-h.s)/DUR*100)+'%';d.dataset.i=i;tl.appendChild(d)});
+  missed.forEach(function(m){var d=document.createElement('div');d.className='miss';d.style.left=(m/DUR*100)+'%';tl.appendChild(d)});
+  tl.appendChild(head);
+}
+function play(i){sel=i;var h=H[i];v.currentTime=h.s;v.play();render()}
+function vote(i,val){
+  state[i].v = state[i].v===val?null:val;
+  if(val==='good' && state[i].v && i<H.length-1){ render(); play(i+1); return; }
+  render();
+}
+document.getElementById('hlist').addEventListener('click',function(e){
+  var rm=e.target.closest('[data-rm]'); if(rm){missed.splice(+rm.dataset.rm,1);render();return}
+  var card=e.target.closest('.h'); if(!card) return; var i=+card.dataset.i;
+  var a=e.target.closest('[data-a]'); if(a){vote(i,a.dataset.a);return}
+  var c=e.target.closest('[data-r]'); if(c){state[i].r[c.dataset.r]=!state[i].r[c.dataset.r];render();return}
+  if(e.target.classList.contains('note')) return;
+  play(i);
+});
+document.getElementById('hlist').addEventListener('input',function(e){var c=e.target.closest('.h');if(c&&e.target.classList.contains('note'))state[+c.dataset.i].note=e.target.value});
+document.getElementById('tl').addEventListener('click',function(e){
+  var hl=e.target.closest('.hl'); if(hl){play(+hl.dataset.i);return}
+  var r=this.getBoundingClientRect(); v.currentTime=(e.clientX-r.left)/r.width*DUR;
+});
+document.getElementById('missbtn').onclick=function(){missed.push(v.currentTime);render()};
+document.getElementById('sup').onclick=function(){scoreVote=scoreVote==='up'?null:'up';wrong={};render()};
+document.getElementById('sdown').onclick=function(){scoreVote=scoreVote==='down'?null:'down';render()};
+document.querySelector('.card').addEventListener('click',function(e){var m=e.target.closest('.meter.pickable');if(m){wrong[m.dataset.k]=!wrong[m.dataset.k];render()}});
+v.addEventListener('timeupdate',function(){
+  document.getElementById('head').style.left=(v.currentTime/DUR*100)+'%';
+  var h=H[sel]; if(h && !v.paused && v.currentTime>h.e+0.5 && v.currentTime<h.e+1.5){ v.currentTime=h.s; } // loop selected highlight
+});
+document.addEventListener('keydown',function(e){
+  if(e.target.tagName==='INPUT') return;
+  var k=e.key.toLowerCase();
+  if(k==='arrowdown'){e.preventDefault();play(Math.min(sel+1,H.length-1))}
+  else if(k==='arrowup'){e.preventDefault();play(Math.max(sel-1,0))}
+  else if(k==='y') vote(sel,'good');
+  else if(k==='n') vote(sel,'bad');
+  else if(k==='m'){missed.push(v.currentTime);render()}
+  else if(k===' '){e.preventDefault();v.paused?v.play():v.pause()}
+  else if(/^[1-4]$/.test(k) && state[sel].v==='bad'){var r=REASONS[+k-1];state[sel].r[r]=!state[sel].r[r];render()}
+});
+var p=''; for(var i=0;i<8;i++) p+='<span class="'+(i<2?'done':i===2?'cur':'')+'"></span>';
+document.getElementById('progress').innerHTML=p;
+render();
+</script>
+</body>
+</html>
