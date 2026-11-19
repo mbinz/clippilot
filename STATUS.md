@@ -347,7 +347,7 @@ Done when: red→green, typecheck + test:all green, page regenerated for the pil
 
 **M2.5c ✅** (45dce99) — full-width layout.
 
-### M2.6 — Taste calibration loop (user idea 2026-11-19, challenged & reshaped)
+### M2.6 — Taste calibration loop (user idea 2026-11-19, challenged & reshaped) — C1 ✅ a4e8b13 · C2 ✅ 34be4e0 · C3 ✅ (SKILL.md) · round 0 pending
 Goal: before analyzing a whole project, calibrate highlight selection to the user's taste in a few short review rounds.
 Design decisions (planner, from the challenge):
 - **What is learned = a per-user taste profile**, not free prompt rewriting: `~/.clippilot/taste-profile.md` (short
