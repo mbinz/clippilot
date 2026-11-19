@@ -98,7 +98,7 @@ new project or says highlights don't match their taste:
    `clippilot analyze --clips <ids> --force`.
 3. **Review.** `clippilot review-highlights --clips <ids> -o <abs path>` and `open` it. The user marks
    verdicts, score toggles, missed moments, notes, then clicks **Export verdicts**.
-4. **Import.** `clippilot review import <export path> --json` → `metrics` (precision, flags, missed per
+4. **Import.** `clippilot review import <export path>` (prints JSON) → `metrics` (precision, flags, missed per
    clip, score verdicts, `stop_rule_met`).
 5. **Learn — propose, don't apply.** Read the metrics and every note / missed-moment note (and
    `get-clip` the flagged clips). Propose a **diff** to the newest profile: add, sharpen or remove
