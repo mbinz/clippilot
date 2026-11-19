@@ -92,7 +92,7 @@ Highlight selection is tuned to the user via a **taste profile**: short explicit
 the Gemini prompt. It is per user and carries across projects. Run a few rounds when the user starts a
 new project or says highlights don't match their taste:
 
-1. **Sample.** `clippilot calibrate sample --n 8 --json` → `clip_ids` (fresh, never-reviewed, biased to
+1. **Sample.** `clippilot calibrate sample --n 8` (prints JSON) → `clip_ids` (fresh, never-reviewed, biased to
    hard clips: people, low stability, long, no highlights). Tell the user which clips and why (`reasons`).
 2. **Analyze with the current profile.** Confirm cost (~US$0.01/clip), then
    `clippilot analyze --clips <ids> --force`.
