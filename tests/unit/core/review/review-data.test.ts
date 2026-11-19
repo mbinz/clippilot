@@ -10,16 +10,13 @@ function clip(overrides: Partial<Clip>): Clip {
     start_timecode: null, nb_frames: null, has_video: 1, has_audio: 1, scene_hint: null,
     ingested_at: '2026-01-01T00:00:00Z', analysis_status: 'done', analysis_error: null,
     location: null, manual_tags: null, people: null, ai_scenes: null, ai_summary: null,
-    ai_quality_stability: null, ai_quality_focus: null, ai_quality_exposure: null,
-    ai_quality_composition: null, ai_quality_audio: null, ai_quality_overall: null,
-    ai_quality_issues: null, ai_editorial_emotional: null, ai_editorial_storytelling: null,
-    ai_editorial_uniqueness: null, ai_editorial_suggested_use: null, ai_visual_keywords: null,
+    ai_visual_keywords: null,
     ...overrides,
   };
 }
 
 function hl(id: number, clip_id: number, start: number): HighlightRecord {
-  return { id, clip_id, start_sec: start, end_sec: start + 2, description: `d${id}`, quality: 4, slowmo: 'light', slowmo_reason: 'waves', suggested_speed: 0.5, created_at: 't' };
+  return { id, clip_id, start_sec: start, end_sec: start + 2, description: `d${id}`, tier: 'hero', shot: 'wide', role: 'action', issues: '["shake"]', slowmo: 'light', slowmo_reason: 'waves', suggested_speed: 0.5, created_at: 't' };
 }
 
 const build = (clips: Clip[], highlights: HighlightRecord[] = []) =>
@@ -52,7 +49,7 @@ describe('buildReviewData', () => {
     const data = build([clip({ id: 1, ai_summary: 'sum' })], [hl(10, 1, 8), hl(11, 1, 2)]);
     const c = data.clips[0];
     expect(c.highlights.map((h) => h.highlight_id)).toEqual([11, 10]);
-    expect(c.highlights[0]).toEqual({ highlight_id: 11, start_sec: 2, end_sec: 4, description: 'd11', quality: 4, slowmo: 'light', slowmo_reason: 'waves', suggested_speed: 0.5 });
+    expect(c.highlights[0]).toEqual({ highlight_id: 11, start_sec: 2, end_sec: 4, description: 'd11', tier: 'hero', shot: 'wide', role: 'action', issues: ['shake'], slowmo: 'light', slowmo_reason: 'waves', suggested_speed: 0.5 });
     expect(c.ai_summary).toBe('sum');
     expect(c.file_name).toBe('a.mp4');
     expect(c.file_path).toBe('/v/a.mp4');
@@ -77,29 +74,16 @@ describe('buildReviewData', () => {
     expect(c.moments).toEqual(['sailing', 'fishing']);
   });
 
-  it('maps all scores, suggested use and parsed quality issues', () => {
-    const c = build([clip({
-      ai_quality_stability: 4, ai_quality_focus: 5, ai_quality_exposure: 3, ai_quality_composition: 2,
-      ai_quality_audio: 1, ai_quality_overall: 7, ai_editorial_emotional: 6, ai_editorial_storytelling: 5,
-      ai_editorial_uniqueness: 4, ai_editorial_suggested_use: 'b-roll',
-      ai_quality_issues: '["shaky","overexposed"]',
-    })]).clips[0];
-    expect(c.scores).toEqual({
-      quality: { stability: 4, focus: 5, exposure: 3, composition: 2, audio: 1, overall: 7 },
-      editorial: { emotional: 6, storytelling: 5, uniqueness: 4 },
-      quality_issues: ['shaky', 'overexposed'],
-      suggested_use: 'b-roll',
-    });
+  it('has fps and no score fields on the clip', () => {
+    const c = build([clip({ fps: 50 })]).clips[0];
+    expect(c.fps).toBe(50);
+    expect('scores' in c).toBe(false);
   });
 
-  it('keeps null scores null and handles issues as plain string or null', () => {
-    const plain = build([clip({ ai_quality_issues: 'slightly shaky' })]).clips[0].scores;
-    expect(plain.quality_issues).toEqual(['slightly shaky']);
-    const none = build([clip({})]).clips[0].scores;
-    expect(none.quality_issues).toEqual([]);
-    expect(none.suggested_use).toBeNull();
-    expect(none.quality).toEqual({ stability: null, focus: null, exposure: null, composition: null, audio: null, overall: null });
-    expect(none.editorial).toEqual({ emotional: null, storytelling: null, uniqueness: null });
+  it('parses issues to an array and tolerates broken JSON', () => {
+    const rec = (issues: string) => ({ ...hl(1, 1, 0), issues });
+    expect(build([clip({})], [rec('["blur"]')]).clips[0].highlights[0].issues).toEqual(['blur']);
+    expect(build([clip({})], [rec('oops')]).clips[0].highlights[0].issues).toEqual([]);
   });
 
   it('restricts to the given clip ids when provided', () => {

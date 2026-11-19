@@ -10,25 +10,17 @@ const data: ReviewData = {
     {
       clip_id: 1, file_name: 'a.mp4', file_path: '/v/a.mp4', scene_hint: 'A', duration_sec: 30,
       proxy_url: 'file:///p/a.mp4', ai_summary: 'boat trip', places: [], moments: [],
-      scores: {
-        quality: { stability: 3, focus: 4, exposure: 4, composition: 3, audio: 2, overall: 3 },
-        editorial: { emotional: 4, storytelling: 3, uniqueness: 2 },
-        quality_issues: ['wind noise'], suggested_use: 'B-Roll',
-      },
+      fps: 50,
       highlights: [
-        { highlight_id: 11, start_sec: 3, end_sec: 5, description: 'first', quality: 8, slowmo: 'none', slowmo_reason: '', suggested_speed: 1 },
-        { highlight_id: 12, start_sec: 10, end_sec: 12, description: 'second', quality: 7, slowmo: 'light', slowmo_reason: 'waves rolling in', suggested_speed: 0.5 },
-        { highlight_id: 13, start_sec: 20, end_sec: 22, description: 'third', quality: 9, slowmo: 'strong', slowmo_reason: 'big splash', suggested_speed: 0.25 },
+        { highlight_id: 11, start_sec: 3, end_sec: 5, description: 'first', tier: 'hero', shot: 'wide', role: 'establishing', issues: [], slowmo: 'none', slowmo_reason: '', suggested_speed: 1 },
+        { highlight_id: 12, start_sec: 10, end_sec: 12, description: 'second', tier: 'solid', shot: 'close', role: 'action', issues: ['shake', 'blur'], slowmo: 'light', slowmo_reason: 'waves rolling in', suggested_speed: 0.5 },
+        { highlight_id: 13, start_sec: 20, end_sec: 22, description: 'third', tier: 'filler', shot: 'detail', role: 'transition', issues: [], slowmo: 'strong', slowmo_reason: 'big splash', suggested_speed: 0.25 },
       ],
     },
     {
       clip_id: 2, file_name: 'b.mp4', file_path: '/v/b.mp4', scene_hint: 'A', duration_sec: 20,
       proxy_url: 'file:///p/b.mp4', ai_summary: 'empty', places: [], moments: [],
-      scores: {
-        quality: { stability: 5, focus: 5, exposure: 5, composition: 5, audio: 5, overall: 5 },
-        editorial: { emotional: 1, storytelling: 1, uniqueness: 1 },
-        quality_issues: [], suggested_use: null,
-      },
+      fps: null,
       highlights: [],
     },
   ],
@@ -100,7 +92,6 @@ describe('review page v2', () => {
     expect(p.all('.progress span')).toHaveLength(2);
     expect(p.all('.progress span.cur')).toHaveLength(1);
     expect(p.all('.h')).toHaveLength(3);
-    expect(p.doc.body.textContent).toContain('8/10');
   });
 
   it('thumbs up marks good and selects + plays the next highlight', () => {
@@ -152,22 +143,43 @@ describe('review page v2', () => {
     expect(p.api.buildExport().missed).toEqual([]);
   });
 
-  it('has no score-vote UI and exports no clip score verdicts', () => {
+  it('has no score UI at all and exports no clip score verdicts', () => {
     const p = load();
     expect(p.doc.querySelector('#sup')).toBeNull();
     expect(p.doc.querySelector('#sdown')).toBeNull();
     expect(p.doc.querySelector('.scorevote')).toBeNull();
     expect(p.doc.body.textContent).not.toContain('Scores look right');
-    expect(p.all('.meter.pickable')).toHaveLength(0);
-    // read-only clip card still shows the scores
-    expect(p.all('.meter')).toHaveLength(8);
-    expect(p.doc.querySelector('.tag.use')?.textContent).toContain('B-Roll');
-    p.click('.tag.use');
-    p.click('.meter[data-k="stability"] i:last-child');
+    expect(p.all('.meter')).toHaveLength(0);
+    expect(p.all('.ring')).toHaveLength(0);
+    expect(p.all('.bars')).toHaveLength(0);
+    expect(p.all('.qdots')).toHaveLength(0);
+    expect(p.doc.body.textContent).not.toMatch(/\/10/);
+    expect(p.doc.body.textContent).not.toContain('Suggested:');
     p.key('y');
     const e = p.api.buildExport();
     expect(e.clip_scores).toEqual([]);
     expect(e.suggested_use_wrong).toEqual([]);
+  });
+
+  it('clip card is one line (file · folder · duration · fps) plus the summary', () => {
+    const p = load();
+    expect(p.doc.querySelector('.clipname')?.textContent).toBe('a.mp4');
+    expect(p.doc.querySelector('.clipmeta')?.textContent).toBe('A · 0:30 · 50 fps');
+    expect(p.doc.querySelector('.summary')?.textContent).toBe('boat trip');
+    p.key('Enter');
+    expect(p.doc.querySelector('.clipmeta')?.textContent).toBe('A · 0:20');
+  });
+
+  it('highlight card shows tier pill, shot · role and issue tags', () => {
+    const p = load();
+    expect(p.doc.querySelector(`${card(0)} .tier`)?.textContent).toBe('hero');
+    expect(p.doc.querySelector(`${card(0)} .tier`)?.classList.contains('hero')).toBe(true);
+    expect(p.doc.querySelector(`${card(1)} .tier`)?.textContent).toBe('solid');
+    expect(p.doc.querySelector(`${card(2)} .tier`)?.textContent).toBe('filler');
+    expect(p.doc.querySelector(`${card(0)} .shotrole`)?.textContent).toBe('wide · establishing');
+    expect(p.doc.querySelector(`${card(2)} .shotrole`)?.textContent).toBe('detail · transition');
+    expect(p.all(`${card(0)} .issue`)).toHaveLength(0);
+    expect(p.all(`${card(1)} .issue`).map((e) => e.textContent)).toEqual(['shake', 'blur']);
   });
 
   it('shows a slow-mo badge with reason only when suggested_speed < 1', () => {

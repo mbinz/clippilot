@@ -45,24 +45,17 @@ const STYLE = `
   /* right */
   .side{display:flex;flex-direction:column;gap:12px}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .clipline{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
   .clipname{font-weight:600;font-size:15px}
-  .clipmeta{color:var(--muted);font-size:12px;margin-top:2px}
+  .clipmeta{color:var(--muted);font-size:12px}
   .summary{color:#c3c8d3;margin-top:8px;font-size:13px}
-  .scores{display:grid;grid-template-columns:72px 1fr;gap:12px;align-items:center}
-  .ring{position:relative;width:72px;height:72px}
-  .ring svg{transform:rotate(-90deg);width:100%;height:100%}
-  .ring .val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
-  .ring .val b{font-size:20px}
-  .ring .val small{color:var(--muted);font-size:11px}
-  .meter{display:grid;grid-template-columns:92px 1fr 22px;align-items:center;gap:8px;font-size:12px;color:var(--muted);padding:1px 4px;border-radius:6px}
-  .bars{display:flex;gap:3px}
-  .bars i{flex:1;height:8px;border-radius:2px;background:var(--seg)}
-  .bars i.on{background:var(--c)}
-  .meter .n{color:var(--text);text-align:right}
-  .group-title{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:8px 0 4px}
-  .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-  .tag{font-size:11px;padding:3px 8px;border-radius:999px;background:rgba(255,181,71,.12);color:var(--warn)}
-  .tag.use{background:rgba(124,156,255,.14);color:var(--accent)}
+  .tier{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;padding:2px 8px;border-radius:999px;background:var(--panel2);color:var(--muted)}
+  .tier.hero{background:rgba(255,181,71,.18);color:var(--warn)}
+  .tier.solid{background:rgba(124,156,255,.16);color:var(--accent)}
+  .tier.filler{background:var(--panel2);color:var(--muted)}
+  .shotrole{font-size:12px;color:var(--muted)}
+  .issues{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .issue{font-size:11px;padding:2px 8px;border-radius:999px;background:rgba(255,107,107,.12);color:var(--bad)}
   .slowmo{font-size:12px;padding:2px 8px;border-radius:999px;background:rgba(124,156,255,.16);color:var(--accent);font-weight:600}
   .spd{font-size:12px;padding:2px 8px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer}
   .spd.on{border-color:var(--accent);color:var(--accent)}
@@ -75,10 +68,6 @@ const STYLE = `
   .h.bad{border-left:4px solid var(--bad)}
   .h-top{display:flex;align-items:center;gap:10px}
   .time{font:12px ui-monospace,monospace;color:var(--muted)}
-  .qdots{display:flex;gap:2px;margin-left:4px}
-  .qdots i{width:5px;height:5px;border-radius:50%;background:var(--seg)}
-  .qdots i.on{background:var(--accent)}
-  .qnum{font-size:12px;color:var(--muted)}
   .thumbs{margin-left:auto;display:flex;gap:6px}
   .thumb{width:38px;height:34px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);font-size:16px;cursor:pointer;filter:grayscale(1);opacity:.75}
   .thumb:hover{opacity:1;filter:none}
@@ -108,8 +97,6 @@ const SCRIPT = `
 var data = JSON.parse(document.getElementById('review-data').textContent);
 var STORAGE_KEY = 'clippilot-review-v2:' + data.project + ':' + data.generated_at;
 var REASONS = [['not_highlight', 'Not a highlight'], ['timing', 'Timing off'], ['description', 'Description wrong'], ['quality', 'Shaky / poor quality'], ['speed', 'Speed wrong']];
-var QUALITY_ROWS = [['stability', 'Stability'], ['focus', 'Focus'], ['exposure', 'Exposure'], ['composition', 'Composition'], ['audio', 'Audio']];
-var EDITORIAL_ROWS = [['emotional', 'Emotional'], ['storytelling', 'Storytelling'], ['uniqueness', 'Uniqueness']];
 
 // state.highlights[id] = { vote: 'good'|'bad'|null, reasons: { key: true }, note: '' }
 // state.missed = [{ clip_id, at_sec, note }]; state.done[clip_id] = true
@@ -151,7 +138,6 @@ function fmt(sec) {
   var s = Math.round(sec);
   return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
 }
-function color(n) { return n >= 4 ? '#3ecf8e' : n >= 3 ? '#ffb547' : '#ff6b6b'; }
 function clip() { return data.clips[cur]; }
 
 // ---- derived verdicts -------------------------------------------------------------
@@ -303,33 +289,6 @@ function updateHead() {
   if (head && video) head.style.left = (video.currentTime / clip().duration_sec * 100) + '%';
 }
 
-function meterRow(name, label, value) {
-  var bars = el('span', { class: 'bars' });
-  bars.style.setProperty('--c', color(value === null ? 0 : value));
-  for (var s = 1; s <= 5; s++) {
-    bars.appendChild(el('i', { class: value !== null && s <= value ? 'on' : '' }));
-  }
-  var row = el('div', { class: 'meter' }, [
-    el('span', { text: label }), bars, el('span', { class: 'n', text: value === null ? '?' : String(value) }),
-  ]);
-  row.setAttribute('data-k', name);
-  return row;
-}
-
-function ringEl(overall) {
-  var wrap = el('div', { class: 'ring' });
-  var C = 251.3;
-  var n = overall === null || overall === undefined ? 0 : overall;
-  var off = (C * (1 - Math.max(0, Math.min(5, n)) / 5)).toFixed(1);
-  var col = color(n);
-  wrap.innerHTML = '<svg viewBox="0 0 96 96"><circle cx="48" cy="48" r="40" stroke="#2a2f3a" stroke-width="9" fill="none"/>' +
-    '<circle cx="48" cy="48" r="40" stroke="' + col + '" stroke-width="9" fill="none" stroke-linecap="round" stroke-dasharray="' + C + '" stroke-dashoffset="' + off + '"/></svg>';
-  wrap.appendChild(el('div', { class: 'val' }, [
-    el('b', { text: overall === null || overall === undefined ? '?' : String(overall) }), el('small', { text: 'quality' }),
-  ]));
-  return wrap;
-}
-
 function thumbBtn(kind, on, extra) {
   var b = el('button', { class: 'thumb ' + (kind === 'up' ? 'up' : 'down') + (on ? ' on' : ''), text: kind === 'up' ? '👍' : '👎' });
   for (var k in (extra || {})) b.setAttribute(k, extra[k]);
@@ -338,8 +297,6 @@ function thumbBtn(kind, on, extra) {
 
 function highlightCard(h, i) {
   var st = hlState(h.highlight_id);
-  var dots = el('span', { class: 'qdots' });
-  for (var k = 1; k <= 10; k++) dots.appendChild(el('i', { class: k <= h.quality ? 'on' : '' }));
   var up = thumbBtn('up', st.vote === 'good');
   var down = thumbBtn('down', st.vote === 'bad');
   up.addEventListener('click', function (e) { e.stopPropagation(); vote(i, 'good'); });
@@ -358,21 +315,26 @@ function highlightCard(h, i) {
   var card = el('div', { class: 'h' + (i === sel ? ' sel' : '') + (st.vote ? ' ' + st.vote : '') }, [
     el('div', { class: 'h-top' }, [
       el('span', { class: 'time', text: fmt(h.start_sec) + '–' + fmt(h.end_sec) }),
-      dots,
-      el('span', { class: 'qnum', text: h.quality + '/10' }),
+      el('span', { class: 'tier ' + h.tier, text: h.tier }),
+      el('span', { class: 'shotrole', text: [h.shot, h.role].filter(Boolean).join(' · ') }),
       el('span', { class: 'thumbs' }, [up, down]),
     ]),
     el('div', { class: 'desc', text: h.description }),
     reasons,
   ]);
+  if (h.issues && h.issues.length) {
+    var issues = el('div', { class: 'issues' });
+    h.issues.forEach(function (t) { issues.appendChild(el('span', { class: 'issue', text: t })); });
+    card.insertBefore(issues, card.querySelector('.desc').nextSibling);
+  }
   if (h.suggested_speed < 1) {
     var pct = Math.round(h.suggested_speed * 100);
     var top = card.querySelector('.h-top');
-    var qnum = top.querySelector('.qnum');
+    var anchor = top.querySelector('.shotrole');
     var badge = el('span', { class: 'slowmo', text: '🐢 ' + pct + ' %', title: h.slowmo_reason || '' });
     var spd = el('button', { class: 'spd' + (fullSpeed[h.highlight_id] ? ' on' : ''), text: '1×', title: 'Compare with 100 % speed (S)' });
     spd.addEventListener('click', function (e) { e.stopPropagation(); toggleSpeed(i); });
-    top.insertBefore(badge, qnum.nextSibling);
+    top.insertBefore(badge, anchor.nextSibling);
     top.insertBefore(spd, badge.nextSibling);
     if (h.slowmo_reason) card.insertBefore(el('div', { class: 'slowwhy', text: h.slowmo_reason }), card.querySelector('.desc').nextSibling);
   }
@@ -386,23 +348,14 @@ function renderSide() {
   var side = sideEl;
   side.textContent = '';
 
-  var qm = el('div'), em = el('div');
-  QUALITY_ROWS.forEach(function (r) { qm.appendChild(meterRow(r[0], r[1], c.scores.quality[r[0]])); });
-  EDITORIAL_ROWS.forEach(function (r) { em.appendChild(meterRow(r[0], r[1], c.scores.editorial[r[0]])); });
-  var tags = el('div', { class: 'tags' });
-  if (c.scores.suggested_use) {
-    var pill = el('span', { class: 'tag use', text: 'Suggested: ' + c.scores.suggested_use });
-    tags.appendChild(pill);
-  }
-  c.scores.quality_issues.forEach(function (t) { tags.appendChild(el('span', { class: 'tag', text: t })); });
+  var meta = [c.scene_hint || '(no scene hint)', fmt(c.duration_sec)];
+  if (c.fps) meta.push(Math.round(c.fps) + ' fps');
   var clipCard = el('div', { class: 'card' }, [
-    el('div', { class: 'clipname', text: c.file_name }),
-    el('div', { class: 'clipmeta', text: (c.scene_hint || '(no scene hint)') + ' · ' + fmt(c.duration_sec) }),
+    el('div', { class: 'clipline' }, [
+      el('span', { class: 'clipname', text: c.file_name }),
+      el('span', { class: 'clipmeta', text: meta.join(' · ') }),
+    ]),
     el('div', { class: 'summary', text: c.ai_summary || '' }),
-    el('div', { class: 'scores', style: 'margin-top:10px' }, [ringEl(c.scores.quality.overall), qm]),
-    el('div', { class: 'group-title', text: 'Editorial' }),
-    em,
-    tags,
   ]);
   side.appendChild(clipCard);
 

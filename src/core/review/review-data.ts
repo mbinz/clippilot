@@ -9,20 +9,13 @@ export interface ReviewHighlight {
   start_sec: number;
   end_sec: number;
   description: string;
-  quality: number;
+  tier: string;
+  shot: string | null;
+  role: string | null;
+  issues: string[];
   slowmo: string;
   slowmo_reason: string;
   suggested_speed: number;
-}
-
-export interface ReviewScores {
-  quality: {
-    stability: number | null; focus: number | null; exposure: number | null;
-    composition: number | null; audio: number | null; overall: number | null;
-  };
-  editorial: { emotional: number | null; storytelling: number | null; uniqueness: number | null };
-  quality_issues: string[];
-  suggested_use: string | null;
 }
 
 export interface ReviewClip {
@@ -31,11 +24,11 @@ export interface ReviewClip {
   file_path: string;
   scene_hint: string | null;
   duration_sec: number;
+  fps: number | null;
   proxy_url: string | null;
   ai_summary: string | null;
   places: string[];
   moments: string[];
-  scores: ReviewScores;
   highlights: ReviewHighlight[];
 }
 
@@ -57,24 +50,9 @@ function parseIssues(raw: string | null): string[] {
     const v = JSON.parse(raw);
     if (Array.isArray(v)) return v.map(String);
   } catch {
-    // not JSON: fall through and treat as plain text
+    // broken JSON: no issues
   }
-  return [raw];
-}
-
-function buildScores(c: Clip): ReviewScores {
-  return {
-    quality: {
-      stability: c.ai_quality_stability, focus: c.ai_quality_focus, exposure: c.ai_quality_exposure,
-      composition: c.ai_quality_composition, audio: c.ai_quality_audio, overall: c.ai_quality_overall,
-    },
-    editorial: {
-      emotional: c.ai_editorial_emotional, storytelling: c.ai_editorial_storytelling,
-      uniqueness: c.ai_editorial_uniqueness,
-    },
-    quality_issues: parseIssues(c.ai_quality_issues),
-    suggested_use: c.ai_editorial_suggested_use,
-  };
+  return [];
 }
 
 /** Analyzed clips (also those without highlights), sorted by scene_hint then file name. */
@@ -102,11 +80,11 @@ export function buildReviewData(
         file_path: c.file_path,
         scene_hint: c.scene_hint,
         duration_sec: c.duration_sec,
+        fps: c.fps,
         proxy_url: c.proxy_path ? pathToFileUri(c.proxy_path) : null,
         ai_summary: c.ai_summary,
         places: uniqueLowercased(scenes.map((s) => s.setting)),
         moments: uniqueLowercased(scenes.map((s) => s.activity)),
-        scores: buildScores(c),
         highlights: (byClip.get(c.id) ?? [])
           .slice()
           .sort((a, b) => a.start_sec - b.start_sec || a.id - b.id)
@@ -115,7 +93,10 @@ export function buildReviewData(
             start_sec: h.start_sec,
             end_sec: h.end_sec,
             description: h.description,
-            quality: h.quality,
+            tier: h.tier,
+            shot: h.shot,
+            role: h.role,
+            issues: parseIssues(h.issues),
             slowmo: h.slowmo,
             slowmo_reason: h.slowmo_reason,
             suggested_speed: h.suggested_speed,
