@@ -9,7 +9,12 @@ const data: ReviewData = {
   generated_at: '2026-02-02T00:00:00Z',
   clips: [{
     clip_id: 1, file_name: 'a.mp4', file_path: '/v/a.mp4', scene_hint: 'A', duration_sec: 10,
-    proxy_url: 'file:///p/a.mp4', ai_summary: 's', places: ['beach'], moments: ['surf'], quality_overall: 7,
+    proxy_url: 'file:///p/a.mp4', ai_summary: 's', places: ['beach'], moments: ['surf'],
+    scores: {
+      quality: { stability: 4, focus: 5, exposure: 3, composition: 2, audio: 1, overall: 7 },
+      editorial: { emotional: 6, storytelling: 5, uniqueness: 4 },
+      quality_issues: [], suggested_use: null,
+    },
     highlights: [{ highlight_id: 5, start_sec: 1, end_sec: 3, description: evil, quality: 4 }],
   }],
 };

@@ -12,6 +12,16 @@ export interface ReviewHighlight {
   quality: number;
 }
 
+export interface ReviewScores {
+  quality: {
+    stability: number | null; focus: number | null; exposure: number | null;
+    composition: number | null; audio: number | null; overall: number | null;
+  };
+  editorial: { emotional: number | null; storytelling: number | null; uniqueness: number | null };
+  quality_issues: string[];
+  suggested_use: string | null;
+}
+
 export interface ReviewClip {
   clip_id: number;
   file_name: string;
@@ -22,7 +32,7 @@ export interface ReviewClip {
   ai_summary: string | null;
   places: string[];
   moments: string[];
-  quality_overall: number | null;
+  scores: ReviewScores;
   highlights: ReviewHighlight[];
 }
 
@@ -36,6 +46,32 @@ function uniqueLowercased(raws: unknown[]): string[] {
   const out = new Set<string>();
   for (const raw of raws) for (const tag of splitTags(raw)) out.add(tag.toLowerCase());
   return [...out];
+}
+
+function parseIssues(raw: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const v = JSON.parse(raw);
+    if (Array.isArray(v)) return v.map(String);
+  } catch {
+    // not JSON: fall through and treat as plain text
+  }
+  return [raw];
+}
+
+function buildScores(c: Clip): ReviewScores {
+  return {
+    quality: {
+      stability: c.ai_quality_stability, focus: c.ai_quality_focus, exposure: c.ai_quality_exposure,
+      composition: c.ai_quality_composition, audio: c.ai_quality_audio, overall: c.ai_quality_overall,
+    },
+    editorial: {
+      emotional: c.ai_editorial_emotional, storytelling: c.ai_editorial_storytelling,
+      uniqueness: c.ai_editorial_uniqueness,
+    },
+    quality_issues: parseIssues(c.ai_quality_issues),
+    suggested_use: c.ai_editorial_suggested_use,
+  };
 }
 
 /** Analyzed clips (also those without highlights), sorted by scene_hint then file name. */
@@ -65,7 +101,7 @@ export function buildReviewData(
         ai_summary: c.ai_summary,
         places: uniqueLowercased(scenes.map((s) => s.setting)),
         moments: uniqueLowercased(scenes.map((s) => s.activity)),
-        quality_overall: c.ai_quality_overall,
+        scores: buildScores(c),
         highlights: (byClip.get(c.id) ?? [])
           .slice()
           .sort((a, b) => a.start_sec - b.start_sec || a.id - b.id)

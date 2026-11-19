@@ -49,11 +49,10 @@ describe('buildReviewData', () => {
   });
 
   it('orders highlights by start_sec and maps fields', () => {
-    const data = build([clip({ id: 1, ai_quality_overall: 7, ai_summary: 'sum' })], [hl(10, 1, 8), hl(11, 1, 2)]);
+    const data = build([clip({ id: 1, ai_summary: 'sum' })], [hl(10, 1, 8), hl(11, 1, 2)]);
     const c = data.clips[0];
     expect(c.highlights.map((h) => h.highlight_id)).toEqual([11, 10]);
     expect(c.highlights[0]).toEqual({ highlight_id: 11, start_sec: 2, end_sec: 4, description: 'd11', quality: 4 });
-    expect(c.quality_overall).toBe(7);
     expect(c.ai_summary).toBe('sum');
     expect(c.file_name).toBe('a.mp4');
     expect(c.file_path).toBe('/v/a.mp4');
@@ -76,5 +75,30 @@ describe('buildReviewData', () => {
     const c = build([clip({ ai_scenes: scenes })]).clips[0];
     expect(c.places).toEqual(['marina', 'boat']);
     expect(c.moments).toEqual(['sailing', 'fishing']);
+  });
+
+  it('maps all scores, suggested use and parsed quality issues', () => {
+    const c = build([clip({
+      ai_quality_stability: 4, ai_quality_focus: 5, ai_quality_exposure: 3, ai_quality_composition: 2,
+      ai_quality_audio: 1, ai_quality_overall: 7, ai_editorial_emotional: 6, ai_editorial_storytelling: 5,
+      ai_editorial_uniqueness: 4, ai_editorial_suggested_use: 'b-roll',
+      ai_quality_issues: '["shaky","overexposed"]',
+    })]).clips[0];
+    expect(c.scores).toEqual({
+      quality: { stability: 4, focus: 5, exposure: 3, composition: 2, audio: 1, overall: 7 },
+      editorial: { emotional: 6, storytelling: 5, uniqueness: 4 },
+      quality_issues: ['shaky', 'overexposed'],
+      suggested_use: 'b-roll',
+    });
+  });
+
+  it('keeps null scores null and handles issues as plain string or null', () => {
+    const plain = build([clip({ ai_quality_issues: 'slightly shaky' })]).clips[0].scores;
+    expect(plain.quality_issues).toEqual(['slightly shaky']);
+    const none = build([clip({})]).clips[0].scores;
+    expect(none.quality_issues).toEqual([]);
+    expect(none.suggested_use).toBeNull();
+    expect(none.quality).toEqual({ stability: null, focus: null, exposure: null, composition: null, audio: null, overall: null });
+    expect(none.editorial).toEqual({ emotional: null, storytelling: null, uniqueness: null });
   });
 });

@@ -25,6 +25,12 @@ h2 { font-size:13px; text-transform:uppercase; letter-spacing:.05em; color:var(-
 .clip { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; margin-bottom:16px; }
 .clip h3 { margin:0 0 4px; font-size:15px; }
 .meta, .tags { color:var(--muted); font-size:12px; margin:2px 0; }
+.clip-body { display:block; }
+@media (min-width: 1000px) {
+  .clip-body { display:grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap:16px; align-items:start; }
+  .left { position:sticky; top:var(--header-h, 56px); }
+}
+.right > :first-child { margin-top:0; }
 video { width:100%; max-height:420px; background:#000; border-radius:4px; margin-top:8px; }
 .noproxy { padding:24px; text-align:center; color:var(--muted); border:1px dashed var(--line); margin-top:8px; }
 .bar { position:relative; height:18px; margin:6px 0; background:var(--bg); border:1px solid var(--line); border-radius:3px; }
@@ -40,6 +46,10 @@ button.on.bad { background:var(--warn); border-color:var(--warn); }
 button.on.good { background:var(--ok); border-color:var(--ok); }
 input[type=text], textarea { width:100%; font:inherit; color:inherit; background:var(--bg);
   border:1px solid var(--line); border-radius:4px; padding:4px 6px; }
+.score-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:2px 0; }
+.score-row .name { width:100px; }
+.score-row .val { width:24px; text-align:right; font-weight:600; }
+.issues { margin:4px 0; padding-left:18px; color:var(--muted); font-size:12px; }
 .missed { display:flex; gap:8px; align-items:center; margin:4px 0; }
 .missed input { flex:1; }
 `;
@@ -52,6 +62,7 @@ var STORAGE_KEY = 'clippilot-review:' + data.project + ':' + data.generated_at;
 var VERDICTS = [['good', 'good'], ['timing', 'timing off'], ['description', 'description off'], ['quality', 'quality off']];
 
 // state.highlights[id] = { verdicts: [], note: '' }; state.missed = [{ clip_id, at_sec, note }]; state.clip_notes[id] = ''
+// state.clip_scores[id][score] = 'low'|'ok'|'high'; state.suggested_use_wrong[id] = true
 var state = loadState();
 var filter = 'all';
 var clipEls = [];   // { clip, el } so the filter can show/hide cards
@@ -60,10 +71,20 @@ var progressEl, missedLists = {};
 function loadState() {
   try {
     var saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (saved) return saved;
+    if (saved) return withDefaults(saved);
   } catch (e) { /* storage unavailable: start empty */ }
-  return { highlights: {}, missed: [], clip_notes: {} };
+  return withDefaults({});
 }
+// state saved by an older page version lacks the newer fields
+function withDefaults(st) {
+  st.highlights = st.highlights || {};
+  st.missed = st.missed || [];
+  st.clip_notes = st.clip_notes || {};
+  st.clip_scores = st.clip_scores || {};            // clip_scores[clip_id][score] = 'low' | 'ok' | 'high'
+  st.suggested_use_wrong = st.suggested_use_wrong || {};   // suggested_use_wrong[clip_id] = true
+  return st;
+}
+function isScored(clipId) { return Object.keys(state.clip_scores[clipId] || {}).length > 0; }
 function saveState() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
   updateProgress();
@@ -137,28 +158,83 @@ function buildClip(clip) {
     } }),
   ]);
 
-  var card = el('div', { class: 'clip' }, [
-    el('h3', { text: clip.file_name }),
-    el('div', { class: 'meta', text: (clip.scene_hint || '(no scene hint)') + ' - ' + fmt(clip.duration_sec) +
-      ' - overall quality ' + (clip.quality_overall === null ? '?' : clip.quality_overall) }),
-    el('div', { class: 'tags', text: 'places: ' + (clip.places.join(', ') || '-') + ' | moments: ' + (clip.moments.join(', ') || '-') }),
-    el('div', { text: clip.ai_summary || '' }),
+  var left = el('div', { class: 'left' }, [
     video || el('div', { class: 'noproxy', text: 'no proxy' }),
     bar,
     controls,
   ]);
-
-  if (clip.highlights.length === 0) card.appendChild(el('div', { class: 'meta', text: 'No highlights found for this clip.' }));
-  clip.highlights.forEach(function (h) { card.appendChild(buildHighlight(h, playRange)); });
+  var right = el('div', { class: 'right' }, [
+    el('div', { class: 'tags', text: 'places: ' + (clip.places.join(', ') || '-') + ' | moments: ' + (clip.moments.join(', ') || '-') }),
+    el('div', { text: clip.ai_summary || '' }),
+    buildScores(clip),
+  ]);
+  if (clip.highlights.length === 0) right.appendChild(el('div', { class: 'meta', text: 'No highlights found for this clip.' }));
+  clip.highlights.forEach(function (h) { right.appendChild(buildHighlight(h, playRange)); });
 
   missedLists[clip.clip_id] = el('div');
-  card.appendChild(missedLists[clip.clip_id]);
+  right.appendChild(missedLists[clip.clip_id]);
   renderMissed(clip, video);
 
   var note = el('input', { type: 'text', placeholder: 'clip note', value: state.clip_notes[clip.clip_id] || '',
     oninput: function () { state.clip_notes[clip.clip_id] = note.value; saveState(); } });
-  card.appendChild(note);
+  right.appendChild(note);
+
+  var card = el('div', { class: 'clip' }, [
+    el('h3', { text: clip.file_name }),
+    el('div', { class: 'meta', text: (clip.scene_hint || '(no scene hint)') + ' - ' + fmt(clip.duration_sec) }),
+    el('div', { class: 'clip-body' }, [left, right]),
+  ]);
   return card;
+}
+
+var SCORE_ROWS = [
+  ['stability', 'quality'], ['focus', 'quality'], ['exposure', 'quality'], ['composition', 'quality'],
+  ['audio', 'quality'], ['overall', 'quality'],
+  ['emotional', 'editorial'], ['storytelling', 'editorial'], ['uniqueness', 'editorial'],
+];
+var SCORE_VERDICTS = [['low', 'too low'], ['ok', 'ok'], ['high', 'too high']];
+
+function buildScores(clip) {
+  var box = el('div', { class: 'scores' });
+  SCORE_ROWS.forEach(function (row) {
+    var name = row[0], value = clip.scores[row[1]][name];
+    var mine = state.clip_scores[clip.clip_id] || (state.clip_scores[clip.clip_id] = {});
+    var buttons = SCORE_VERDICTS.map(function (v) {
+      var b = el('button', { text: v[1], onclick: function () {
+        if (mine[name] === v[0]) delete mine[name]; else mine[name] = v[0];   // click again to unset
+        refresh();
+        saveState();
+      } });
+      b.dataset.verdict = v[0];
+      return b;
+    });
+    function refresh() {
+      buttons.forEach(function (b) { b.className = mine[name] === b.dataset.verdict ? 'on' : ''; });
+    }
+    refresh();
+    box.appendChild(el('div', { class: 'score-row' }, [
+      el('span', { class: 'name', text: name }),
+      el('span', { class: 'val', text: value === null ? '?' : String(value) }),
+    ].concat(buttons)));
+  });
+
+  var wrong = el('button', { text: 'suggested use wrong', onclick: function () {
+    if (state.suggested_use_wrong[clip.clip_id]) delete state.suggested_use_wrong[clip.clip_id];
+    else state.suggested_use_wrong[clip.clip_id] = true;
+    wrong.className = state.suggested_use_wrong[clip.clip_id] ? 'on bad' : '';
+    saveState();
+  } });
+  wrong.className = state.suggested_use_wrong[clip.clip_id] ? 'on bad' : '';
+  box.appendChild(el('div', { class: 'score-row' }, [
+    el('span', { text: 'suggested use: ' + (clip.scores.suggested_use || '-') }), wrong,
+  ]));
+
+  if (clip.scores.quality_issues.length) {
+    var list = el('ul', { class: 'issues' });
+    clip.scores.quality_issues.forEach(function (t) { list.appendChild(el('li', { text: t })); });
+    box.appendChild(list);
+  }
+  return box;
 }
 
 function buildHighlight(h, playRange) {
@@ -227,12 +303,15 @@ function updateProgress() {
   data.clips.forEach(function (c) {
     c.highlights.forEach(function (h) { total++; if (isReviewed(h.highlight_id)) reviewed++; });
   });
-  progressEl.textContent = 'reviewed ' + reviewed + ' / ' + total + ' highlights';
+  var scored = data.clips.filter(function (c) { return isScored(c.clip_id); }).length;
+  progressEl.textContent = 'reviewed ' + reviewed + ' / ' + total + ' highlights - scored clips ' +
+    scored + ' / ' + data.clips.length;
 }
 
 function exportVerdicts() {
   var out = { project: data.project, db_generated_at: data.generated_at, reviewed_at: new Date().toISOString(),
-    highlights: [], missed: state.missed, clip_notes: [] };
+    highlights: [], missed: state.missed, clip_notes: [],
+    clip_scores: [], suggested_use_wrong: [] };
   data.clips.forEach(function (c) {
     c.highlights.forEach(function (h) {
       var st = hlState(h.highlight_id);
@@ -240,6 +319,11 @@ function exportVerdicts() {
         out.highlights.push({ highlight_id: h.highlight_id, clip_id: c.clip_id, verdicts: st.verdicts, note: st.note });
       }
     });
+    var scores = state.clip_scores[c.clip_id] || {};
+    Object.keys(scores).forEach(function (name) {
+      out.clip_scores.push({ clip_id: c.clip_id, score: name, verdict: scores[name] });
+    });
+    if (state.suggested_use_wrong[c.clip_id]) out.suggested_use_wrong.push(c.clip_id);
     if (state.clip_notes[c.clip_id]) out.clip_notes.push({ clip_id: c.clip_id, note: state.clip_notes[c.clip_id] });
   });
   var url = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' }));
@@ -274,6 +358,8 @@ function init() {
     main.appendChild(card);
   });
   updateProgress();
+  // the sticky video column sits just below the sticky header
+  document.documentElement.style.setProperty('--header-h', document.getElementById('header').offsetHeight + 'px');
 }
 init();
 `;
