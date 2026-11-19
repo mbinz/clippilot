@@ -4,7 +4,6 @@ import type { Facets } from '../api/types';
 
 const EMPTY_FACETS: Facets = {
   locations: [],
-  suggested_uses: [],
   tags: [],
   people: [],
   moods: [],

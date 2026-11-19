@@ -16,9 +16,7 @@ export function SortControl({ sort, sortDir, onSortChange, onSortDirChange }: So
           className="w-full px-2 py-1.5 bg-white border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Default</option>
-          <option value="quality">Quality</option>
           <option value="date">Date</option>
-          <option value="emotional">Emotional Impact</option>
           <option value="duration">Duration</option>
         </select>
       </div>

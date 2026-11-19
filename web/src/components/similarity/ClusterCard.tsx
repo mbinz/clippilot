@@ -1,5 +1,8 @@
 import type { SimilarityCluster } from '../../api/types';
-import { markBest, updateClip } from '../../api/client';
+import { markBest } from '../../api/client';
+
+// similarity_score = tier rank of the clip's best moment (hero 3, solid 2, filler 1, none 0)
+const TIER_BY_RANK: Record<number, string> = { 3: 'hero', 2: 'solid', 1: 'filler' };
 
 interface ClusterCardProps {
   cluster: SimilarityCluster;
@@ -9,11 +12,6 @@ interface ClusterCardProps {
 export function ClusterCard({ cluster, onRefresh }: ClusterCardProps) {
   const handleMarkBest = async (clipId: number) => {
     await markBest(cluster.id, clipId);
-    onRefresh();
-  };
-
-  const handleSkip = async (clipId: number) => {
-    await updateClip(clipId, { ai_editorial_suggested_use: 'Skip' });
     onRefresh();
   };
 
@@ -42,7 +40,7 @@ export function ClusterCard({ cluster, onRefresh }: ClusterCardProps) {
                 </span>
               )}
               <span className="absolute top-1 right-1 px-1.5 py-0.5 bg-black/70 text-white text-[10px] rounded">
-                {member.similarity_score.toFixed(1)}
+                {TIER_BY_RANK[member.similarity_score] ?? '-'}
               </span>
             </div>
             <div className="p-2 flex gap-1">
@@ -51,12 +49,6 @@ export function ClusterCard({ cluster, onRefresh }: ClusterCardProps) {
                 className="flex-1 text-[10px] px-1.5 py-1 bg-green-50 text-green-700 rounded hover:bg-green-100"
               >
                 Best
-              </button>
-              <button
-                onClick={() => handleSkip(member.clip_id)}
-                className="flex-1 text-[10px] px-1.5 py-1 bg-red-50 text-red-700 rounded hover:bg-red-100"
-              >
-                Skip
               </button>
             </div>
           </div>

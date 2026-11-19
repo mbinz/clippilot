@@ -17,21 +17,6 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
-function QualityBar({ label, value }: { label: string; value: number | null }) {
-  if (value === null) return null;
-  const pct = (value / 5) * 100;
-  const color = value >= 4 ? 'bg-green-500' : value >= 2.5 ? 'bg-yellow-500' : 'bg-red-500';
-  return (
-    <div className="flex items-center gap-2 text-xs">
-      <span className="w-24 text-gray-600">{label}</span>
-      <div className="flex-1 bg-gray-200 rounded h-2">
-        <div className={`h-2 rounded ${color}`} style={{ width: `${pct}%` }} />
-      </div>
-      <span className="w-6 text-right text-gray-500">{value.toFixed(1)}</span>
-    </div>
-  );
-}
-
 interface ClipDetailProps {
   clip: Clip;
   thumbnails: Thumbnail[];
@@ -125,40 +110,25 @@ export function ClipDetail({ clip, thumbnails, onClose, onUpdated }: ClipDetailP
           </div>
         )}
 
-        {/* Quality scores */}
-        {clip.ai_quality_overall !== null && (
+        {/* Moments */}
+        {clip.highlights && clip.highlights.length > 0 && (
           <div>
-            <h3 className="text-xs font-semibold text-gray-700 mb-2">Quality Scores</h3>
-            <div className="space-y-1.5">
-              <QualityBar label="Stability" value={clip.ai_quality_stability} />
-              <QualityBar label="Focus" value={clip.ai_quality_focus} />
-              <QualityBar label="Exposure" value={clip.ai_quality_exposure} />
-              <QualityBar label="Composition" value={clip.ai_quality_composition} />
-              <QualityBar label="Audio" value={clip.ai_quality_audio} />
-              <QualityBar label="Overall" value={clip.ai_quality_overall} />
+            <h3 className="text-xs font-semibold text-gray-700 mb-2">Moments ({clip.highlights.length})</h3>
+            <div className="space-y-2">
+              {clip.highlights.map((m) => (
+                <div key={m.id} className="text-xs bg-gray-50 rounded p-2">
+                  <div className="flex justify-between text-gray-400 mb-1">
+                    <span>{formatDuration(m.start_sec)} - {formatDuration(m.end_sec)}</span>
+                    <span className="font-semibold text-gray-600">{m.tier}</span>
+                  </div>
+                  <p className="text-gray-700">{m.description}</p>
+                  <p className="text-gray-500 mt-0.5">
+                    {[m.shot, m.role].filter(Boolean).join(' · ')}
+                    {m.issues.length > 0 && <span className="text-amber-600"> · {m.issues.join(', ')}</span>}
+                  </p>
+                </div>
+              ))}
             </div>
-            {clip.ai_quality_issues && clip.ai_quality_issues.length > 0 && (
-              <div className="mt-2 text-xs text-amber-600">
-                Issues: {clip.ai_quality_issues.join(', ')}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Editorial scores */}
-        {clip.ai_editorial_emotional !== null && (
-          <div>
-            <h3 className="text-xs font-semibold text-gray-700 mb-2">Editorial Value</h3>
-            <div className="space-y-1.5">
-              <QualityBar label="Emotional" value={clip.ai_editorial_emotional} />
-              <QualityBar label="Storytelling" value={clip.ai_editorial_storytelling} />
-              <QualityBar label="Uniqueness" value={clip.ai_editorial_uniqueness} />
-            </div>
-            {clip.ai_editorial_suggested_use && (
-              <p className="mt-1 text-xs text-gray-500">
-                Suggested use: <span className="font-medium">{clip.ai_editorial_suggested_use}</span>
-              </p>
-            )}
           </div>
         )}
 

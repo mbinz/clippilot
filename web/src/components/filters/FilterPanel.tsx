@@ -1,6 +1,6 @@
 import type { Facets, ClipSearchParams } from '../../api/types';
 import { SearchBar } from './SearchBar';
-import { QualitySlider } from './QualitySlider';
+import { TierSelect } from './TierSelect';
 import { FacetFilter } from './FacetFilter';
 import { SortControl } from './SortControl';
 import { DateRangeFilter } from './DateRangeFilter';
@@ -33,9 +33,9 @@ export function FilterPanel({
         onSortDirChange={(v) => onFilterChange('sort_dir', v)}
       />
 
-      <QualitySlider
-        value={filters.min_quality ?? 0}
-        onChange={(v) => onFilterChange('min_quality', v > 0 ? v : undefined)}
+      <TierSelect
+        value={filters.min_tier ?? ''}
+        onChange={(v) => onFilterChange('min_tier', v || undefined)}
       />
 
       <FacetFilter
@@ -43,13 +43,6 @@ export function FilterPanel({
         options={facets.locations}
         value={filters.location ?? ''}
         onChange={(v) => onFilterChange('location', v || undefined)}
-      />
-
-      <FacetFilter
-        label="Suggested Use"
-        options={facets.suggested_uses}
-        value={filters.suggested_use ?? ''}
-        onChange={(v) => onFilterChange('suggested_use', v || undefined)}
       />
 
       <FacetFilter

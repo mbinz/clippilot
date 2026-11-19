@@ -27,11 +27,9 @@ export async function fetchClips(params: ClipSearchParams): Promise<PaginatedRes
   if (params.location) qs.set('location', params.location);
   if (params.date_from) qs.set('date_from', params.date_from);
   if (params.date_to) qs.set('date_to', params.date_to);
-  if (params.min_quality !== undefined) qs.set('min_quality', String(params.min_quality));
-  if (params.max_quality !== undefined) qs.set('max_quality', String(params.max_quality));
+  if (params.min_tier) qs.set('min_tier', params.min_tier);
   if (params.tags?.length) qs.set('tags', params.tags.join(','));
   if (params.people?.length) qs.set('people', params.people.join(','));
-  if (params.suggested_use) qs.set('suggested_use', params.suggested_use);
   if (params.mood) qs.set('mood', params.mood);
   if (params.sort) qs.set('sort', params.sort);
   if (params.sort_dir) qs.set('sort_dir', params.sort_dir);
@@ -51,7 +49,6 @@ export async function updateClip(
     location?: string | null;
     manual_tags?: string[] | null;
     people?: string[] | null;
-    ai_editorial_suggested_use?: string | null;
   },
 ): Promise<ApiResponse<Clip>> {
   return fetchJson(`${BASE}/clips/${id}`, {

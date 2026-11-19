@@ -18,18 +18,21 @@ export interface Clip {
   people: string[] | null;
   ai_scenes: Scene[] | null;
   ai_summary: string | null;
-  ai_quality_stability: number | null;
-  ai_quality_focus: number | null;
-  ai_quality_exposure: number | null;
-  ai_quality_composition: number | null;
-  ai_quality_audio: number | null;
-  ai_quality_overall: number | null;
-  ai_quality_issues: string[] | null;
-  ai_editorial_emotional: number | null;
-  ai_editorial_storytelling: number | null;
-  ai_editorial_uniqueness: number | null;
-  ai_editorial_suggested_use: string | null;
   ai_visual_keywords: string[] | null;
+  highlights?: Moment[];
+}
+
+export type Tier = 'hero' | 'solid' | 'filler';
+
+export interface Moment {
+  id: number;
+  start_sec: number;
+  end_sec: number;
+  description: string;
+  tier: Tier;
+  shot: string | null;
+  role: string | null;
+  issues: string[];
 }
 
 export interface Scene {
@@ -73,7 +76,6 @@ export interface ApiResponse<T> {
 
 export interface Facets {
   locations: string[];
-  suggested_uses: string[];
   tags: string[];
   people: string[];
   moods: string[];
@@ -101,13 +103,11 @@ export interface ClipSearchParams {
   location?: string;
   date_from?: string;
   date_to?: string;
-  min_quality?: number;
-  max_quality?: number;
+  min_tier?: Tier;
   tags?: string[];
   people?: string[];
-  suggested_use?: string;
   mood?: string;
-  sort?: 'quality' | 'date' | 'emotional' | 'duration';
+  sort?: 'date' | 'duration';
   sort_dir?: 'asc' | 'desc';
   page?: number;
   per_page?: number;

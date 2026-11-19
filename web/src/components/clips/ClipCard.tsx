@@ -1,4 +1,4 @@
-import type { Clip } from '../../api/types';
+import type { Clip, Tier } from '../../api/types';
 import path from '../../utils/path';
 
 function formatDuration(sec: number): string {
@@ -7,12 +7,13 @@ function formatDuration(sec: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-function qualityColor(score: number | null): string {
-  if (score === null) return 'bg-gray-500';
-  if (score >= 4) return 'bg-green-500';
-  if (score >= 2.5) return 'bg-yellow-500';
-  return 'bg-red-500';
-}
+const TIER_ORDER: Tier[] = ['hero', 'solid', 'filler'];
+
+const TIER_STYLE: Record<Tier, string> = {
+  hero: 'bg-amber-500',
+  solid: 'bg-blue-500',
+  filler: 'bg-gray-500',
+};
 
 interface ClipCardProps {
   clip: Clip;
@@ -23,6 +24,10 @@ export function ClipCard({ clip, onClick }: ClipCardProps) {
   const thumbnailUrl = clip.proxy_path
     ? `/media/thumbnails/${path.basename(clip.file_hash)}_0.jpg`
     : undefined;
+
+  const tiers = TIER_ORDER
+    .map((tier) => [tier, (clip.highlights ?? []).filter((m) => m.tier === tier).length] as [Tier, number])
+    .filter(([, count]) => count > 0);
 
   return (
     <div
@@ -43,10 +48,14 @@ export function ClipCard({ clip, onClick }: ClipCardProps) {
           </div>
         )}
 
-        {/* Quality badge */}
-        {clip.ai_quality_overall !== null && (
-          <span className={`absolute top-2 left-2 px-1.5 py-0.5 rounded text-xs font-bold text-white ${qualityColor(clip.ai_quality_overall)}`}>
-            {clip.ai_quality_overall.toFixed(1)}
+        {/* Moment tiers: one chip per tier present, best first */}
+        {tiers.length > 0 && (
+          <span className="absolute top-2 left-2 flex gap-1">
+            {tiers.map(([tier, count]) => (
+              <span key={tier} className={`px-1.5 py-0.5 rounded text-xs font-bold text-white ${TIER_STYLE[tier]}`}>
+                {count} {tier}
+              </span>
+            ))}
           </span>
         )}
 
@@ -54,13 +63,6 @@ export function ClipCard({ clip, onClick }: ClipCardProps) {
         <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/70 text-white text-xs font-mono">
           {formatDuration(clip.duration_sec)}
         </span>
-
-        {/* Suggested use badge */}
-        {clip.ai_editorial_suggested_use && (
-          <span className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded bg-black/70 text-white text-xs">
-            {clip.ai_editorial_suggested_use}
-          </span>
-        )}
       </div>
 
       <div className="p-2">
