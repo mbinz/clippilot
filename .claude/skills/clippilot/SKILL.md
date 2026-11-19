@@ -6,8 +6,8 @@ description: Use when the user wants to ingest, analyze, or chat with their vide
 # ClipPilot — chat with the footage
 
 ClipPilot stores ingested video clips in a local SQLite database with
-Gemini-generated structured analysis (scenes, quality, editorial scores,
-visual keywords, locations, people). All commands operate on the database
+Gemini-generated structured analysis (scenes, summary, visual keywords, per-moment
+tier/shot/role/issues tags, locations, people). All commands operate on the database
 in the current working directory (`.clippilot/`). The skill exposes that
 data to you so the user can converse with their material instead of
 clicking through a UI.
@@ -50,7 +50,7 @@ on success. Always pass `--json` so output is parseable.
 | `clippilot ingest <path> [--project <name>] [--location <l>] [--no-proxy] [--skip-analysis]` | Import a folder of video files. Confirm the path with the user first. |
 | `clippilot analyze [--project <name>] [--force] [--retry-errors]` | Run Gemini analysis on pending clips. Requires a Gemini key. `--retry-errors` re-queues clips that previously failed. |
 | `clippilot config show` / `clippilot config set gemini_api_key <key>` | Inspect or set the Gemini API key. |
-| `clippilot search "<query>" --json [--min-quality N] [--limit N]` | User asks "find me clips about X". FTS over scenes, summary, keywords, location, people. |
+| `clippilot search "<query>" --json [--min-tier hero|solid|filler] [--limit N]` | User asks "find me clips about X". FTS over scenes, summary, keywords, location, people. `--min-tier` keeps clips with at least one moment at or above that tier. |
 | `clippilot get-clip <id>` | User asks about one specific clip in detail (you already have its ID). |
 | `clippilot summary [--project <name>] [--top N] --json` | Overview of a project: scene hints, places, moments, best highlights. Run after analyze, before storyboarding. |
 | `clippilot similar <id>` | User asks "what other takes of this exist" or "any duplicates of clip N". |
@@ -58,7 +58,7 @@ on success. Always pass `--json` so output is parseable.
 | `clippilot tag <id> [-l <location>] [-t a,b,c] [--people n,m] --json` | User adds metadata. |
 | `clippilot contact-sheet [--query <q>] [--project <name>] [--ids 1,2,3] [--cols 4 --rows 6] [-o /tmp/sheet.png]` | User wants to *see* a batch of clips. Render the PNG, then `Read` it. |
 | `clippilot export --clips 1,5,12 --format otio --output ./final.otio --json` | User is ready to take a selection to DaVinci. **`otio` is primary** (keeps markers, linked audio); `fcpxml` secondary; also csv, json, edl. |
-| `clippilot review-highlights [--clips 1,2,3] [-o <path>]` | Writes a local HTML review page (video + highlights + score/verdict toggles + Export). Open it with `open <path>`. |
+| `clippilot review-highlights [--clips 1,2,3] [-o <path>]` | Writes a local HTML review page (video + highlights with tier/shot/role/issues + verdict toggles + Export). Open it with `open <path>`. |
 | `clippilot review import <review-verdicts.json> [--project <name>]` | Stores the user's exported verdicts as a calibration round; prints metrics. |
 | `clippilot calibrate sample [--n 8] [--seed N] [--project <name>]` / `calibrate status --json` | Pick fresh, hard clips for the next calibration round / list rounds with metrics. |
 
@@ -93,13 +93,13 @@ the Gemini prompt. It is per user and carries across projects. Run a few rounds 
 new project or says highlights don't match their taste:
 
 1. **Sample.** `clippilot calibrate sample --n 8` (prints JSON) → `clip_ids` (fresh, never-reviewed, biased to
-   hard clips: people, low stability, long, no highlights). Tell the user which clips and why (`reasons`).
+   hard clips: people, shaky (a moment with the `shake` issue), long, no highlights). Tell the user which clips and why (`reasons`).
 2. **Analyze with the current profile.** Confirm cost (~US$0.01/clip), then
    `clippilot analyze --clips <ids> --force`.
 3. **Review.** `clippilot review-highlights --clips <ids> -o <abs path>` and `open` it. The user marks
-   verdicts, score toggles, missed moments, notes, then clicks **Export verdicts**.
+   verdicts, missed moments, notes, then clicks **Export verdicts**.
 4. **Import.** `clippilot review import <export path>` (prints JSON) → `metrics` (precision, flags, missed per
-   clip, score verdicts, `stop_rule_met`).
+   clip, `stop_rule_met`).
 5. **Learn — propose, don't apply.** Read the metrics and every note / missed-moment note (and
    `get-clip` the flagged clips). Propose a **diff** to the newest profile: add, sharpen or remove
    rules. Rules must be concrete and checkable ("people: prefer genuine laughter or reactions with eyes
@@ -123,13 +123,19 @@ JSON-encoded text columns:
 - `duration_sec`, `resolution`, `fps`, `recorded_at`, `location`
 - `manual_tags: string[]`, `people: string[]`
 - `ai_scenes: object[]`, `ai_summary`, `ai_visual_keywords: string[]`
-- `ai_quality_overall` plus per-axis (`stability`, `focus`, `exposure`, `composition`, `audio`)
-- `ai_editorial_emotional`, `ai_editorial_storytelling`, `ai_editorial_uniqueness`, `ai_editorial_suggested_use`
-- `ai_quality_issues: string[]`
-- `scene_hint: string | null` (source-folder grouping); `get-clip` and `search --json` also carry `highlights: [{start_sec, end_sec, description, quality}]` per clip
+- `scene_hint: string | null` (source-folder grouping)
+- There are no clip-level scores (no overall/quality/editorial numbers, no suggested use): they did not discriminate.
+  Judge a clip by its moments instead.
+- `get-clip` and `search --json` carry `highlights` per clip (the moments):
+  `[{id, start_sec, end_sec, description, tier, shot, role, issues, slowmo, slowmo_reason, suggested_speed}]`
+  - `tier`: `hero` (would open or anchor a scene) | `solid` (good usable shot) | `filler` (only to fill a gap)
+  - `shot`: `wide` | `medium` | `close` | `detail`
+  - `role`: `establishing` | `action` | `reaction` | `detail` | `transition`
+  - `issues`: array of `shake` | `blur` | `obstructed` | `overexposed` | `underexposed` (empty when clean)
+  - `slowmo` / `suggested_speed`: whether slow motion suits the moment and the playback speed derived from fps
 
-Quality and editorial scores are 1–5. `analysis_status` of `done` means
-the AI fields are populated; `pending`/`error` means they aren't yet.
+`analysis_status` of `done` means
+the AI fields and moments are populated; `pending`/`error` means they aren't yet.
 
 ## Constraints
 
@@ -153,4 +159,4 @@ the AI fields are populated; `pending`/`error` means they aren't yet.
   minutes for medium projects (100–1000 clips). Resumes idempotently —
   re-running only picks up `pending` clips unless `--force` is passed.
 - Before `analyze`, `pending` clips have empty `ai_*` fields, so search
-  results will be sparse and `--min-quality` filters won't match anything.
+  results will be sparse and `--min-tier` filters won't match anything.
