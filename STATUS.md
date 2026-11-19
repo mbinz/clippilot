@@ -314,6 +314,37 @@ Tests first:
   embedded JSON back yields the input data.
 Done when: red→green, typecheck + test:all green, `review-highlights` run in `~/Video/ClipPilot M2 Pilot/` writes the page.
 
+**M2.5 ✅** (88971b4, 49275e7) — page generated for the Delfine pilot.
+
+**M2.5b — Review page v2 after first user look (implementer)**
+User feedback: (1) with > 2 highlights the video and the highlight list don't fit on one screen; (2) wants to see
+**all** clip scores, not just overall, and give feedback on each.
+Behavior:
+- Layout: on wide screens (≥ 1000 px) each clip card is two columns — left: video + band bar + controls, `position:
+  sticky; top: <header height>` so it stays visible while scrolling that card's highlight list; right: tags, summary,
+  scores, highlights, missed moments, clip note. Narrow screens stack as today. Header stays sticky.
+- `buildReviewData` adds `scores` per clip: `quality: { stability, focus, exposure, composition, audio, overall }`,
+  `editorial: { emotional, storytelling, uniqueness }` (numbers or null, as stored), `quality_issues: string[]` (parsed
+  from the JSON-array string `ai_quality_issues`; non-JSON → `[that string]`; null → `[]`),
+  `suggested_use: string | null`. Keep `quality_overall` for compatibility or replace it — your call, keep tests honest.
+- Page shows all scores compactly (e.g. a small table `stability 4 · focus 5 · …`), issues as a list, suggested use.
+  Per score a 3-way toggle `too low / ok / too high` (unset by default); per clip a toggle `suggested use wrong`.
+  Stored in state as `clip_scores[clip_id][score_name] = 'low'|'ok'|'high'`, exported as
+  `clip_scores: [{ clip_id, score, verdict }]` and `suggested_use_wrong: [clip_id]`. Progress line also shows
+  `scored clips n / total` (a clip counts once any score verdict is set).
+- Don't lose existing localStorage state: new fields must default when absent from a saved state.
+Tests first (`review-data.test.ts`): literal clip row with all score columns → `scores` mapped; `ai_quality_issues`
+as JSON array, as plain string, and null; null scores stay null.
+Done when: red→green, typecheck + test:all green, page regenerated for the pilot.
+
+**Pilot analysis — user feedback so far (2026-11-19, input to the pre-full-run prompt/analysis fixes)**
+- ✅ Good at finding the moment in long clips where otherwise little happens.
+- ❌ People / head shots: the user picks different highlights than Gemini (what they pick → from missed-moment markers).
+- ❌ Shaky footage: segments with heavy camera shake are proposed as highlights. Likely root cause: Gemini samples
+  ~1 fps, so it can't perceive shake; candidate fix = local per-segment shake metric (ffmpeg motion analysis) that
+  penalises/drops highlights, rather than prompt wording alone.
+- Full verdict export still pending.
+
 ### M3 — Storyboard model + CLI  ← NEXT
 - Migration: `scenes`, cut brief, panel `intent` / `state` (filled | candidates | gap) / `speed`, panel candidates.
 - Scenes seeded from source folders.
