@@ -31,6 +31,9 @@ Claude is the collaborator at every step (drafts, proposes candidates, finds fil
 
 1. **Ingest** — point at the trip folder. Resumable / incremental (a 123 GB trip must survive interruptions). Folder structure (`01 Flug`, `02 Cacela Velha`, …) is captured as a scene hint.
 2. **Understand** — Gemini analyzes the 720p proxy **video** (not just stills) and returns per-clip metadata **plus timestamped highlights** ("dolphin jumps, 01:12–01:16, quality 8/10"). Highlights — not whole clips — are the unit the storyboard works with. A project-level summary answers "what's in here".
+2b. **Calibrate (once per user, briefly per project)** — a few review rounds on fresh, hard clips; verdicts teach a
+   per-user taste profile (explicit rules appended to the analysis prompt, proposed by Claude, approved by the user).
+   Stop at precision ≥ 0.8 and ≤ 0.3 missed moments per clip, or 3 rounds. Then analyze the whole project.
 3. **Brief** — the user states intent per cut: target length, mood, must-have moments, ending ("15 min, relaxed, surf + Lisbon city life, end on Lisbon sunset"). Stored on the cut; drives drafting and defines what counts as a gap.
 4. **Storyboard draft** — Claude drafts scenes (seeded from folders, then renamed/split/merged/reordered) and panels. Each panel has an intent and is in one of three states:
    - **filled** — a clip with in/out and speed

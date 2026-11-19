@@ -345,6 +345,60 @@ Done when: red→green, typecheck + test:all green, page regenerated for the pil
   penalises/drops highlights, rather than prompt wording alone.
 - Full verdict export still pending.
 
+**M2.5c ✅** (45dce99) — full-width layout.
+
+### M2.6 — Taste calibration loop (user idea 2026-11-19, challenged & reshaped)
+Goal: before analyzing a whole project, calibrate highlight selection to the user's taste in a few short review rounds.
+Design decisions (planner, from the challenge):
+- **What is learned = a per-user taste profile**, not free prompt rewriting: `~/.clippilot/taste-profile.md` (short
+  explicit rules), versioned (`taste-profile.v<N>.md` kept on each change). Base prompt stays fixed; the profile is
+  appended. Per user (carries across trips), not per project.
+- **Who learns = Claude in chat** (CLI-as-skill): reads imported verdicts + metrics, proposes a profile diff, user approves.
+  No LLM loop inside the app.
+- **Only prompt-fixable issues go into the profile.** Pipeline issues (camera shake invisible at Gemini's ~1 fps; timing
+  precision on 1–2 s moments) get deterministic fixes (M2.7), not prompt rounds.
+- **Each round uses fresh clips** (never re-tune on what was just reviewed); round 0 = the Delfine pilot review.
+- **Stop rule:** precision (highlights marked only `good` / reviewed highlights) ≥ 0.8 **and** missed moments per
+  reviewed clip ≤ 0.3, or 3 rounds.
+
+**C1 — Verdict import + metrics + taste profile in the prompt (implementer)**
+Behavior:
+- Migration `009_calibration`: `calibration_rounds(id PK, project_id, profile_version INT, created_at)`,
+  `highlight_verdicts(round_id, highlight_id, clip_id, verdicts TEXT JSON, note TEXT)`, `missed_moments(round_id, clip_id,
+  at_sec REAL, note TEXT)`, `clip_score_verdicts(round_id, clip_id, score TEXT, verdict TEXT CHECK in low/ok/high)`,
+  `clip_notes(round_id, clip_id, note TEXT, suggested_use_wrong INT)`. Highlight descriptions/times are **snapshotted**
+  into `highlight_verdicts` (`start_sec, end_sec, description, quality`) because re-analysis replaces highlights.
+- `clippilot review import <review-verdicts.json> [--project]` → creates a round (profile_version = current), stores
+  everything, prints JSON `{ round_id, metrics }`. Unknown highlight ids → error listing them (no partial import, one
+  transaction).
+- Pure `computeRoundMetrics(verdicts, missed, reviewedClipIds)` → `{ reviewed_highlights, good_only, precision,
+  flags: { timing, description, quality }, missed_moments, reviewed_clips, missed_per_clip, score_verdicts: {
+  <score>: { low, ok, high } }, stop_rule_met: boolean }`. A reviewed clip = a clip with any highlight verdict, score
+  verdict, missed marker or note.
+- Taste profile: pure `loadTasteProfile(dir)` → `{ version, text } | null` (highest `taste-profile.v<N>.md`, or
+  `taste-profile.md` as v1); `buildUserPrompt(profile)` returns `USER_PROMPT` unchanged when null, else appends a
+  section `Vorlieben dieses Editors (befolgen):\n<text>`. `GeminiClient` uses it; `clips` gains
+  `analysis_profile_version INT` set on successful analysis. Profile dir overridable via `CLIPPILOT_HOME` env (tests).
+- `clippilot calibrate status --json` → rounds with metrics + profile_version, newest first.
+Tests first: metrics on literal verdict sets (incl. precision with mixed flags, a clip reviewed only via a missed
+marker, stop rule true/false at the boundary); import round-trip into an in-memory DB incl. snapshot + unknown-id
+rejection; `loadTasteProfile` picks highest version from a temp dir; `buildUserPrompt` with/without profile; analyze
+stores `analysis_profile_version` (fake client).
+Done when: red→green, typecheck + test:all; the user's real Delfine export imports as round 0.
+
+**C2 — Sampling fresh, hard clips (implementer, after C1)**
+`clippilot calibrate sample [--n 8] [--project]` → clip ids not reviewed in any round, stratified over scene_hint and
+camera (resolution+fps), weighted towards hard: people/face tags in ai_scenes, `ai_quality_stability` ≤ 3, duration
+≥ 20 s, 0 highlights. Deterministic given `--seed`. `analyze` and `review-highlights` gain `--clips <ids>`.
+
+**C3 — Skill loop (planner)** — `.claude/skills/clippilot/SKILL.md` gets the calibration procedure: sample → analyze
+`--clips --force` → review page → import → read metrics + notes → propose profile diff (only taste rules; route
+shake/timing to M2.7) → user approves → write new version → next round.
+
+### M2.7 — Pipeline fixes from pilot feedback (planned, not started)
+- Local camera-shake metric per highlight range (ffmpeg motion/vidstab) → drop or down-rank shaky highlights.
+- Experiment: Gemini `videoMetadata.fps` > 1 for short clips (timing precision, motion) — measure cost vs. gain.
+
 ### M3 — Storyboard model + CLI  ← NEXT
 - Migration: `scenes`, cut brief, panel `intent` / `state` (filled | candidates | gap) / `speed`, panel candidates.
 - Scenes seeded from source folders.
