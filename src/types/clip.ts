@@ -35,6 +35,7 @@ export interface Clip {
   ai_editorial_uniqueness: number | null;
   ai_editorial_suggested_use: string | null;
   ai_visual_keywords: string | null;
+  analysis_profile_version: number | null;
 }
 
 export type AnalysisStatus = 'pending' | 'analyzing' | 'done' | 'error';
@@ -88,6 +89,7 @@ export interface ClipAnalysis {
   ai_editorial_uniqueness: number;
   ai_editorial_suggested_use: string;
   ai_visual_keywords: string;
+  analysis_profile_version?: number | null;
 }
 
 export interface SearchFilters {

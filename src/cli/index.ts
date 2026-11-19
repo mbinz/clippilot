@@ -13,6 +13,8 @@ import { registerSimilarCommand } from './commands/similar.js';
 import { registerMarkBestCommand } from './commands/mark-best.js';
 import { registerSummaryCommand } from './commands/summary.js';
 import { registerReviewHighlightsCommand } from './commands/review-highlights.js';
+import { registerReviewImportCommand } from './commands/review-import.js';
+import { registerCalibrateCommand } from './commands/calibrate.js';
 import { setLogLevel } from '../utils/logger.js';
 
 export function createProgram(): Command {
@@ -44,6 +46,8 @@ export function createProgram(): Command {
   registerMarkBestCommand(program);
   registerSummaryCommand(program);
   registerReviewHighlightsCommand(program);
+  registerReviewImportCommand(program);
+  registerCalibrateCommand(program);
 
   return program;
 }

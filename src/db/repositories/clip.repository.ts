@@ -48,7 +48,8 @@ export class ClipRepository {
         ai_editorial_storytelling = @ai_editorial_storytelling,
         ai_editorial_uniqueness = @ai_editorial_uniqueness,
         ai_editorial_suggested_use = @ai_editorial_suggested_use,
-        ai_visual_keywords = @ai_visual_keywords
+        ai_visual_keywords = @ai_visual_keywords,
+        analysis_profile_version = @analysis_profile_version
       WHERE id = @id
     `);
 
@@ -105,7 +106,7 @@ export class ClipRepository {
   }
 
   updateAnalysis(id: number, analysis: ClipAnalysis): void {
-    this.stmtUpdateAnalysis.run({ ...analysis, id });
+    this.stmtUpdateAnalysis.run({ analysis_profile_version: null, ...analysis, id });
   }
 
   updateAnalysisError(id: number, error: string): void {

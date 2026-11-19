@@ -48,3 +48,14 @@ start_sec und end_sec sind Zahlen in Sekunden ab Clip-Beginn und müssen aus dem
 quality ist eine ganze Zahl von 1 bis 10: wie stark der Moment als Einstellung in einem Reise-Montage-Video ist.
 setting und activity: kurze englische Tags in Kleinbuchstaben (lowercase), je 1-3 Wörter (1-3 words), z.B. "marina", "open sea", "dolphin watching". Keine ganzen Sätze, wiederverwendbar über Clips hinweg.
 suggested_use muss einer von: "Hero Shot", "B-Roll", "Establishing", "Transition", "Skip" sein.`;
+
+
+export interface PromptProfile {
+  version: number;
+  text: string;
+}
+
+export function buildUserPrompt(profile: PromptProfile | null): string {
+  if (!profile) return USER_PROMPT;
+  return `${USER_PROMPT}\n\nVorlieben dieses Editors (befolgen):\n${profile.text}`;
+}

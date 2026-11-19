@@ -7,6 +7,7 @@ import { migration005 } from './005_nb_frames.js';
 import { migration006 } from './006_has_audio_video.js';
 import { migration007 } from './007_scene_hint.js';
 import { migration008 } from './008_highlights.js';
+import { migration009 } from './009_calibration.js';
 
 interface Migration {
   version: number;
@@ -23,6 +24,7 @@ const migrations: Migration[] = [
   { version: 6, name: 'has_audio_video', up: migration006 },
   { version: 7, name: 'scene_hint', up: migration007 },
   { version: 8, name: 'highlights', up: migration008 },
+  { version: 9, name: 'calibration', up: migration009 },
 ];
 
 export function runMigrations(db: Database.Database): void {

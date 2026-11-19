@@ -9,6 +9,8 @@ import { normalizeHighlights } from './highlights.js';
 import type { ClipAnalysisResponse } from './schema.js';
 
 export interface AnalysisClient {
+  /** Version of the taste profile baked into this client's prompt (null/undefined = none). */
+  profileVersion?: number | null;
   analyzeVideo(path: string): Promise<ClipAnalysisResponse>;
 }
 
@@ -60,7 +62,10 @@ export async function analyzeClips(
       try {
         clipRepo.updateAnalysisStatus(clip.id, 'analyzing');
         const analysis = await client.analyzeVideo(videoPath);
-        const dbFields = analysisToDbFields(analysis);
+        const dbFields = {
+          ...analysisToDbFields(analysis),
+          analysis_profile_version: client.profileVersion ?? null,
+        };
         clipRepo.updateAnalysis(clip.id, dbFields);
         highlightRepo?.replaceForClip(
           clip.id,
