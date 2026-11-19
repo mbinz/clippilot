@@ -67,7 +67,6 @@ function loadState() {
 function saveState() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
   updateProgress();
-  applyFilter();
 }
 function hlState(id) {
   if (!state.highlights[id]) state.highlights[id] = { verdicts: [], note: '' };
@@ -208,10 +207,15 @@ function renderMissed(clip, video) {
 }
 
 function clipMatches(clip) {
-  if (filter === 'unreviewed') return clip.highlights.some(function (h) { return !isReviewed(h.highlight_id); });
+  var hasMissed = state.missed.some(function (m) { return m.clip_id === clip.clip_id; });
+  if (filter === 'unreviewed') {
+    // clips without highlights count as unreviewed until the user adds a note or a missed marker
+    if (clip.highlights.length === 0) return !state.clip_notes[clip.clip_id] && !hasMissed;
+    return clip.highlights.some(function (h) { return !isReviewed(h.highlight_id); });
+  }
   if (filter === 'flagged') {
     return clip.highlights.some(function (h) { return isFlagged(h.highlight_id); }) ||
-      state.missed.some(function (m) { return m.clip_id === clip.clip_id; });
+      hasMissed;
   }
   return true;
 }
