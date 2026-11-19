@@ -117,7 +117,6 @@ export function registerExportCommand(parent: Command): void {
             has_audio: seg.has_audio !== 0,
             resolution: seg.resolution,
             ai_summary: seg.ai_summary,
-            ai_quality_overall: null,
             segment_role: seg.segment_role,
             notes: seg.notes,
           }));
@@ -152,7 +151,6 @@ export function registerExportCommand(parent: Command): void {
                 has_audio: clip.has_audio !== 0,
                 resolution: clip.resolution,
                 ai_summary: clip.ai_summary,
-                ai_quality_overall: clip.ai_quality_overall,
                 segment_role: null,
                 notes: null,
               };

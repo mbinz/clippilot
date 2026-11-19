@@ -15,7 +15,6 @@ export interface ExportSegment {
   has_audio: boolean;
   resolution: string | null;
   ai_summary: string | null;
-  ai_quality_overall: number | null;
   segment_role: string | null;
   notes: string | null;
   /** Playback speed, 1.0 = real time, 0.5 = half speed (slow motion). Default 1. */

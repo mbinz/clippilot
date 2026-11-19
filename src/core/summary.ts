@@ -1,5 +1,6 @@
 import path from 'node:path';
 import type { Clip } from '../types/clip.js';
+import { tierRank, type Tier } from './tiers.js';
 import type { HighlightRecord } from '../db/repositories/highlight.repository.js';
 
 export interface NameCount {
@@ -15,7 +16,9 @@ export interface SummaryHighlight {
   start_sec: number;
   end_sec: number;
   description: string;
-  quality: number;
+  tier: Tier;
+  shot: string | null;
+  role: string | null;
 }
 
 export interface ProjectSummary {
@@ -127,10 +130,16 @@ export function buildProjectSummary(
       start_sec: h.start_sec,
       end_sec: h.end_sec,
       description: h.description,
-      quality: h.quality,
+      tier: h.tier,
+      shot: h.shot,
+      role: h.role,
     });
   }
-  best.sort((a, b) => b.quality - a.quality || a.clip_id - b.clip_id || a.start_sec - b.start_sec);
+  best.sort((a, b) =>
+    tierRank(b.tier) - tierRank(a.tier)
+    || (b.end_sec - b.start_sec) - (a.end_sec - a.start_sec)
+    || a.clip_id - b.clip_id
+    || a.start_sec - b.start_sec);
 
   const scene_hints = [...hints.entries()]
     .map(([scene_hint, g]) => ({ scene_hint, ...g }))

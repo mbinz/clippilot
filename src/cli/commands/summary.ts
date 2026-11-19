@@ -66,7 +66,7 @@ export function registerSummaryCommand(parent: Command): void {
         for (const m of summary.moments.slice(0, 10)) console.log(`  ${m.name} (${m.clips})`);
         console.log(chalk.bold('\nBest highlights'));
         for (const h of summary.best_highlights) {
-          console.log(`  [${h.quality}] ${h.file_name} ${h.start_sec}-${h.end_sec}s  ${h.description}`);
+          console.log(`  [${h.tier}] ${h.file_name} ${h.start_sec}-${h.end_sec}s  ${h.description}`);
         }
       } finally {
         db.close();

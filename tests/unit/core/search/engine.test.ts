@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
 import { runMigrations } from '../../../../src/db/migrations/runner.js';
+import { HighlightRepository } from '../../../../src/db/repositories/highlight.repository.js';
 import { ClipRepository } from '../../../../src/db/repositories/clip.repository.js';
 import { searchClips } from '../../../../src/core/search/engine.js';
 
@@ -28,17 +29,6 @@ function seedClip(repo: ClipRepository, hash: string, summary: string, keywords:
   repo.updateAnalysis(clip.id, {
     ai_scenes: '[]',
     ai_summary: summary,
-    ai_quality_stability: 4,
-    ai_quality_focus: 4,
-    ai_quality_exposure: 4,
-    ai_quality_composition: 3,
-    ai_quality_audio: 3,
-    ai_quality_overall: 3.6,
-    ai_quality_issues: '[]',
-    ai_editorial_emotional: 4,
-    ai_editorial_storytelling: 3,
-    ai_editorial_uniqueness: 2,
-    ai_editorial_suggested_use: 'B-Roll',
     ai_visual_keywords: keywords,
   });
 
@@ -88,8 +78,13 @@ describe('searchClips', () => {
     expect(results).toHaveLength(1);
   });
 
-  it('filters by min_quality', () => {
-    const results = searchClips(repo, 'Strand', { min_quality: 5 });
-    expect(results).toHaveLength(0);
+  it('filters by min_tier: needs a moment at or above the tier', () => {
+    const hl = new HighlightRepository(db);
+    const strand = repo.search('Strand')[0];
+    expect(searchClips(repo, 'Strand', { min_tier: 'filler' })).toHaveLength(0);
+    hl.replaceForClip(strand.id, [{ start_sec: 0, end_sec: 2, description: 'x', tier: 'solid' }]);
+    expect(searchClips(repo, 'Strand', { min_tier: 'filler' })).toHaveLength(1);
+    expect(searchClips(repo, 'Strand', { min_tier: 'solid' })).toHaveLength(1);
+    expect(searchClips(repo, 'Strand', { min_tier: 'hero' })).toHaveLength(0);
   });
 });

@@ -3,17 +3,17 @@ import chalk from 'chalk';
 import type { Clip } from '../../types/clip.js';
 import { formatDuration } from '../../utils/timecode.js';
 
-export function formatClipTable(clips: Clip[]): string {
+/** `bestTiers` maps clip id to the tier of its best moment (shown in the Best column). */
+export function formatClipTable(clips: Clip[], bestTiers: Map<number, string> = new Map()): string {
   const table = new Table({
     head: [
       chalk.white('ID'),
       chalk.white('File'),
       chalk.white('Duration'),
-      chalk.white('Quality'),
-      chalk.white('Use'),
+      chalk.white('Best'),
       chalk.white('Summary'),
     ],
-    colWidths: [6, 30, 10, 9, 14, 40],
+    colWidths: [6, 30, 10, 9, 40],
     wordWrap: true,
   });
 
@@ -23,8 +23,7 @@ export function formatClipTable(clips: Clip[]): string {
       clip.id,
       fileName.length > 28 ? fileName.slice(0, 25) + '...' : fileName,
       formatDuration(clip.duration_sec),
-      clip.ai_quality_overall?.toFixed(1) ?? '-',
-      clip.ai_editorial_suggested_use ?? '-',
+      bestTiers.get(clip.id) ?? '-',
       (clip.ai_summary ?? '-').slice(0, 38),
     ]);
   }

@@ -143,7 +143,6 @@ export function goldenSegments(): ExportSegment[] {
       has_audio: true,
       resolution: media.resolution,
       ai_summary: null,
-      ai_quality_overall: null,
       segment_role: null,
       notes: null,
       speed,

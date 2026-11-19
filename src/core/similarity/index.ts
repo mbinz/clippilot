@@ -1,4 +1,5 @@
 import type { Clip } from '../../types/clip.js';
+import { tierRank } from '../tiers.js';
 import { UnionFind } from './union-find.js';
 
 export interface RawCluster {
@@ -22,7 +23,31 @@ function timestampDiffSec(a: string | null, b: string | null): number | null {
   return Math.abs(ta - tb) / 1000;
 }
 
-export function computeSimilarityClusters(clips: Clip[]): RawCluster[] {
+/** Minimal moment info the best-take order needs. */
+export interface MomentInfo {
+  tier: string;
+  start_sec: number;
+  end_sec: number;
+}
+
+/** Best moment of a clip: highest tier, then longest. */
+function bestMoment(moments: MomentInfo[] | undefined): { rank: number; length: number } {
+  let best = { rank: 0, length: 0 };
+  for (const m of moments ?? []) {
+    const cand = { rank: tierRank(m.tier), length: m.end_sec - m.start_sec };
+    if (cand.rank > best.rank || (cand.rank === best.rank && cand.length > best.length)) best = cand;
+  }
+  return best;
+}
+
+/**
+ * `momentsByClip` drives the best-take order inside a cluster: best moment tier, then that moment's
+ * duration, then clip id. `similarity_score` stores the best moment's tier rank (hero 3, solid 2, filler 1, none 0).
+ */
+export function computeSimilarityClusters(
+  clips: Clip[],
+  momentsByClip: Map<number, MomentInfo[]> = new Map(),
+): RawCluster[] {
   // Only operate on analyzed clips
   const analyzed = clips.filter((c) => c.analysis_status === 'done');
   if (analyzed.length < 2) return [];
@@ -180,18 +205,22 @@ export function computeSimilarityClusters(clips: Clip[]): RawCluster[] {
       }
     }
 
-    // Sort members by quality descending
+    // Sort members: best moment tier, then moment duration, then clip id
+    const best = new Map(memberIds.map((id) => [id, bestMoment(momentsByClip.get(id))]));
     const members = memberIds
       .map((id) => clipById.get(id)!)
       .filter(Boolean)
-      .sort((a, b) => (b.ai_quality_overall ?? 0) - (a.ai_quality_overall ?? 0));
-
+      .sort((a, b) => {
+        const ba = best.get(a.id)!;
+        const bb = best.get(b.id)!;
+        return bb.rank - ba.rank || bb.length - ba.length || a.id - b.id;
+      });
     result.push({
       reason: [...clusterReasons].join('; '),
       members: members.map((clip, idx) => ({
         clip_id: clip.id,
         is_best: idx === 0,
-        similarity_score: clip.ai_quality_overall ?? 0,
+        similarity_score: best.get(clip.id)!.rank,
       })),
     });
   }

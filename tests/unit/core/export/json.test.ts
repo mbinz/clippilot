@@ -16,7 +16,6 @@ function makeSegment(overrides: Partial<ExportSegment> = {}): ExportSegment {
     fps: 30,
     resolution: '1920x1080',
     ai_summary: 'Beach scene',
-    ai_quality_overall: 3.5,
     segment_role: 'intro',
     notes: null,
     ...overrides,
@@ -50,5 +49,12 @@ describe('exportJson', () => {
   it('includes computed duration per segment', () => {
     const parsed = JSON.parse(exportJson([makeSegment({ start_sec: 5, end_sec: 20 })], OPTIONS));
     expect(parsed.segments[0].duration_sec).toBe(15);
+  });
+});
+
+describe('exportJson without clip scores', () => {
+  it('has no quality field per segment', () => {
+    const out = JSON.parse(exportJson([makeSegment()], OPTIONS));
+    expect('quality' in out.segments[0]).toBe(false);
   });
 });

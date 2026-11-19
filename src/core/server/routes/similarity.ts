@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type Database from 'better-sqlite3';
 import { ClipRepository } from '../../../db/repositories/clip.repository.js';
 import { SimilarityRepository } from '../../../db/repositories/similarity.repository.js';
+import { HighlightRepository, type HighlightRecord } from '../../../db/repositories/highlight.repository.js';
 import { computeSimilarityClusters } from '../../similarity/index.js';
 
 export function createSimilarityRoutes(db: Database.Database): Hono {
@@ -38,7 +39,11 @@ export function createSimilarityRoutes(db: Database.Database): Hono {
   // POST /similarity/compute - Trigger similarity computation
   app.post('/compute', (c) => {
     const clips = clipRepo.listAll();
-    const clusters = computeSimilarityClusters(clips);
+    const momentsByClip = new Map<number, HighlightRecord[]>();
+    for (const h of new HighlightRepository(db).listAll()) {
+      (momentsByClip.get(h.clip_id) ?? momentsByClip.set(h.clip_id, []).get(h.clip_id)!).push(h);
+    }
+    const clusters = computeSimilarityClusters(clips, momentsByClip);
 
     // Clear existing groups and insert new ones
     simRepo.clearGroups();

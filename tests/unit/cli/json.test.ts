@@ -23,17 +23,6 @@ function baseClip(overrides: Partial<Clip> = {}): Clip {
     people: null,
     ai_scenes: null,
     ai_summary: null,
-    ai_quality_stability: null,
-    ai_quality_focus: null,
-    ai_quality_exposure: null,
-    ai_quality_composition: null,
-    ai_quality_audio: null,
-    ai_quality_overall: null,
-    ai_quality_issues: null,
-    ai_editorial_emotional: null,
-    ai_editorial_storytelling: null,
-    ai_editorial_uniqueness: null,
-    ai_editorial_suggested_use: null,
     ai_visual_keywords: null,
     ...overrides,
   };
@@ -46,14 +35,14 @@ describe('clipToJson', () => {
         manual_tags: '["a","b"]',
         people: '["Alice"]',
         ai_visual_keywords: '["beach","kids"]',
-        ai_quality_issues: '[]',
         ai_scenes: '[{"t":0}]',
       }),
     );
     expect(json.manual_tags).toEqual(['a', 'b']);
     expect(json.people).toEqual(['Alice']);
     expect(json.ai_visual_keywords).toEqual(['beach', 'kids']);
-    expect(json.ai_quality_issues).toEqual([]);
+    expect('ai_quality_overall' in json).toBe(false);
+    expect('ai_editorial_suggested_use' in json).toBe(false);
     expect(json.ai_scenes).toEqual([{ t: 0 }]);
   });
 
@@ -80,7 +69,7 @@ describe('clipToJson', () => {
   });
 
   it('includes highlights when provided', () => {
-    const hl = [{ id: 1, start_sec: 1, end_sec: 2.5, description: 'Wave', quality: 7 }];
+    const hl = [{ id: 1, start_sec: 1, end_sec: 2.5, description: 'Wave', tier: 'hero', shot: 'wide', role: 'action', issues: [], slowmo: 'none', slowmo_reason: '', suggested_speed: 1 }];
     const json = clipToJson(baseClip(), undefined, hl);
     expect(json.highlights).toEqual(hl);
   });
@@ -90,10 +79,10 @@ describe('clipToJson', () => {
     expect('highlights' in json).toBe(false);
   });
 
-  it('highlightsToJson passes slowmo fields through', () => {
-    const rec = { id: 3, start_sec: 1, end_sec: 2, description: 'd', quality: 6, slowmo: 'light', slowmo_reason: 'waves', suggested_speed: 0.5, clip_id: 9, created_at: 'x' };
+  it('highlightsToJson passes slowmo fields through and exposes tier/shot/role/issues (issues parsed to an array)', () => {
+    const rec = { id: 3, start_sec: 1, end_sec: 2, description: 'd', tier: 'hero', shot: 'close', role: 'reaction', issues: '["shake"]', slowmo: 'light', slowmo_reason: 'waves', suggested_speed: 0.5, clip_id: 9, created_at: 'x' };
     expect(highlightsToJson([rec])).toEqual([
-      { id: 3, start_sec: 1, end_sec: 2, description: 'd', quality: 6, slowmo: 'light', slowmo_reason: 'waves', suggested_speed: 0.5 },
+      { id: 3, start_sec: 1, end_sec: 2, description: 'd', tier: 'hero', shot: 'close', role: 'reaction', issues: ['shake'], slowmo: 'light', slowmo_reason: 'waves', suggested_speed: 0.5 },
     ]);
   });
 });

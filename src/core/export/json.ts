@@ -14,7 +14,6 @@ export function exportJson(segments: ExportSegment[], options: ExportOptions): s
       duration_sec: seg.end_sec - seg.start_sec,
       fps: seg.fps,
       resolution: seg.resolution,
-      quality: seg.ai_quality_overall,
       role: seg.segment_role,
       summary: seg.ai_summary,
       notes: seg.notes,

@@ -9,42 +9,45 @@ const cand = (clip_id: number, scene_hint: string | null, camera: string, reason
 
 const base = {
   ai_scenes: null as string | null, ai_visual_keywords: null as string | null,
-  ai_quality_stability: 5 as number | null, duration_sec: 10,
+  duration_sec: 10,
 };
+const moments = (n: number, issues: string[] = []) => Array.from({ length: n }, () => ({ issues: JSON.stringify(issues) }));
 
 describe('detectReasons', () => {
   it('flags people from scene description, case-insensitive', () => {
     const scenes = JSON.stringify([{ description_en: 'A Woman walks on the pier', setting: 'pier', activity: 'walking', subjects: [] }]);
-    expect(detectReasons({ ...base, ai_scenes: scenes }, 2)).toEqual(['people']);
+    expect(detectReasons({ ...base, ai_scenes: scenes }, moments(2))).toEqual(['people']);
   });
 
   it('flags people from visual keywords and from setting/activity', () => {
-    expect(detectReasons({ ...base, ai_visual_keywords: JSON.stringify(['sea', 'selfie']) }, 1)).toEqual(['people']);
+    expect(detectReasons({ ...base, ai_visual_keywords: JSON.stringify(['sea', 'selfie']) }, moments(1))).toEqual(['people']);
     const scenes = JSON.stringify([{ description_en: 'x', setting: 'beach', activity: 'group dinner' }]);
-    expect(detectReasons({ ...base, ai_scenes: scenes }, 1)).toEqual(['people']);
+    expect(detectReasons({ ...base, ai_scenes: scenes }, moments(1))).toEqual(['people']);
   });
 
   it('matches whole words only: "manhattan" is not "man"', () => {
     const scenes = JSON.stringify([{ description_en: 'Manhattan skyline at dusk', setting: 'city', activity: 'sightseeing' }]);
-    expect(detectReasons({ ...base, ai_scenes: scenes, ai_visual_keywords: JSON.stringify(['skyline', 'manhattan']) }, 1)).toEqual([]);
+    expect(detectReasons({ ...base, ai_scenes: scenes, ai_visual_keywords: JSON.stringify(['skyline', 'manhattan']) }, moments(1))).toEqual([]);
   });
 
-  it('flags low_stability at <= 3, not at 4 or null', () => {
-    expect(detectReasons({ ...base, ai_quality_stability: 3 }, 1)).toEqual(['low_stability']);
-    expect(detectReasons({ ...base, ai_quality_stability: 4 }, 1)).toEqual([]);
-    expect(detectReasons({ ...base, ai_quality_stability: null }, 1)).toEqual([]);
+  it('flags shaky when any moment has the shake issue, not for other issues or none', () => {
+    expect(detectReasons(base, [...moments(1), ...moments(1, ['blur', 'shake'])])).toEqual(['shaky']);
+    expect(detectReasons(base, moments(2, ['blur', 'obstructed']))).toEqual([]);
+    expect(detectReasons(base, moments(1))).toEqual([]);
+    expect(detectReasons(base, [{ issues: ['shake'] }])).toEqual(['shaky']);
+    expect(detectReasons(base, [{ issues: 'not json' }])).toEqual([]);
   });
 
   it('flags long at >= 20 s and no_highlights at 0', () => {
-    expect(detectReasons({ ...base, duration_sec: 20 }, 1)).toEqual(['long']);
-    expect(detectReasons({ ...base, duration_sec: 19.9 }, 1)).toEqual([]);
-    expect(detectReasons(base, 0)).toEqual(['no_highlights']);
+    expect(detectReasons({ ...base, duration_sec: 20 }, moments(1))).toEqual(['long']);
+    expect(detectReasons({ ...base, duration_sec: 19.9 }, moments(1))).toEqual([]);
+    expect(detectReasons(base, moments(0))).toEqual(['no_highlights']);
   });
 
   it('combines reasons in a stable order', () => {
     const scenes = JSON.stringify([{ description_en: 'child laughing', setting: 'a', activity: 'b' }]);
-    expect(detectReasons({ ai_scenes: scenes, ai_visual_keywords: null, ai_quality_stability: 2, duration_sec: 30 }, 0))
-      .toEqual(['people', 'low_stability', 'long', 'no_highlights']);
+    expect(detectReasons({ ai_scenes: scenes, ai_visual_keywords: null, duration_sec: 30 }, moments(1, ['shake'])))
+      .toEqual(['people', 'shaky', 'long']);
   });
 });
 
@@ -89,7 +92,7 @@ describe('sampleCalibrationClips', () => {
   });
 
   it('weights hard clips: a clip with 4 reasons is picked far more often than a plain one', () => {
-    const p = [cand(1, 'x', 'c', ['people', 'low_stability', 'long', 'no_highlights']), cand(2, 'x', 'c')];
+    const p = [cand(1, 'x', 'c', ['people', 'shaky', 'long', 'no_highlights']), cand(2, 'x', 'c')];
     let hard = 0;
     for (let seed = 0; seed < 200; seed++) if (sampleCalibrationClips(p, { n: 1, seed })[0].clip_id === 1) hard++;
     // expected 5/6 = ~167 of 200

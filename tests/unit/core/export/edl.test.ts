@@ -21,7 +21,6 @@ function makeSegment(overrides: Partial<ExportSegment> = {}): ExportSegment {
     has_audio: true,
     resolution: '1920x1080',
     ai_summary: 'Beach scene',
-    ai_quality_overall: 3.5,
     segment_role: 'intro',
     notes: null,
     ...overrides,

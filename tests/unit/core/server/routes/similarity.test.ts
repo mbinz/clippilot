@@ -2,12 +2,13 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
 import { runMigrations } from '../../../../../src/db/migrations/runner.js';
 import { ClipRepository } from '../../../../../src/db/repositories/clip.repository.js';
+import { HighlightRepository } from '../../../../../src/db/repositories/highlight.repository.js';
 import { createSimilarityRoutes } from '../../../../../src/core/server/routes/similarity.js';
 
 function seedAnalyzedClip(
   db: Database.Database,
   hash: string,
-  opts: { location?: string; recorded_at?: string; keywords?: string; quality?: number } = {},
+  opts: { location?: string; recorded_at?: string; keywords?: string; tier?: 'hero' | 'solid' | 'filler' } = {},
 ) {
   const repo = new ClipRepository(db);
   const clip = repo.insert({
@@ -33,19 +34,12 @@ function seedAnalyzedClip(
   repo.updateAnalysis(clip.id, {
     ai_scenes: '[]',
     ai_summary: `Summary ${hash}`,
-    ai_quality_stability: 4,
-    ai_quality_focus: 4,
-    ai_quality_exposure: 4,
-    ai_quality_composition: 3,
-    ai_quality_audio: 3,
-    ai_quality_overall: opts.quality ?? 3.6,
-    ai_quality_issues: '[]',
-    ai_editorial_emotional: 4,
-    ai_editorial_storytelling: 3,
-    ai_editorial_uniqueness: 2,
-    ai_editorial_suggested_use: 'B-Roll',
     ai_visual_keywords: opts.keywords ?? '[]',
   });
+
+  if (opts.tier) {
+    new HighlightRepository(db).replaceForClip(clip.id, [{ start_sec: 0, end_sec: 2, description: 'x', tier: opts.tier }]);
+  }
 
   return clip;
 }
@@ -66,12 +60,12 @@ describe('Similarity API Routes', () => {
       seedAnalyzedClip(db, 'h1', {
         location: 'Beach',
         recorded_at: '2025-06-15T10:00:00Z',
-        quality: 4.0,
+        tier: 'hero',
       });
       seedAnalyzedClip(db, 'h2', {
         location: 'Beach',
         recorded_at: '2025-06-15T10:05:00Z',
-        quality: 3.0,
+        tier: 'filler',
       });
 
       const res = await app.request('/compute', { method: 'POST' });
@@ -79,6 +73,15 @@ describe('Similarity API Routes', () => {
 
       const body = await res.json();
       expect(body.data.clusters_found).toBe(1);
+    });
+
+    it('orders members by best moment tier and stores the tier rank as score', async () => {
+      seedAnalyzedClip(db, 'h1', { location: 'Beach', recorded_at: '2025-06-15T10:00:00Z', tier: 'filler' });
+      seedAnalyzedClip(db, 'h2', { location: 'Beach', recorded_at: '2025-06-15T10:05:00Z', tier: 'hero' });
+      await app.request('/compute', { method: 'POST' });
+      const body = await (await app.request('/clusters')).json();
+      const members = body.data[0].members;
+      expect(members.map((m: any) => [m.clip_id, m.is_best, m.similarity_score])).toEqual([[2, 1, 3], [1, 0, 1]]);
     });
 
     it('returns 0 clusters for unrelated clips', async () => {
@@ -125,12 +128,12 @@ describe('Similarity API Routes', () => {
       seedAnalyzedClip(db, 'h1', {
         location: 'Beach',
         recorded_at: '2025-06-15T10:00:00Z',
-        quality: 4.0,
+        tier: 'hero',
       });
       seedAnalyzedClip(db, 'h2', {
         location: 'Beach',
         recorded_at: '2025-06-15T10:03:00Z',
-        quality: 3.0,
+        tier: 'filler',
       });
 
       await app.request('/compute', { method: 'POST' });

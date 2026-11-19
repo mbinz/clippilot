@@ -10,16 +10,16 @@ function clip(overrides: Partial<Clip>): Clip {
     start_timecode: null, nb_frames: null, has_video: 1, has_audio: 1, scene_hint: null,
     ingested_at: '2026-01-01T00:00:00Z', analysis_status: 'done', analysis_error: null,
     location: null, manual_tags: null, people: null, ai_scenes: null, ai_summary: null,
-    ai_quality_stability: null, ai_quality_focus: null, ai_quality_exposure: null,
-    ai_quality_composition: null, ai_quality_audio: null, ai_quality_overall: null,
-    ai_quality_issues: null, ai_editorial_emotional: null, ai_editorial_storytelling: null,
-    ai_editorial_uniqueness: null, ai_editorial_suggested_use: null, ai_visual_keywords: null,
+    ai_visual_keywords: null,
     ...overrides,
   };
 }
 
-function hl(id: number, clip_id: number, start: number, quality: number, desc = 'x'): HighlightRecord {
-  return { id, clip_id, start_sec: start, end_sec: start + 2, description: desc, quality, created_at: 't' };
+function hl(id: number, clip_id: number, start: number, tier: 'hero' | 'solid' | 'filler', len = 2, desc = 'x'): HighlightRecord {
+  return {
+    id, clip_id, start_sec: start, end_sec: start + len, description: desc, tier, shot: 'wide', role: 'action',
+    issues: '[]', slowmo: 'none', slowmo_reason: '', suggested_speed: 1, created_at: 't',
+  };
 }
 
 const scenes = (...items: Array<[string, string]>) =>
@@ -39,7 +39,7 @@ const clips: Clip[] = [
 ];
 
 const highlights: HighlightRecord[] = [
-  hl(1, 1, 5, 4), hl(2, 1, 1, 5), hl(3, 2, 3, 5), hl(4, 3, 0, 2), hl(5, 4, 0, 4),
+  hl(1, 1, 5, 'solid'), hl(2, 1, 1, 'hero'), hl(3, 2, 3, 'hero', 3), hl(4, 3, 0, 'filler'), hl(5, 4, 0, 'solid', 4),
 ];
 
 describe('buildProjectSummary', () => {
@@ -73,11 +73,11 @@ describe('buildProjectSummary', () => {
     ]);
   });
 
-  it('orders best highlights by quality desc, clip_id, start_sec and fills clip info', () => {
-    expect(s.best_highlights.map((h) => h.highlight_id)).toEqual([2, 3, 1, 5, 4]);
-    expect(s.best_highlights[0]).toEqual({
+  it('orders best highlights by tier, then longer first, then clip_id, start_sec and fills clip info', () => {
+    expect(s.best_highlights.map((h) => h.highlight_id)).toEqual([3, 2, 5, 1, 4]);
+    expect(s.best_highlights[1]).toEqual({
       highlight_id: 2, clip_id: 1, file_name: 'a.mp4', scene_hint: 'Delfine',
-      start_sec: 1, end_sec: 3, description: 'x', quality: 5,
+      start_sec: 1, end_sec: 3, description: 'x', tier: 'hero', shot: 'wide', role: 'action',
     });
   });
 

@@ -7,13 +7,11 @@ export type ClipJson = Omit<
   | 'manual_tags'
   | 'people'
   | 'ai_scenes'
-  | 'ai_quality_issues'
   | 'ai_visual_keywords'
 > & {
   manual_tags: unknown;
   people: unknown;
   ai_scenes: unknown;
-  ai_quality_issues: unknown;
   ai_visual_keywords: unknown;
   thumbnails?: string[];
   highlights?: HighlightJson[];
@@ -24,17 +22,23 @@ export interface HighlightJson {
   start_sec: number;
   end_sec: number;
   description: string;
-  quality: number;
+  tier: string;
+  shot: string | null;
+  role: string | null;
+  issues: string[];
   slowmo: string;
   slowmo_reason: string;
   suggested_speed: number;
 }
 
+/** DB records carry `issues` as a JSON string; the CLI emits a real array. */
 export function highlightsToJson(
-  items: HighlightJson[],
+  items: Array<Omit<HighlightJson, 'issues'> & { issues: string | string[] }>,
 ): HighlightJson[] {
-  return items.map(({ id, start_sec, end_sec, description, quality, slowmo, slowmo_reason, suggested_speed }) => ({
-    id, start_sec, end_sec, description, quality, slowmo, slowmo_reason, suggested_speed,
+  return items.map(({ id, start_sec, end_sec, description, tier, shot, role, issues, slowmo, slowmo_reason, suggested_speed }) => ({
+    id, start_sec, end_sec, description, tier, shot, role,
+    issues: typeof issues === 'string' ? (parseJson(issues) as string[] | null) ?? [] : issues,
+    slowmo, slowmo_reason, suggested_speed,
   }));
 }
 
@@ -48,7 +52,6 @@ export function clipToJson(
     manual_tags: parseJson(clip.manual_tags),
     people: parseJson(clip.people),
     ai_scenes: parseJson(clip.ai_scenes),
-    ai_quality_issues: parseJson(clip.ai_quality_issues),
     ai_visual_keywords: parseJson(clip.ai_visual_keywords),
   };
   if (thumbnails) out.thumbnails = thumbnails;

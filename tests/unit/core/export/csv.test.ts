@@ -16,7 +16,6 @@ function makeSegment(overrides: Partial<ExportSegment> = {}): ExportSegment {
     fps: 30,
     resolution: '1920x1080',
     ai_summary: 'Beach scene',
-    ai_quality_overall: 3.5,
     segment_role: 'intro',
     notes: null,
     ...overrides,
@@ -27,7 +26,7 @@ describe('exportCsv', () => {
   it('produces correct header', () => {
     const csv = exportCsv([makeSegment()], OPTIONS);
     const lines = csv.split('\n');
-    expect(lines[0]).toBe('position,clip_id,file_path,file_name,start_sec,end_sec,duration_sec,quality,role,summary');
+    expect(lines[0]).toBe('position,clip_id,file_path,file_name,start_sec,end_sec,duration_sec,role,summary');
   });
 
   it('produces correct data row', () => {
@@ -35,7 +34,7 @@ describe('exportCsv', () => {
     const lines = csv.split('\n');
     expect(lines[1]).toContain('/videos/beach.mp4');
     expect(lines[1]).toContain('beach.mp4');
-    expect(lines[1]).toContain('3.5');
+    expect(lines[1].split(',')).toHaveLength(9);
   });
 
   it('escapes commas in fields', () => {

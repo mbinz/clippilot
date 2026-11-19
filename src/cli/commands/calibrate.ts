@@ -5,7 +5,7 @@ import { ProjectRepository } from '../../db/repositories/project.repository.js';
 import { CalibrationRepository } from '../../db/repositories/calibration.repository.js';
 import { resolveDbPath } from '../../utils/fs.js';
 import { ClipRepository } from '../../db/repositories/clip.repository.js';
-import { HighlightRepository } from '../../db/repositories/highlight.repository.js';
+import { HighlightRepository, type HighlightRecord } from '../../db/repositories/highlight.repository.js';
 import { cameraKey, detectReasons, sampleCalibrationClips, type SampleCandidate } from '../../core/calibration/sampling.js';
 import path from 'node:path';
 import { resolveProject } from './resolve-project.js';
@@ -43,9 +43,9 @@ export function registerCalibrateCommand(parent: Command): void {
         if (!project) return;
         const calib = new CalibrationRepository(db);
         const reviewed = calib.reviewedClipIds();
-        const highlightCounts = new Map<number, number>();
+        const momentsByClip = new Map<number, HighlightRecord[]>();
         for (const h of new HighlightRepository(db).listByProject(project.id)) {
-          highlightCounts.set(h.clip_id, (highlightCounts.get(h.clip_id) ?? 0) + 1);
+          (momentsByClip.get(h.clip_id) ?? momentsByClip.set(h.clip_id, []).get(h.clip_id)!).push(h);
         }
         const pool: SampleCandidate[] = new ClipRepository(db).listByProject(project.id)
           .filter((c) => c.analysis_status === 'done' && !reviewed.has(c.id))
@@ -54,7 +54,7 @@ export function registerCalibrateCommand(parent: Command): void {
             file_name: path.basename(c.file_path),
             scene_hint: c.scene_hint,
             camera: cameraKey(c.resolution, c.fps),
-            reasons: detectReasons(c, highlightCounts.get(c.id) ?? 0),
+            reasons: detectReasons(c, momentsByClip.get(c.id) ?? []),
           }));
         const n = Number.parseInt(options.n, 10);
         const seed = options.seed !== undefined ? Number.parseInt(options.seed, 10) : calib.roundCount();

@@ -34,7 +34,6 @@ function seg(overrides: Partial<ExportSegment> = {}): ExportSegment {
     has_audio: true,
     resolution: '1920x1080',
     ai_summary: null,
-    ai_quality_overall: null,
     segment_role: null,
     notes: null,
     ...overrides,

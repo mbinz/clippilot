@@ -9,14 +9,15 @@ import { resolveDbPath } from '../../utils/fs.js';
 import { formatClipTable } from '../formatters/table.js';
 import { searchClips } from '../../core/search/engine.js';
 import { clipsToJson } from '../json.js';
+import { TIERS, isTier, tierRank } from '../../core/tiers.js';
 
 export function registerSearchCommand(parent: Command): void {
   parent
     .command('search <query>')
     .description('Full-text search over analyzed clips')
     .option('--project <name>', 'Search within project')
-    .option('--min-quality <score>', 'Minimum quality score (1-5)')
-    .option('--sort <field>', 'Sort by: quality, date, emotional, duration')
+    .option('--min-tier <tier>', 'Only clips with a moment at or above this tier: hero, solid, filler')
+    .option('--sort <field>', 'Sort by: date, duration')
     .option('--limit <n>', 'Max results', '20')
     .option('--json', 'Emit JSON instead of a table (for scripts and Claude skills)')
     .action(async (query: string, options) => {
@@ -28,8 +29,13 @@ export function registerSearchCommand(parent: Command): void {
       const highlightRepo = new HighlightRepository(db);
 
       try {
+        if (options.minTier !== undefined && !isTier(options.minTier)) {
+          console.error(chalk.red(`Invalid --min-tier "${options.minTier}". Use: ${TIERS.join(', ')}`));
+          process.exitCode = 1;
+          return;
+        }
         const results = searchClips(clipRepo, query, {
-          min_quality: options.minQuality ? parseFloat(options.minQuality) : undefined,
+          min_tier: options.minTier,
           sort: options.sort,
           limit: parseInt(options.limit, 10),
         });
@@ -55,9 +61,18 @@ export function registerSearchCommand(parent: Command): void {
         }
 
         console.log(chalk.green(`Found ${results.length} clip(s):\n`));
-        console.log(formatClipTable(results));
+        console.log(formatClipTable(results, bestTiers(highlightRepo, results.map((c) => c.id))));
       } finally {
         db.close();
       }
     });
+}
+
+function bestTiers(repo: HighlightRepository, clipIds: number[]): Map<number, string> {
+  const out = new Map<number, string>();
+  for (const id of clipIds) {
+    const best = repo.findByClip(id).map((h) => h.tier).sort((a, b) => tierRank(b) - tierRank(a))[0];
+    if (best) out.set(id, best);
+  }
+  return out;
 }

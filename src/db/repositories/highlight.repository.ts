@@ -38,6 +38,7 @@ export class HighlightRepository {
   private stmtInsert: Database.Statement;
   private stmtFindByClip: Database.Statement;
   private stmtListByProject: Database.Statement;
+  private stmtListAll: Database.Statement;
 
   constructor(private db: Database.Database) {
     this.stmtDelete = db.prepare('DELETE FROM highlights WHERE clip_id = ?');
@@ -47,6 +48,7 @@ export class HighlightRepository {
     this.stmtFindByClip = db.prepare(
       'SELECT * FROM highlights WHERE clip_id = ? ORDER BY start_sec ASC, id ASC',
     );
+    this.stmtListAll = db.prepare('SELECT * FROM highlights ORDER BY clip_id ASC, start_sec ASC, id ASC');
     this.stmtListByProject = db.prepare(`
       SELECT h.* FROM highlights h
       JOIN clips c ON c.id = h.clip_id
@@ -72,5 +74,9 @@ export class HighlightRepository {
 
   listByProject(projectId: number): HighlightRecord[] {
     return this.stmtListByProject.all(projectId) as HighlightRecord[];
+  }
+
+  listAll(): HighlightRecord[] {
+    return this.stmtListAll.all() as HighlightRecord[];
   }
 }

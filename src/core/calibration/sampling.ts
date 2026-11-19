@@ -13,7 +13,6 @@ const PEOPLE_RE = new RegExp(`\\b(?:${PEOPLE_WORDS.join('|')})\\b`, 'i');
 export interface HardnessInput {
   ai_scenes: string | null;
   ai_visual_keywords: string | null;
-  ai_quality_stability: number | null;
   duration_sec: number;
 }
 
@@ -40,12 +39,25 @@ function peopleText(c: HardnessInput): string {
   return parts.filter((p): p is string => typeof p === 'string').join('\n');
 }
 
-export function detectReasons(clip: HardnessInput, highlightCount: number): string[] {
+export interface MomentInput {
+  /** JSON array string (DB record) or array. */
+  issues: string | string[];
+}
+
+function hasShake(m: MomentInput): boolean {
+  let issues: unknown = m.issues;
+  if (typeof issues === 'string') {
+    try { issues = JSON.parse(issues); } catch { return false; }
+  }
+  return Array.isArray(issues) && issues.includes('shake');
+}
+
+export function detectReasons(clip: HardnessInput, moments: MomentInput[]): string[] {
   const reasons: string[] = [];
   if (PEOPLE_RE.test(peopleText(clip))) reasons.push('people');
-  if (clip.ai_quality_stability !== null && clip.ai_quality_stability <= 3) reasons.push('low_stability');
+  if (moments.some(hasShake)) reasons.push('shaky');
   if (clip.duration_sec >= 20) reasons.push('long');
-  if (highlightCount === 0) reasons.push('no_highlights');
+  if (moments.length === 0) reasons.push('no_highlights');
   return reasons;
 }
 
