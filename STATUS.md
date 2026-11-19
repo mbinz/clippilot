@@ -347,7 +347,7 @@ Done when: red→green, typecheck + test:all green, page regenerated for the pil
 
 **M2.5c ✅** (45dce99) — full-width layout.
 
-### M2.6 — Taste calibration loop (user idea 2026-11-19, challenged & reshaped) — C1 ✅ a4e8b13 · C2 ✅ 34be4e0 · C3 ✅ (SKILL.md) · C4 ✅ 7f8379a (review page v2) · round 0 pending
+### M2.6 — Taste calibration loop (user idea 2026-11-19, challenged & reshaped) — C1 ✅ a4e8b13 · C2 ✅ 34be4e0 · C3 ✅ (SKILL.md) · C4 ✅ 7f8379a (review page v2) · round 0 ✅ (P 0.89, missed 0.5/clip) · C5 moments + slow-mo in progress
 Goal: before analyzing a whole project, calibrate highlight selection to the user's taste in a few short review rounds.
 Design decisions (planner, from the challenge):
 - **What is learned = a per-user taste profile**, not free prompt rewriting: `~/.clippilot/taste-profile.md` (short
@@ -428,6 +428,44 @@ scripts, drive clicks/keys, assert on the export object (expose it via `window.c
 👍 → good + next selected; 👎 + reasons; score 👍 all ok; score 👎 + clicked step → low/high; missed via M; Next marks
 clip done → in `reviewed_clips`; state survives reload via localStorage. Keep the existing self-contained/escaping tests.
 Done when: typecheck + test:all green, page regenerated for the pilot opens in a browser and matches the mockup.
+
+#### C5 — Moments first: slow-mo suggestion + moment-only review (user feedback 2026-11-19 after round 0)
+User: fast footage (landscape, action) should be *seen* slowed down when that suits the moment — but not blindly for every
+high-fps clip (no slow-mo for talking). And: do clip-level scores make sense, or move entirely to moment scoring?
+Decision: **the moment (highlight) is the unit.** Clip scores stay as background data (search/filters, summary) but are no
+longer reviewed. Each highlight gets a slow-mo suggestion; its 1–10 `quality` stays the one number per moment.
+Round 0 (round_id 1, 4 clips): precision 0.89, missed/clip 0.5, quality scores all ok, uniqueness 2× too low → consistent
+with dropping clip-score review (uniqueness is project-relative; compute later, not per clip).
+
+**Analysis (Gemini schema + prompt)**
+- `HighlightSchema` gains `slowmo: "none" | "light" | "strong"` (default `"none"` when absent, so old responses parse) and
+  `slowmo_reason: string` (default `""`, short English). Prompt (German, existing style): judge per moment whether slowing
+  it down would look better in a travel montage — yes for flowing/fast motion with visual payoff (water, waves, splashes,
+  animals, hair/fabric in wind, sport/action, smooth pans over landscape); `none` for speech, people talking to camera,
+  moments that depend on sound or on real-time comedic timing, static shots. `strong` only for short, fast action peaks.
+- Deterministic gate in code, not the model: `suggestedSpeed(slowmo, fps)` → 1 if `slowmo = none` or `fps < 48`;
+  `light` → 0.5; `strong` → 0.25 if fps ≥ 90, else 0.5. (Assumes a 25 fps timeline; M3 may re-derive from the cut's rate.)
+  `normalizeHighlights(raw, durationSec, fps)` adds `suggested_speed`.
+- Migration `011`: `highlights` + `slowmo TEXT NOT NULL DEFAULT 'none'`, `slowmo_reason TEXT NOT NULL DEFAULT ''`,
+  `suggested_speed REAL NOT NULL DEFAULT 1`; `highlight_verdicts` + `suggested_speed REAL` snapshot (filled by `importRound`).
+  `highlight.repository` reads/writes the new fields; `get-clip` / `search --json` highlight objects include them.
+
+**Review page (v2 → keep look, simplify)**
+- Remove the "Scores look right? 👍 👎" row, score-editing mode and suggested-use toggle. Keep the clip card read-only
+  (ring + bars + pills), visually a bit more compact. Export no longer emits `clip_scores` / `suggested_use_wrong` entries
+  (fields stay as empty arrays; schema/import unchanged).
+- Highlight card: if `suggested_speed < 1`, a badge "🐢 50 %" (or 25 %) with `slowmo_reason` as tooltip/sub-line; selecting
+  that highlight plays its loop at `playbackRate = suggested_speed`. A small "1×" toggle on the card (key `S`) flips that
+  loop between suggested speed and 100 % to compare. Proxies keep source fps (verified: 100 fps clip → 100 fps proxy).
+- New 👎 reason chip `speed` "Speed wrong" (key `5`), always offered (also when no slow-mo was suggested but should be).
+- `metrics.flags` gains `speed`. Precision unchanged.
+- `review-data.ts` passes `slowmo`, `slowmo_reason`, `suggested_speed` per highlight.
+Tests first: schema defaults (old response without slowmo parses); `suggestedSpeed` table (none/light/strong × 25/50/100 fps,
+talking→none stays 1); normalize carries speed; migration 011 + repository round-trip; import snapshots speed; metrics
+`speed` flag; page (jsdom): no score vote UI, badge only when speed < 1, selected slow-mo highlight plays at 0.5/0.25,
+`S` toggles 1×, chip `5` → `["bad","speed"]`; `get-clip --json` includes the new fields; prompt text mentions slowmo.
+Manual after merge-ready: user re-analyzes the 33 pilot clips (`analyze --force`, ~US$0.33, user's terminal) → regenerate
+page → round 1. Done when: typecheck + test:all green; regenerated page shows slow-mo badges on a 50/100 fps action clip.
 
 ### M2.7 — Pipeline fixes from pilot feedback (planned, not started)
 - Local camera-shake metric per highlight range (ffmpeg motion/vidstab) → drop or down-rank shaky highlights.
