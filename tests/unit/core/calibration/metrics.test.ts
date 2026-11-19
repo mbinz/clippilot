@@ -19,7 +19,7 @@ describe('computeRoundMetrics', () => {
     expect(m.reviewed_highlights).toBe(4);
     expect(m.good_only).toBe(1);
     expect(m.precision).toBe(0.25);
-    expect(m.flags).toEqual({ timing: 2, description: 1, quality: 1, not_highlight: 0 });
+    expect(m.flags).toEqual({ timing: 2, description: 1, quality: 1, not_highlight: 0, speed: 0 });
     expect(m.reviewed_clips).toBe(3);
   });
 
@@ -90,6 +90,15 @@ describe('computeRoundMetrics', () => {
     );
     expect(m.good_only).toBe(1);
     expect(m.precision).toBe(0.25);
-    expect(m.flags).toEqual({ timing: 1, description: 0, quality: 0, not_highlight: 1 });
+    expect(m.flags).toEqual({ timing: 1, description: 0, quality: 0, not_highlight: 1, speed: 0 });
+  });
+
+  it('counts the speed flag, which is also not good-only', () => {
+    const m = computeRoundMetrics(
+      [{ clip_id: 1, verdicts: ['bad', 'speed'] }, { clip_id: 1, verdicts: ['good'] }],
+      [], [1],
+    );
+    expect(m.flags.speed).toBe(1);
+    expect(m.precision).toBe(0.5);
   });
 });

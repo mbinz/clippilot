@@ -7,6 +7,9 @@ export interface HighlightRecord {
   end_sec: number;
   description: string;
   quality: number;
+  slowmo: 'none' | 'light' | 'strong';
+  slowmo_reason: string;
+  suggested_speed: number;
   created_at: string;
 }
 
@@ -15,6 +18,9 @@ export interface InsertHighlight {
   end_sec: number;
   description: string;
   quality: number;
+  slowmo?: 'none' | 'light' | 'strong';
+  slowmo_reason?: string;
+  suggested_speed?: number;
 }
 
 export class HighlightRepository {
@@ -26,7 +32,7 @@ export class HighlightRepository {
   constructor(private db: Database.Database) {
     this.stmtDelete = db.prepare('DELETE FROM highlights WHERE clip_id = ?');
     this.stmtInsert = db.prepare(
-      'INSERT INTO highlights (clip_id, start_sec, end_sec, description, quality) VALUES (?, ?, ?, ?, ?)',
+      'INSERT INTO highlights (clip_id, start_sec, end_sec, description, quality, slowmo, slowmo_reason, suggested_speed) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     );
     this.stmtFindByClip = db.prepare(
       'SELECT * FROM highlights WHERE clip_id = ? ORDER BY start_sec ASC, id ASC',
@@ -43,7 +49,8 @@ export class HighlightRepository {
     this.db.transaction(() => {
       this.stmtDelete.run(clipId);
       for (const h of items) {
-        this.stmtInsert.run(clipId, h.start_sec, h.end_sec, h.description, h.quality);
+        this.stmtInsert.run(clipId, h.start_sec, h.end_sec, h.description, h.quality,
+          h.slowmo ?? 'none', h.slowmo_reason ?? '', h.suggested_speed ?? 1);
       }
     })();
   }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { clipToJson } from '../../../src/cli/json.js';
+import { clipToJson, highlightsToJson } from '../../../src/cli/json.js';
 import type { Clip } from '../../../src/types/clip.js';
 
 function baseClip(overrides: Partial<Clip> = {}): Clip {
@@ -88,5 +88,12 @@ describe('clipToJson', () => {
   it('omits highlights key when not provided', () => {
     const json = clipToJson(baseClip());
     expect('highlights' in json).toBe(false);
+  });
+
+  it('highlightsToJson passes slowmo fields through', () => {
+    const rec = { id: 3, start_sec: 1, end_sec: 2, description: 'd', quality: 6, slowmo: 'light', slowmo_reason: 'waves', suggested_speed: 0.5, clip_id: 9, created_at: 'x' };
+    expect(highlightsToJson([rec])).toEqual([
+      { id: 3, start_sec: 1, end_sec: 2, description: 'd', quality: 6, slowmo: 'light', slowmo_reason: 'waves', suggested_speed: 0.5 },
+    ]);
   });
 });

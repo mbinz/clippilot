@@ -83,4 +83,15 @@ describe('HighlightRepository', () => {
     const clip = clips.insert(makeClip());
     expect(() => repo.replaceForClip(clip.id, [item(1, 2, 'x', 11)])).toThrow();
   });
+
+  it('round-trips slowmo fields and defaults them for plain inserts', () => {
+    const clip = clips.insert(makeClip());
+    repo.replaceForClip(clip.id, [
+      { ...item(1, 2, 'splash', 8), slowmo: 'strong', slowmo_reason: 'water', suggested_speed: 0.25 },
+      item(5, 6, 'plain', 5),
+    ]);
+    const [a, b] = repo.findByClip(clip.id);
+    expect(a).toMatchObject({ slowmo: 'strong', slowmo_reason: 'water', suggested_speed: 0.25 });
+    expect(b).toMatchObject({ slowmo: 'none', slowmo_reason: '', suggested_speed: 1 });
+  });
 });

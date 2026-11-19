@@ -78,6 +78,22 @@ describe('CalibrationRepository', () => {
     expect(round).toMatchObject({ project_id: projectId, profile_version: 3 });
   });
 
+  it('snapshots suggested_speed of each highlight at import', () => {
+    hlRepo.replaceForClip(clipA, [
+      { start_sec: 2, end_sec: 5, description: 'Dolphin jumps', quality: 9, slowmo: 'light', slowmo_reason: 'water', suggested_speed: 0.5 },
+    ]);
+    const id = hlRepo.findByClip(clipA)[0].id;
+    const data = parseVerdictExport({
+      project: 'Delfine', db_generated_at: 'x', reviewed_at: 'y',
+      highlights: [{ highlight_id: id, clip_id: clipA, verdicts: ['bad', 'speed'], note: '' }],
+      missed: [], clip_notes: [],
+    });
+    const { round_id, metrics } = repo.importRound(projectId, 1, data);
+    const snap = db.prepare('SELECT suggested_speed FROM highlight_verdicts WHERE round_id = ?').get(round_id) as any;
+    expect(snap.suggested_speed).toBe(0.5);
+    expect(metrics.flags.speed).toBe(1);
+  });
+
   it('keeps the snapshot after re-analysis replaces the highlights', () => {
     const { round_id } = repo.importRound(projectId, 1, exportJson());
     hlRepo.replaceForClip(clipA, []);
@@ -163,7 +179,7 @@ describe('CalibrationRepository reviewed clips', () => {
     expect(repo.roundCount()).toBe(0);
     expect(repo.reviewedClipIds()).toEqual(new Set());
     for (const t of [1, 2]) db.prepare('INSERT INTO calibration_rounds (profile_version) VALUES (0)').run();
-    db.prepare("INSERT INTO highlight_verdicts VALUES (1, 100, 11, '[]', '', 0, 1, 'd', 5)").run();
+    db.prepare("INSERT INTO highlight_verdicts (round_id, highlight_id, clip_id, verdicts, note, start_sec, end_sec, description, quality) VALUES (1, 100, 11, '[]', '', 0, 1, 'd', 5)").run();
     db.prepare("INSERT INTO missed_moments VALUES (1, 12, 3, '')").run();
     db.prepare("INSERT INTO clip_score_verdicts VALUES (2, 13, 'focus', 'ok')").run();
     db.prepare("INSERT INTO clip_notes VALUES (2, 14, 'n', 0)").run();

@@ -25,13 +25,16 @@ export interface HighlightJson {
   end_sec: number;
   description: string;
   quality: number;
+  slowmo: string;
+  slowmo_reason: string;
+  suggested_speed: number;
 }
 
 export function highlightsToJson(
-  items: { id: number; start_sec: number; end_sec: number; description: string; quality: number }[],
+  items: HighlightJson[],
 ): HighlightJson[] {
-  return items.map(({ id, start_sec, end_sec, description, quality }) => ({
-    id, start_sec, end_sec, description, quality,
+  return items.map(({ id, start_sec, end_sec, description, quality, slowmo, slowmo_reason, suggested_speed }) => ({
+    id, start_sec, end_sec, description, quality, slowmo, slowmo_reason, suggested_speed,
   }));
 }
 

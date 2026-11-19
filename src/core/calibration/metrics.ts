@@ -18,7 +18,7 @@ export interface RoundMetrics {
   reviewed_highlights: number;
   good_only: number;
   precision: number;
-  flags: { timing: number; description: number; quality: number; not_highlight: number };
+  flags: { timing: number; description: number; quality: number; not_highlight: number; speed: number };
   missed_moments: number;
   reviewed_clips: number;
   missed_per_clip: number;
@@ -51,7 +51,7 @@ export function computeRoundMetrics(
     reviewed_highlights: reviewed.length,
     good_only: goodOnly,
     precision,
-    flags: { timing: has('timing'), description: has('description'), quality: has('quality'), not_highlight: has('not_highlight') },
+    flags: { timing: has('timing'), description: has('description'), quality: has('quality'), not_highlight: has('not_highlight'), speed: has('speed') },
     missed_moments: missed.length,
     reviewed_clips: reviewedClips,
     missed_per_clip: missedPerClip,

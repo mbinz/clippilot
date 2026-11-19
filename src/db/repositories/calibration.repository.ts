@@ -37,12 +37,12 @@ export class CalibrationRepository {
           .run(projectId, profileVersion).lastInsertRowid,
       );
       const insHl = this.db.prepare(`INSERT INTO highlight_verdicts
-        (round_id, highlight_id, clip_id, verdicts, note, start_sec, end_sec, description, quality)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        (round_id, highlight_id, clip_id, verdicts, note, start_sec, end_sec, description, quality, suggested_speed)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
       for (const h of data.highlights) {
         const s = snapshots.get(h.highlight_id);
         insHl.run(roundId, h.highlight_id, h.clip_id, JSON.stringify(h.verdicts), h.note,
-          s.start_sec, s.end_sec, s.description, s.quality);
+          s.start_sec, s.end_sec, s.description, s.quality, s.suggested_speed);
       }
       const insMissed = this.db.prepare('INSERT INTO missed_moments (round_id, clip_id, at_sec, note) VALUES (?, ?, ?, ?)');
       for (const m of data.missed) insMissed.run(roundId, m.clip_id, m.at_sec, m.note);
