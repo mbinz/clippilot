@@ -223,6 +223,29 @@ highlights example; prompt mentions English tags of 1–3 words for setting/acti
 Done when: red→green, typecheck + test:all green; pilot run 2 (`analyze --force` on Delfine) shows no repeated
 example timestamps and places/moments that group.
 
+**M2.2c — Analysis robustness after pilot run 2 (implementer)**
+Pilot run 2 (prompt M2.2b): 32/33 done, 38 highlights, no anchored timestamps, places 37 → 22 (`open sea` 11,
+`marina` 5). C0586 failed: Gemini returned malformed JSON (`Expected double-quoted property name…`) and the client
+does not retry parse errors (message wrongly says "after 5 attempts"). Plain `analyze` skips `error` clips, and
+`--force` re-runs everything. Tags still sometimes come back as lists (`marina, boat`). Behavior:
+- `GeminiClient` retries a response that fails `JSON.parse` or Zod validation, up to 3 attempts total; 429/503
+  backoff unchanged; the final error message states the real number of attempts made. To make this testable the
+  constructor accepts an optional `generate(videoBase64) => Promise<string>` (default = the current
+  `ai.models.generateContent` call returning `response.text`).
+- `analyze --retry-errors`: resets `error` clips (optionally of `--project`) to `pending` before collecting pending
+  clips. New `ClipRepository.resetErrors(projectId?) → number` (also clears `analysis_error`).
+- `buildProjectSummary`: a `setting`/`activity`/`location` value containing commas counts as several tags
+  (`"marina, boat"` → `marina` + `boat`), each trimmed; still one count per clip.
+Tests first:
+- `tests/unit/core/analyze/gemini-client.test.ts`: fake `generate` returns `'{"scenes": [ {'` then a valid literal
+  response → `analyzeVideo` resolves, `generate` called twice; always-malformed → rejects after exactly 3 calls with
+  a message containing `3 attempts`. (Use a tiny temp file as the "proxy"; no network.)
+- `tests/unit/db/repositories/clip.repository.test.ts`: `resetErrors` flips only `error` clips (and only in the given
+  project), clears `analysis_error`, returns the count.
+- `tests/unit/core/summary.test.ts`: a clip with setting `"marina, boat"` and another with `"Marina"` → `marina` 2,
+  `boat` 1.
+Done when: red→green, typecheck + test:all green; `analyze --retry-errors` on the pilot re-analyzes only C0586.
+
 **M2.4 — Pilot on Delfine (planner, with user)**
 - Working dir `~/Video/ClipPilot M2 Pilot/`; `ingest "~/Video/Portugal/Src /Import/03 Arrifana/Delfine"`; user OK on
   cost before `analyze`; show ~8 highlights with timestamps for the user to judge; `summary --json`.
