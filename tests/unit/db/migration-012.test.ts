@@ -57,7 +57,7 @@ describe('migration 012 — moment tags, no clip scores', () => {
       db.prepare('INSERT INTO _migrations (version, name) VALUES (?, ?)').run(i + 1, `m${i + 1}`);
     });
     db.prepare(`INSERT INTO clips (file_path, file_hash, file_size, duration_sec, ai_summary, ai_visual_keywords,
-      ai_quality_overall, ai_editorial_suggested_use) VALUES ('a.mp4','h1',1,10,'Wellen am Strand','meer, sand',3.5,'B-Roll')`).run();
+      ai_quality_overall, ai_editorial_suggested_use) VALUES ('a.mp4','h1',1,10,'Wellen am Strand','meer, sand',3.5,'Broll')`).run();
     db.prepare(`INSERT INTO clips (file_path, file_hash, file_size, duration_sec, ai_summary, ai_visual_keywords)
       VALUES ('b.mp4','h2',1,10,'Altstadt Gasse','haus, tür')`).run();
 
@@ -67,7 +67,7 @@ describe('migration 012 — moment tags, no clip scores', () => {
       (db.prepare('SELECT rowid FROM clips_fts WHERE clips_fts MATCH ?').all(q) as { rowid: number }[]).map((r) => r.rowid);
     expect(find('Wellen')).toEqual([1]);
     expect(find('Altstadt')).toEqual([2]);
-    expect(find('B-Roll')).toEqual([]);
+    expect(find('Broll')).toEqual([]);
 
     // triggers still maintain the index
     db.prepare("UPDATE clips SET ai_summary = 'Sonnenuntergang' WHERE id = 1").run();
