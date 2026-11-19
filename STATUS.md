@@ -347,7 +347,7 @@ Done when: red→green, typecheck + test:all green, page regenerated for the pil
 
 **M2.5c ✅** (45dce99) — full-width layout.
 
-### M2.6 — Taste calibration loop (user idea 2026-11-19, challenged & reshaped) — C1 ✅ a4e8b13 · C2 ✅ 34be4e0 · C3 ✅ (SKILL.md) · C4 ✅ 7f8379a (review page v2) · round 0 ✅ (P 0.89, missed 0.5/clip) · C5 moments + slow-mo in progress
+### M2.6 — Taste calibration loop (user idea 2026-11-19, challenged & reshaped) — C1 ✅ a4e8b13 · C2 ✅ 34be4e0 · C3 ✅ (SKILL.md) · C4 ✅ 7f8379a (review page v2) · round 0 ✅ (P 0.89, missed 0.5/clip) · C5 ✅ e39aa1a (moments + slow-mo; 481 tests) · next: re-analyze pilot (user) → round 1
 Goal: before analyzing a whole project, calibrate highlight selection to the user's taste in a few short review rounds.
 Design decisions (planner, from the challenge):
 - **What is learned = a per-user taste profile**, not free prompt rewriting: `~/.clippilot/taste-profile.md` (short
@@ -429,7 +429,7 @@ scripts, drive clicks/keys, assert on the export object (expose it via `window.c
 clip done → in `reviewed_clips`; state survives reload via localStorage. Keep the existing self-contained/escaping tests.
 Done when: typecheck + test:all green, page regenerated for the pilot opens in a browser and matches the mockup.
 
-#### C5 — Moments first: slow-mo suggestion + moment-only review (user feedback 2026-11-19 after round 0)
+#### C5 — Moments first: slow-mo suggestion + moment-only review (user feedback 2026-11-19 after round 0) — ✅ df2ee04, 1ebbf39, e39aa1a. Deferred: 25 fps timeline assumption in the speed gate (re-derive per cut in M3); 1× toggle not persisted
 User: fast footage (landscape, action) should be *seen* slowed down when that suits the moment — but not blindly for every
 high-fps clip (no slow-mo for talking). And: do clip-level scores make sense, or move entirely to moment scoring?
 Decision: **the moment (highlight) is the unit.** Clip scores stay as background data (search/filters, summary) but are no
