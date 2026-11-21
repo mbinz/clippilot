@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { USER_PROMPT } from "../../../../src/core/analyze/prompts.js";
+import { SYSTEM_PROMPT, USER_PROMPT } from "../../../../src/core/analyze/prompts.js";
 
 describe("USER_PROMPT", () => {
   it("has no numeric start_sec/end_sec in any example (avoids anchoring)", () => {
@@ -21,7 +21,7 @@ describe("USER_PROMPT", () => {
   });
 
   it("asks for a slowmo judgement per highlight with reason, none for speech", () => {
-    expect(USER_PROMPT).toMatch(/"slowmo": "none"/);
+    expect(USER_PROMPT).toMatch(/"slowmo": "none \| light \| strong"/);
     expect(USER_PROMPT).toMatch(/slowmo_reason/);
     expect(USER_PROMPT).toMatch(/light/);
     expect(USER_PROMPT).toMatch(/strong/);
@@ -38,5 +38,25 @@ describe("USER_PROMPT", () => {
     }
     expect(USER_PROMPT).toMatch(/gesamte Bandbreite/);
     expect(USER_PROMPT).not.toMatch(/technical_quality|editorial_value|suggested_use|"quality"|Bewertungsskala/);
+  });
+});
+
+describe("prompt cleanup", () => {
+  it("is neutral about family content and drops removed wording", () => {
+    const all = SYSTEM_PROMPT + USER_PROMPT;
+    expect(SYSTEM_PROMPT).toContain("Video-Analyse-Assistent für Reisevideos");
+    expect(all).not.toContain("Familien");
+    expect(all).not.toContain("Haare");
+    expect(all).not.toContain("herausragende");
+    expect(all).not.toContain("description_de");
+  });
+
+  it("lists every slowmo enum value in the example and narrows water", () => {
+    expect(USER_PROMPT).toContain('"none | light | strong"');
+    expect(USER_PROMPT).toContain("Wasser nur mit einem Ereignis (Welle bricht, Spritzer, Tier, Boot)");
+  });
+
+  it("asks for usable moments for a travel montage", () => {
+    expect(USER_PROMPT).toContain("0 bis 5 brauchbare Momente für einen Reise-Montage-Film (leeres Array, wenn nichts taugt)");
   });
 });

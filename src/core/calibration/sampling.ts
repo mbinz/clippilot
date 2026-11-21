@@ -22,7 +22,7 @@ function peopleText(c: HardnessInput): string {
     try {
       const scenes = JSON.parse(c.ai_scenes);
       for (const s of Array.isArray(scenes) ? scenes : []) {
-        parts.push(s?.setting, s?.activity, s?.description_en, s?.description_de);
+        parts.push(s?.setting, s?.activity, s?.description_en);
       }
     } catch {
       parts.push(c.ai_scenes);

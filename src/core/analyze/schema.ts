@@ -3,7 +3,6 @@ import { z } from 'zod';
 export const SceneSchema = z.object({
   start_sec: z.number(),
   end_sec: z.number(),
-  description_de: z.string(),
   description_en: z.string(),
   subjects: z.array(z.string()),
   setting: z.string(),

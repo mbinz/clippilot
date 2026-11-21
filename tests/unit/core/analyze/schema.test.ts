@@ -6,7 +6,6 @@ const VALID_RESPONSE = {
     {
       start_sec: 0,
       end_sec: 15,
-      description_de: 'Kinder spielen am Strand',
       description_en: 'Children playing at the beach',
       subjects: ['Kind 1', 'Kind 2'],
       setting: 'Strand',
@@ -54,7 +53,6 @@ describe('ClipAnalysisResponseSchema', () => {
           ...VALID_RESPONSE.scenes[0],
           start_sec: 15,
           end_sec: 30,
-          description_de: 'Zweite Szene',
           description_en: 'Second scene',
         },
       ],

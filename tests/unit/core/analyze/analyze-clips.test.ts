@@ -13,7 +13,6 @@ function response(highlights: ClipAnalysisResponse['highlights']): ClipAnalysisR
       {
         start_sec: 0,
         end_sec: 4,
-        description_de: 'Strand',
         description_en: 'Beach',
         subjects: [],
         setting: 'Strand',

@@ -143,7 +143,7 @@ export function ClipDetail({ clip, thumbnails, onClose, onUpdated }: ClipDetailP
                     <span>{formatDuration(scene.start_sec)} - {formatDuration(scene.end_sec)}</span>
                     <span>{scene.mood}</span>
                   </div>
-                  <p className="text-gray-600">{scene.description_de || scene.description_en}</p>
+                  <p className="text-gray-600">{scene.description_en}</p>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {scene.visual_keywords?.map((kw) => (
                       <span key={kw} className="px-1.5 py-0.5 bg-gray-200 text-gray-600 rounded text-[10px]">

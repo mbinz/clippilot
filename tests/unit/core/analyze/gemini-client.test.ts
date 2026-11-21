@@ -9,7 +9,7 @@ import type { AppConfig } from '../../../../src/types/config.js';
 const validResponse = JSON.stringify({
   scenes: [
     {
-      start_sec: 0, end_sec: 4, description_de: 'Hafen', description_en: 'Harbour',
+      start_sec: 0, end_sec: 4, description_en: 'Harbour',
       subjects: ['boat'], setting: 'marina', activity: 'docking', mood: 'calm',
       visual_keywords: ['water'],
     },

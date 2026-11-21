@@ -642,6 +642,64 @@ Every slice: failing test first, `npm run typecheck && npm run test:all` green, 
 - Web: simple events view (name, time range, clip count, thumbnail strip; rename / merge / split).
 - Then: ingest + analyze `03 Arrifana` (104 clips, ~US$1, user runs analyze).
 
+#### M2.8 implementation specs (planner, 2026-11-21)
+Slices E1→E5, test-first, one commit each. Migration 015 (013/014 are taken by G4/G7).
+
+**E1 — schema + pure derivation**
+- Migration `015_events.ts`: `events (id PK, project_id FK NOT NULL, name TEXT NOT NULL, source TEXT NOT NULL CHECK
+  (source IN ('folder','time')), folder_path TEXT NULL, sort_order INTEGER NOT NULL DEFAULT 0, created_at)` +
+  `clips.event_id INTEGER NULL REFERENCES events(id) ON DELETE SET NULL` + index on `clips(event_id)`.
+- Pure `deriveEvents(clips: {id, file_path, recorded_at: string|null}[]): DerivedEvent[]` in `src/core/events/derive.ts`,
+  `DerivedEvent = {name, source, folder_path|null, clip_ids}`; folder of a clip = `path.dirname(file_path)`.
+  1. **Flat:** all clips share one folder → time mode for everything.
+  2. **Leaf folders:** a folder is a leaf if no other clip's folder lies strictly under it. Each leaf → one `folder` event,
+     name = folder basename, `folder_path` = the folder.
+  3. **Loose files** (folder is not a leaf) with `recorded_at` → join the folder event whose [min,max] recorded_at range
+     is nearest (distance 0 if inside; tie → earlier event). If no folder event has any dated clip → time mode for them.
+  4. **Time mode:** sort by recorded_at; gap > 45 min between consecutive clips starts a new event; name = first clip's
+     local time formatted `Tue 27 May, 08:34` (en-GB weekday/day/month, 24 h). `source='time'`, `folder_path` NULL.
+     Clips without `recorded_at` in time mode or loose → one event "Undated" (source time).
+  5. Output sorted by earliest recorded_at (undated last); clips within an event by recorded_at then file_path.
+- Tests: table of synthetic clip sets for each rule (flat→time groups with 44 vs 46 min gaps; two leaf folders; loose
+  file nearest-by-time incl. inside-range and tie; nested `A/` with files + `A/B/` leaf; undated; name formatting —
+  pin TZ via `process.env.TZ='Europe/Lisbon'` in the test).
+
+**E2 — repository + assignment on ingest**
+- `EventRepository`: `listByProject` (with clip_count, start/end recorded_at, sorted by sort_order), `create`, `rename`,
+  `merge(targetId, otherIds)` (move clips, delete others), `split(eventId, atClipId)` (clips at/after the clip in event
+  order move to a new event "<name> (2)", same source, folder_path NULL), `clipsOf(eventId)`, `resort(projectId)` (sort_order
+  by earliest recorded_at).
+- `assignEvents(db, projectId)` in `src/core/events/index.ts`: project has no events → `deriveEvents` over all clips and
+  persist. Otherwise only clips with `event_id IS NULL`: join an existing `folder` event with equal folder_path, else the
+  nearest event by time (rule 3), else a new derived event. Never renames/merges/splits existing events (user edits stick).
+- `ingestDirectory` calls nothing new; the **ingest CLI command** calls `assignEvents` after the run (keeps the pure
+  pipeline testable). Backfill for existing projects = `clippilot events rebuild` (E3).
+- Tests: repo ops on an in-memory DB (merge moves clips, split boundary inclusive, resort); `assignEvents` first-run vs
+  incremental (new clip in an existing folder joins it; user-renamed event keeps its name).
+
+**E3 — CLI** (`src/cli/commands/events.ts`, all read commands support `--json`)
+- `events list [--project] [--json]` → `[{id, name, source, folder_path, clip_count, start, end}]`.
+- `events rename <id> <name>`, `events merge <targetId> <otherId...>`, `events split <id> --at-clip <clipId>`,
+  `events rebuild [--project]` (= `assignEvents`; only fills unassigned clips; `--reset` deletes the project's events first).
+  Mutations print the resulting event(s) as JSON.
+- `summary --json` gains `events: [{id, name, clips, duration_sec, highlights}]` in event order; existing fields unchanged.
+- SKILL.md: short "Events" section (what they are, the verbs, "propose renames, don't apply without the user").
+- Tests: command-level like existing CLI tests (list JSON shape, split/merge output, summary field).
+
+**E4 — server routes**
+- `GET /api/projects/:id/events` (list incl. up to 8 thumbnail URLs per event, one per clip, earliest first),
+  `PATCH /api/events/:id {name}`, `POST /api/events/:id/merge {other_ids}`, `POST /api/events/:id/split {at_clip_id}`.
+  Tests via Hono `app.request` like the other route tests.
+
+**E5 — web events view**
+- New header tab "Events" (next to browse / similarity), `EventsView.tsx` + `useEvents` hook: one row per event — name
+  (inline rename on click, Enter saves), time range, clip count, thumbnail strip; checkbox select + "Merge selected";
+  "Split…" opens the event's clips, click a clip = split there. Needs a selected project (else hint text).
+- No unit tests for React (none exist today); verify in the browser pane against the pilot DB copy. Planner verifies.
+
+Done when: `events rebuild` on a copy of the pilot DB gives sensible events; then the user-facing step is ingesting
+`03 Arrifana` + the user running analyze.
+
 ### M3 — Storyboard model + CLI
 - Migration: `scenes` (per cut, start event), cut brief, panel `intent` / `state` (filled | candidates | gap) / `speed` /
   `source` (ai | user), panel candidates; moment `status` (proposed | confirmed | rejected); `clips.hidden`.

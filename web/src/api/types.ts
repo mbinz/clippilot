@@ -38,7 +38,6 @@ export interface Moment {
 export interface Scene {
   start_sec: number;
   end_sec: number;
-  description_de: string;
   description_en: string;
   subjects: string[];
   setting: string;
