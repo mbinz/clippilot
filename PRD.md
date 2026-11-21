@@ -1,110 +1,141 @@
 # ClipPilot — PRD
 
-> Re-planned 2026-11-18 after a grilling session. Supersedes the 2026-06-14 "selects + assembly → per-scene FCPXML" plan.
-> Key learnings that triggered it: the Resolve handoff was unreliable (timelines failed to load, clips showed as missing), and the first real test (Portugal) only ever ingested 33 of 508 clips — the actual workflow (story → gaps → rough cut) was never there.
+> Re-planned 2026-11-21 after a second grilling session (events + scene board). Builds on the 2026-11-18 re-plan
+> (storyboard workflow, Resolve export fixed in M1).
+> Key learnings that triggered it: absolute AI scores (clip and moment) don't discriminate; a learned "taste profile"
+> overfit to one folder; a separate "review every moment" pass recreates the time problem. Market research
+> (`docs/research/footage-logging-landscape.md`) found no tool that logs B-roll *moments* with tags and hands off to
+> free Resolve — so we build it, inside the storyboard workflow, not as a separate sort step.
 
 ## Goal (north star)
 
 **Take a trip's raw footage to a first rough cut you'd rather start from than an empty timeline** — through an iterative loop:
 
 ```
-understand footage → write a brief → draft a storyboard → reshape around what exists
-   → fill the gaps → rough cut → timeline in your editor (DaVinci Resolve first)
+ingest → analyze (moments + tags) → events → brief → Claude drafts the storyboard
+   → steer on the scene board → preview in the browser → export → DaVinci Resolve
 ```
 
-Claude is the collaborator at every step (drafts, proposes candidates, finds fillers). The web UI is where the user sees and steers. The editor (Resolve) does fine cut, music, color, and finishing.
+The main pain is **time**: nobody watches hundreds of clips. ClipPilot finds the moments, groups the footage, drafts
+the story, and lets the user review *only what the story needs*. The editor (Resolve) does fine cut, music, color,
+finishing.
 
 ## Users
 
 - **Now:** the author — travel footage from phone, action cams (GoPro), and a Sony A7C II; mixed 25/50/100 fps; edits in free DaVinci Resolve.
-- **Target persona (later, for open source / productizing):** travel & vlog creators shooting mixed cameras, editing in Resolve / Final Cut / Premiere.
+- **Later:** travel & vlog creators shooting mixed cameras; possibly professionals down the road (they have other solutions, so it would have to be very good). Personal tool first; open source / product decided later.
 - **Typical output:** a 10–20 min montage of scenes, set to music; voice-over sometimes recorded afterwards. No talking-head / A-roll. Single video layer.
 
 ## Principles
 
-- **Vendor-neutral and free to run.** The core must work with free Resolve and open formats (FCPXML / OTIO). Paid or vendor-specific integrations (Resolve Studio scripting, stock, AI video) are optional plugins, never required. Gemini stays the analysis model for now (no provider abstraction yet).
-- **Local-first.** Originals never mutated; all derived assets live in `<project>/.clippilot/`.
-- **One path into the timeline.** Everything that lands on a timeline — own clips, stock, generated cards, AI video — is a real file that goes through normal ingest. Exporters never special-case a source.
-- **Claude drafts, the UI steers.** Story reasoning happens in chat via the CLI (`--json`); results persist as normal DB rows; the UI shows and edits them. No AI built into the UI for now.
+- **Vendor-neutral and free to run.** Works with free Resolve via file import (OTIO / FCPXML) — no Resolve scripting (moved to Studio in Resolve 21.1). Paid or vendor-specific integrations are optional plugins. Gemini stays the analysis model (no provider abstraction yet).
+- **Local-first; originals are never touched.** No moving, renaming or deleting source files — "hide" / "reject" are DB flags only. All derived assets live in `<project>/.clippilot/`.
+- **AI proposes, human confirms — and confirmation is optional.** Everything the AI proposes is usable as-is; human choices are marked as such. As AI gets better, approval can drop away without a redesign.
+- **Categorical tags over absolute scores.** The model is asked for checkable categories (tier, shot, role, issues), not 1–5 numbers. What can be measured (shake, frame rate, duration) is computed in code, not asked of the model.
+- **One path into the timeline.** Everything on a timeline — own clips, generated cards, stock, AI video — is a real file that goes through normal ingest.
+- **v1: Claude drafts in chat, the UI shows and steers.** Long-term the UI becomes the main workspace and starts AI actions itself (roadmap, below).
 
 ## Workflow (the product)
 
-1. **Ingest** — point at the trip folder. Resumable / incremental (a 123 GB trip must survive interruptions). Folder structure (`01 Flug`, `02 Cacela Velha`, …) is captured as a scene hint.
-2. **Understand** — Gemini analyzes the 720p proxy **video** (not just stills) and returns per-clip metadata **plus timestamped highlights** ("dolphin jumps, 01:12–01:16, quality 8/10"). Highlights — not whole clips — are the unit the storyboard works with. A project-level summary answers "what's in here".
-2b. **Calibrate (once per user, briefly per project)** — a few review rounds on fresh, hard clips; verdicts teach a
-   per-user taste profile (explicit rules appended to the analysis prompt, proposed by Claude, approved by the user).
-   Stop at precision ≥ 0.8 and ≤ 0.3 missed moments per clip, or 3 rounds. Then analyze the whole project.
-3. **Brief** — the user states intent per cut: target length, mood, must-have moments, ending ("15 min, relaxed, surf + Lisbon city life, end on Lisbon sunset"). Stored on the cut; drives drafting and defines what counts as a gap.
-4. **Storyboard draft** — Claude drafts scenes (seeded from folders, then renamed/split/merged/reordered) and panels. Each panel has an intent and is in one of three states:
-   - **filled** — a clip with in/out and speed
-   - **candidates** — 2–5 highlight options to choose from
+1. **Ingest** — point at the trip folder. Resumable / incremental (a 123 GB trip must survive interruptions). Runs from terminal / chat.
+2. **Analyze** — Gemini analyzes the 720p proxy **video** and returns per-clip summary/scenes/keywords plus **moments**
+   (timestamped highlights), each tagged:
+   - **tier** `hero | solid | filler`
+   - **shot** `wide | medium | close | detail`
+   - **role** `establishing | action | reaction | detail | transition`
+   - **issues** `shake | blur | obstructed | overexposed | underexposed` (shake also measured in code)
+   - **slow-mo** suggestion (`none | light | strong` + reason) → suggested speed gated by source fps in code
+   - **audio worth keeping** yes/no + type `ambient | speech | music | noise`
+   - **duplicate group** — the same moment in another clip / take
+   Moments are ≥ ~3 s (enforced in code). No clip-level scores. Runs from terminal / chat.
+3. **Events** — group the footage by *what was shot*:
+   - Folders present → the **deepest folder is an event**; parent folders are kept only as context for Claude.
+   - Flat files / loose files → grouped by recording time (new event after a gap of ~45 min), provisional names; loose files next to folders join the nearest event by time (no flag).
+   - Claude renames / merges / splits events in chat; the user can do the same in the UI. Optional, ~5 min per trip; nothing waits for it.
+4. **Brief** — per cut: target length, mood, must-have moments, ending. **Claude proposes a brief** from the events and their best moments; the user adjusts it in a UI form or in chat. Drives the draft and defines what counts as a gap.
+5. **Storyboard draft** — Claude drafts scenes and panels in chat from the brief. Each scene starts from one event but may use moments from any event. Each **panel** (one shot slot) has an intent and is:
+   - **filled** — a moment with in/out and speed
+   - **candidates** — 2–5 moments to choose from
    - **gap** — intent only, nothing suitable found yet
-5. **Reshape & fill** — two moves on gaps: (a) reshape the story around what exists, (b) find a filler for *that specific gap*, searching sources in order:
-   1. own library (unused clips in this project, then other projects)
-   2. locally generated: title/chapter cards, animated route map, photos with pan/zoom (ffmpeg, free, offline)
-   3. stock (Pexels/Pixabay) — plugin
-   4. AI-generated video (Kling, Veo, …) — plugin
-6. **Rough cut export** — one timeline per cut with scene markers, into free Resolve, every clip online, correct speed.
+6. **Scene board (web UI)** — the user opens an already-filled board and steers. Sorting happens here, as a side effect:
+   - **Moment pool** per scene: grouped by role, hero first, filler collapsed, duplicates stacked, rejected / hidden behind a "hidden: n" link.
+   - **Placing** a moment (drag onto a panel, or picking a candidate) = confirmed. **👎** rejects a moment (optional reason). **Hide clip** hides a whole clip. Untouched moments stay "proposed".
+   - **AI picks and human picks are visually distinct**; both are usable and exportable any time.
+   - Edit: scenes add / rename / delete / reorder; panels add / delete / reorder; trim in/out; speed 100 / 50 / 25 % (within the clip's fps).
+   - **Preview** a scene or the whole cut in the browser (panels played in order, at their speed).
+7. **Fill gaps** (M5) — reshape the story around what exists, or find a filler for that gap: own library → locally generated (title cards, route map, photo pan/zoom) → stock (plugin) → AI video (plugin).
+8. **Export** — "Export to Resolve" button: one OTIO timeline per cut with scene markers (FCPXML secondary), into free Resolve, every clip online, correct speed.
 
-## Data model — Project → Cut → Scene → Panel
+## Data model
 
 ```
 Project (the trip — "Portugal")
-  └─ Cut            ← an edit; has a brief (length, mood, must-haves)
-       └─ Scene      ← ordered, named; seeded from source folders, then edited
-            └─ Panel (segment)  ← ordered; intent + state (filled | candidates | gap)
-                                   filled: clip_id, in/out (start_sec/end_sec), speed (default 100%)
+  ├─ Event          ← what was shot; from deepest folder or recording-time grouping; renamable / mergeable / splittable
+  │    └─ Clip → Moment (tier, shot, role, issues, slow-mo, audio, duplicate group; status proposed | confirmed | rejected)
+  └─ Cut            ← one edit; has a brief (Claude-proposed, user-adjusted)
+       └─ Scene      ← story unit; ordered, named; starts from an event
+            └─ Panel  ← one shot slot; ordered; intent + state (filled | candidates | gap); source ai | user
+                         filled: moment/clip, in/out (start_sec/end_sec), speed (default 100 %)
 ```
 
-- Scenes live inside a cut (no cross-cut sharing).
-- Same clip may appear multiple times. "Only part slowed down" = same clip placed twice: one segment at 100 %, the next at e.g. 25 %.
-- Speed is per panel, user-decided; Claude may *suggest* slow-mo for 50/100 fps action shots.
-- Single video layer. No effects, transitions, audio mixing. Music is added in the editor.
-- Schema keeps `stories` (= Cut) / `story_segments` (= Panel) names to avoid churn; product vocabulary is Cut / Scene / Panel.
+- Event = footage side (objective, shared by all cuts). Scene = story side (per cut).
+- Same clip may appear in several panels ("only part slowed down" = same clip twice: 100 % then 50 %).
+- Clips can be hidden (flag); originals untouched.
+- Model allows several cuts per project; the UI shows one cut for now.
+- Schema keeps `stories` (= Cut) / `story_segments` (= Panel) names; product vocabulary is Event / Cut / Scene / Panel / Moment.
 
 ## Export / handoff
 
-- **One timeline per cut, scene markers** — replaces the old one-file-per-scene plan (that was a workaround for Resolve importing only the last `<project>` of a multi-timeline FCPXML; a single timeline per file avoids it).
-- **Format chosen by spike (M1):** FCPXML vs OTIO, both tested against free Resolve with a 3-camera fixture. Winner is primary; the other may stay as secondary. EDL to be dropped unless the spike shows a reason to keep it. CSV/JSON stay as data exports.
-- **Must handle:** per-asset formats with resolution; mixed 25/50/100 fps on one timeline; per-segment speed (retime); embedded timecode (Sony) vs none (phone); VFR phone footage; paths with spaces / trailing spaces (Portugal has `Src /`).
-- **Open question:** Resolve Studio scripting API as an optional "pro" adapter — revisit only if open formats can't be made reliable.
+- One timeline per cut, scene markers. **OTIO primary** (keeps markers, linked audio), FCPXML secondary — both verified in free Resolve (M1).
+- Handles per-asset formats, mixed 25/50/100 fps, per-panel speed, embedded TC (Sony, incl. >50 fps frame-field quirk) vs none, VFR, paths with spaces.
+- No bins / keyword / "selects" export for now — the handoff is the rough cut.
 
 ## Surfaces
 
-- **CLI (AI + scripting):** existing verbs (`ingest`, `analyze`, `search`, `get-clip`, `similar`, `mark-best`, `tag`, `contact-sheet`, `export`, `stats`, `config`, `ui`) plus cut/brief/scene/panel verbs (M3). All read commands emit `--json`.
-- **Web UI (React + Vite, kept):** browse/search (exists) + **storyboard view** — scenes as rows, panels as cards, candidate picker, in/out + speed, gap list, export button.
+- **CLI (AI + scripting):** ingest, analyze, events, brief, cut/scene/panel verbs, search, summary, export… All read commands emit JSON. Claude drafts through these in chat.
+- **Web UI (React + Vite):** events view, brief form, **scene board**, browser preview, export button. Browse/search stays.
 
 ## Milestones
 
 | | Milestone | Done when |
 |---|---|---|
-| **M0** | Docs reset | PRD / ARCHITECTURE / STATUS reflect this plan |
-| **M1** | Export that works | 3-camera fixture (25/50/100 fps, TC + no TC, VFR phone, path with spaces, one retimed segment) imports into free Resolve with every clip online, right offsets and speed; FCPXML-vs-OTIO decided; checklist + automated structural tests |
-| **M2** | Understand the footage | Resumable full ingest of Portugal; proxy-video analysis with timestamped highlights (piloted on `Arrifana/Delfine` for quality + cost first); project summary command |
-| **M3** | Storyboard model + CLI | Migration for scenes, brief, panel state/intent/speed, candidates; CLI verbs; Claude can draft a storyboard for Portugal in chat from a brief |
-| **M4** | Storyboard UI | Review, pick candidate, trim, set speed, reorder, see gaps, export from UI |
-| **M5** | Gap fillers (free) | Per-gap library search; locally rendered title cards, route map, photo pan/zoom — ingested as clips |
+| **M0** ✅ | Docs reset | — |
+| **M1** ✅ | Export that works | Verified in free Resolve; OTIO primary |
+| **M2** ✅ | Understand the footage | Resumable ingest, proxy-video analysis with moments, summary (piloted on Delfine) |
+| **M2.6** ✅ | Review page + moment tags | Moment tags/tier/slow-mo, clip scores dropped; taste-profile learning tried and dropped |
+| **M2.7** | Analysis groundwork | Files API upload, prompt cleanup, ≥ 3 s moments, shake metric, audio tag, duplicate groups, taste-profile code removed |
+| **M2.8** | Events | Folders → events, flat files → time grouping, CLI rename/merge/split, simple events view in UI; `03 Arrifana` (104 clips) ingested + analyzed |
+| **M3** | Storyboard model + CLI | Events/brief/scene/panel schema (panel source ai/user, moment status); Claude proposes a brief and drafts the Arrifana cut in chat |
+| **M4** | Scene board UI | Mockup first; pool + board + placing/👎/hide, trim, speed, preview, export button |
+| **M5** | Gap fillers (free) | Per-gap library search; local title cards, route map, photo pan/zoom — ingested as clips |
 | **M6** | Plugins (optional) | Stock and AI-video gap fillers behind a plugin seam |
 
-**v0.2 = M0–M4.** Acceptance: the full Portugal trip goes ingest → brief → storyboard → export, imports cleanly into free Resolve, and the author would rather start from it than from an empty timeline.
-**v0.3:** M5–M6, then open-source release (README, packaging, docs for others).
+**v0.2 = M0–M4.** Acceptance: `03 Arrifana` goes ingest → events → brief → storyboard → export, imports cleanly into
+free Resolve, and the author would rather start from it than from an empty timeline. Full Portugal follows once that holds.
+**v0.3:** M5–M6.
+
+## Roadmap (after v0.2)
+
+- **AI actions from the UI** — UI becomes the main workspace: buttons tied to context ("Draft cut", "Redraft scene", "Alternatives for this panel", "Find filler for gap") with a text hint; local server runs Claude via the Agent SDK with the user's login, acting through the same CLI verbs; background progress, one undo per action. Later maybe a chat panel.
+- Ingest / analyze from the UI (with cost shown first).
+- Full Portugal; library across trips.
 
 ## Out of scope for v0.2
 
-- Music awareness of any kind (track selection, length fitting, beat sync)
+- Music awareness (track selection, length fitting, beat sync)
 - Voice-over and VO-script drafting
-- Speed ramps (only constant per-segment speed)
-- Talking-head / A-roll + B-roll layering; multi-track timelines
+- Speed ramps (only constant per-panel speed)
+- Talking-head / A-roll layering; multi-track timelines
 - Effects, transitions, audio mixing
-- AI model provider abstraction
-- Packaging / distribution, CI, MCP server surface
-- Resolve Studio scripting (open question)
+- Touching originals (delete / move / rename)
+- Bins / keywords / selects export
+- Learned taste profiles
+- AI model provider abstraction; packaging, CI, MCP surface; Resolve scripting
 
 ## Future / wishlist
 
-- **Music-aware cutting** — pick a track per cut, plan scene lengths to fit, beat-synced cut points
-- **Speed ramps** within a segment
-- **VO script** drafted from the storyboard, one line per scene
+- Music-aware cutting; speed ramps; VO script from the storyboard
 - Multi-NLE polish (Final Cut, Premiere, Kdenlive via OTIO)
 - Short social cuts derived from the main cut
+- Standalone "sort & tag footage" mode (the moment pool without the story)
 - Open-source release & productization

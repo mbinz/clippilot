@@ -5,6 +5,8 @@ Update this file whenever the answer to any of those questions shifts.
 
 ## Version & state
 
+**2026-11-21:** re-planned around events + scene board (see "Re-plan 2026-11-21"). Next: M2.7 analysis groundwork.
+
 `v0.1.0` — ingest (resumable) / analyze with timestamped highlights / search / summary; OTIO + FCPXML export verified in free Resolve (M1). No story/storyboard workflow yet (M3).
 Solo project, MIT. Run via `tsx`, no compiled binary.
 
@@ -38,6 +40,20 @@ one timeline per cut with scene markers.
 
 Acceptance project: `~/Video/Portugal` — 508 videos / 123 GB, Sony A7C II (`C0xxx`, embedded TC)
 + GoPro (`GH01…`), 25/50/100 fps, folders `01 Flug`…`04 Lissabon`, source root has a trailing space (`Src /`).
+
+## Re-plan 2026-11-21 — events + scene board
+
+Second grilling session (after calibration rounds 0–2 and market research `docs/research/footage-logging-landscape.md`).
+Decisions — full picture in [PRD.md](PRD.md):
+- **No learned taste profile.** v1 rules from ~29 rated moments in one folder were circumstantial → profile disabled
+  (`~/.clippilot/disabled-taste-profile-v1.md`), code removal in M2.7. Calibration rounds stay as history only.
+- **No separate sort pass.** Sorting happens on the scene board while storyboarding (place = confirm, 👎 = reject,
+  hide clip). Untouched moments stay "proposed"; AI picks vs user picks are visually distinct, both exportable.
+- **Events** (footage side) vs **Scenes** (story side, per cut). Deepest folder = event; flat / loose files → recording-time
+  groups. Claude proposes the **brief**; user adjusts.
+- **v1: Claude drafts in chat, UI steers.** AI actions from the UI (Agent SDK) are the first roadmap item after v0.2.
+- **Originals never touched** (no delete/move). Next test set: `03 Arrifana` (104 clips), not full Portugal.
+- Vocabulary stays Panel (one shot slot).
 
 ## Milestones (v0.2 = M0–M4)
 
@@ -505,19 +521,53 @@ columns, review page jsdom, web type-check). Update/remove tests that encode cli
 Done when: typecheck (incl. web) + test:all green; `grep -rn "ai_quality_\|ai_editorial_" src web/src` only hits migration
 001/012; then user re-analyzes the pilot (~US$0.33) and the page shows tiers.
 
-### M2.7 — Pipeline fixes from pilot feedback (planned, not started)
-- Local camera-shake metric per highlight range (ffmpeg motion/vidstab) → drop or down-rank shaky highlights.
-- Experiment: Gemini `videoMetadata.fps` > 1 for short clips (timing precision, motion) — measure cost vs. gain.
+Round 2 (round_id 3, taste profile v1): precision 0.75, missed 0.125/clip, speed flags 0 (v1 fixed slow-mo on faces);
+2× not_highlight on plain sea surface, 1× too short. Calibration closed 2026-11-21 (3 rounds) — see re-plan.
 
-### M3 — Storyboard model + CLI  ← NEXT
-- Migration: `scenes`, cut brief, panel `intent` / `state` (filled | candidates | gap) / `speed`, panel candidates.
-- Scenes seeded from source folders.
-- CLI verbs for cut / brief / scene / panel; Claude drafts a Portugal storyboard in chat from a brief.
+### M2.7 — Analysis groundwork  ← NEXT
+Slices (each test-first, implementer; one commit per behavior):
+- **G1 Remove taste-profile learning.** Delete `core/calibration/taste-profile.ts`, profile loading in `gemini-client`,
+  `buildUserPrompt(profile)` → plain prompt, `clips.analysis_profile_version` writes (column may stay), SKILL.md "Taste
+  calibration" section → replaced by a 3-line "Review page" note. Keep verdict import / metrics / sampling (history).
+- **G2 Prompt cleanup.** System prompt: travel footage, not "Familien- und Urlaubsvideos". Example JSON lists all values
+  (`"slowmo": "none | light | strong"`). Slow-mo text: drop "Haare oder Stoff im Wind"; water only *with an event* (wave,
+  splash, animal, boat). Replace "herausragende Momente" with "brauchbare Momente für einen Reise-Montage-Film; 0 wenn
+  nichts taugt". Drop `description_de` from scenes (schema + prompt + any reader). Tests: prompt text assertions.
+- **G3 Minimum moment length.** `normalizeHighlights`: moments < 3 s are widened symmetrically to 3 s, clamped to
+  [0, duration] (shift if at an edge); clips < 3 s keep the full clip. Tests: table of cases.
+- **G4 Audio tag.** Moment gains `audio_keep: boolean` (default false) + `audio_type: ambient | speech | music | noise`
+  (default `noise`); prompt defines them (keep = sound worth hearing under/instead of music). Migration 013; repo,
+  JSON projection, review page pill. Tests as in C5/C6.
+- **G5 Files API upload.** Proxies above the inline cap (~20 MB) go through `ai.files.upload` → wait until ACTIVE →
+  `fileData` part → delete the remote file after the response (also on error). Small proxies stay inline. Injected
+  uploader for tests; real API untested (as today). Done when a > 20 MB proxy analyzes (user runs it).
+- **G6 Shake metric (spike first).** Our ffmpeg has no vidstab; candidates: `deshake`/`mestimate` motion vectors,
+  frame-difference via `signalstats`, `blurdetect`. Spike: compute per-moment score on the pilot, compare against known
+  shaky clips (#26, #30, #16 quality 👎) and steady ones; pick a method + threshold → `issues += "shake"` (measured) on
+  the moment. Spike result documented here before building.
+- **G7 Duplicate groups.** Moments from different clips whose wall-clock ranges (`recorded_at` + start/end) overlap, or
+  whose mid-frame thumbnails are near-identical (perceptual hash) within the same day → same `dup_group`. Pool shows
+  one stack. Migration + repo + JSON. Tests with synthetic clips.
+
+### M2.8 — Events
+- Migration: `events` (id, project_id, name, source `folder | time`, folder_path, sort order) + `clips.event_id`.
+- Ingest/backfill: deepest folder → event; files without a folder event (flat list, or loose next to folders) → recording-time
+  groups (gap > 45 min = new event, name "Tue 27 May, 08:34"); loose files next to folder events join the nearest event by time.
+- CLI: `events list --json`, `events rename|merge|split` (split at a clip/time). Summary groups by event.
+- Web: simple events view (name, time range, clip count, thumbnail strip; rename / merge / split).
+- Then: ingest + analyze `03 Arrifana` (104 clips, ~US$1, user runs analyze).
+
+### M3 — Storyboard model + CLI
+- Migration: `scenes` (per cut, start event), cut brief, panel `intent` / `state` (filled | candidates | gap) / `speed` /
+  `source` (ai | user), panel candidates; moment `status` (proposed | confirmed | rejected); `clips.hidden`.
+- CLI verbs for brief (Claude proposes, user adjusts) / cut / scene / panel; Claude drafts the Arrifana cut in chat.
 - Server routes for the same.
 
-### M4 — Storyboard UI
-- Scenes as rows, panels as cards; pick candidate (absorbs old "mark-best in UI"), trim in/out, speed,
-  reorder, gap list, export button.
+### M4 — Scene board UI (mockup first)
+- Moment pool per scene (by role, hero first, filler collapsed, duplicates stacked, hidden behind a link) + panel row.
+- Place (drag / pick candidate) = confirm; 👎 with reasons; hide clip; AI vs user picks visually distinct.
+- Edit scenes and panels, trim, speed 100/50/25 %; brief form; browser preview of scene / cut; export button (OTIO).
+- Replaces the standalone review page.
 
 ### M5 — Gap fillers (free) — v0.3
 - Per-gap search over own library (unused clips, other projects).
