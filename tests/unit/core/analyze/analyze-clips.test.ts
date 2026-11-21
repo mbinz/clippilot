@@ -56,7 +56,7 @@ describe('analyzeClips with highlights', () => {
     expect(clipRepo.findById(clip.id)!.analysis_status).toBe('done');
     const stored = hlRepo.findByClip(clip.id);
     expect(stored).toHaveLength(1);
-    expect(stored[0]).toMatchObject({ start_sec: 3.5, end_sec: 4.3, description: 'Wave', tier: 'hero', shot: 'wide', role: 'action' });
+    expect(stored[0]).toMatchObject({ start_sec: 1.3, end_sec: 4.3, description: 'Wave', tier: 'hero', shot: 'wide', role: 'action' });
     expect(JSON.parse(stored[0].issues)).toEqual(['shake']);
 
     const second = { analyzeVideo: async () => response([{ start_sec: 0.5, end_sec: 2, description: 'Gull', tier: 'filler', shot: 'close', role: 'detail' }]) };

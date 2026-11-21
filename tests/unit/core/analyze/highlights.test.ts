@@ -13,9 +13,9 @@ const h = (start_sec: number, end_sec: number, tier: 'hero' | 'solid' | 'filler'
 
 describe('normalizeHighlights', () => {
   it('clamps end past the clip duration', () => {
-    const out = normalizeHighlights([h(3.5, 9)], 4.3);
+    const out = normalizeHighlights([h(1, 9)], 4.3);
     expect(out).toHaveLength(1);
-    expect(out[0].start_sec).toBe(3.5);
+    expect(out[0].start_sec).toBe(1);
     expect(out[0].end_sec).toBe(4.3);
   });
 
@@ -27,7 +27,7 @@ describe('normalizeHighlights', () => {
 
   it('drops zero-length and too-short entries', () => {
     const out = normalizeHighlights([h(4, 4), h(5, 5.3), h(12.8, 20), h(1, 2)], 13.0);
-    expect(out.map((x) => [x.start_sec, x.end_sec])).toEqual([[1, 2]]);
+    expect(out.map((x) => [x.start_sec, x.end_sec])).toEqual([[0, 3]]);
   });
 
   it('drops entries entirely beyond the duration', () => {
@@ -35,15 +35,32 @@ describe('normalizeHighlights', () => {
   });
 
   it('sorts by start_sec', () => {
-    const out = normalizeHighlights([h(8, 10, 'hero'), h(1, 3, 'filler'), h(4, 6, 'solid')], 13.0);
-    expect(out.map((x) => x.start_sec)).toEqual([1, 4, 8]);
+    const out = normalizeHighlights([h(8, 11, 'hero'), h(1, 4, 'filler'), h(4.5, 7.5, 'solid')], 13.0);
+    expect(out.map((x) => x.start_sec)).toEqual([1, 4.5, 8]);
   });
 
   it('rounds to 0.01 s', () => {
-    const out = normalizeHighlights([h(1.234, 3.456)], 13.0);
+    const out = normalizeHighlights([h(1.234, 4.456)], 13.0);
     expect(out[0].start_sec).toBe(1.23);
-    expect(out[0].end_sec).toBe(3.46);
+    expect(out[0].end_sec).toBe(4.46);
   });
+});
+
+describe('normalizeHighlights minimum length', () => {
+  const table: [number, [number, number], [number, number] | null][] = [
+    [13, [1, 2], [0, 3]],
+    [13, [5, 6], [4, 7]],
+    [13, [12, 12.9], [10, 13]],
+    [13, [4, 8], [4, 8]],
+    [2.4, [0.5, 1.5], [0, 2.4]],
+    [13, [5, 5.3], null],
+  ];
+  for (const [duration, [s, e], want] of table) {
+    it(`duration ${duration}: [${s}, ${e}] -> ${want ? `[${want}]` : 'dropped'}`, () => {
+      const out = normalizeHighlights([h(s, e)], duration).map((x) => [x.start_sec, x.end_sec]);
+      expect(out).toEqual(want ? [want] : []);
+    });
+  }
 });
 
 describe('suggestedSpeed', () => {

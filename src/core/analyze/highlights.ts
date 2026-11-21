@@ -1,6 +1,7 @@
 import type { HighlightResponse, SlowmoLevel } from './schema.js';
 
 const MIN_LENGTH_SEC = 0.5;
+const MIN_MOMENT_SEC = 3;
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -27,7 +28,22 @@ export function suggestedSpeed(slowmo: SlowmoLevel, fps: number | null | undefin
   return 0.5;
 }
 
-/** Clamp to [0, duration], drop too-short entries, sort by start, round to 0.01 s, add suggested_speed. */
+/** Widen a range to MIN_MOMENT_SEC around its midpoint, shifted to stay inside [0, duration]. */
+function widen(start: number, end: number, durationSec: number): [number, number] {
+  if (end - start >= MIN_MOMENT_SEC) return [start, end];
+  if (durationSec < MIN_MOMENT_SEC) return [0, durationSec];
+  const mid = (start + end) / 2;
+  let s = mid - MIN_MOMENT_SEC / 2;
+  let e = mid + MIN_MOMENT_SEC / 2;
+  if (s < 0) [s, e] = [0, MIN_MOMENT_SEC];
+  if (e > durationSec) [s, e] = [durationSec - MIN_MOMENT_SEC, durationSec];
+  return [s, e];
+}
+
+/**
+ * Clamp to [0, duration], drop junk (< 0.5 s), widen to a 3 s minimum, sort by start, round to 0.01 s,
+ * add suggested_speed.
+ */
 export function normalizeHighlights(
   raw: HighlightResponse[],
   durationSec: number,
@@ -40,6 +56,10 @@ export function normalizeHighlights(
       end_sec: Math.min(durationSec, h.end_sec),
     }))
     .filter((h) => h.end_sec - h.start_sec >= MIN_LENGTH_SEC)
+    .map((h) => {
+      const [start_sec, end_sec] = widen(h.start_sec, h.end_sec, durationSec);
+      return { ...h, start_sec, end_sec };
+    })
     .sort((a, b) => a.start_sec - b.start_sec)
     .map((h) => {
       const slowmo = h.slowmo ?? 'none';
