@@ -6,20 +6,8 @@ import { runMigrations } from '../../db/migrations/runner.js';
 import { ProjectRepository } from '../../db/repositories/project.repository.js';
 import { EventRepository, type EventSummary } from '../../db/repositories/event.repository.js';
 import { resolveDbPath } from '../../utils/fs.js';
-import { assignEvents } from '../../core/events/index.js';
+import { assignEvents, eventJson } from '../../core/events/index.js';
 import { resolveProject } from './resolve-project.js';
-
-export function eventJson(e: EventSummary) {
-  return {
-    id: e.id,
-    name: e.name,
-    source: e.source,
-    folder_path: e.folder_path,
-    clip_count: e.clip_count,
-    start: e.start,
-    end: e.end,
-  };
-}
 
 function summaryOf(repo: EventRepository, id: number): EventSummary {
   const e = repo.findById(id)!;

@@ -5,6 +5,19 @@ import { EventRepository, type EventSummary } from '../../db/repositories/event.
 import type { Clip } from '../../types/clip.js';
 import { deriveEvents, rangeDistance, timeGroups, TIME_GAP_MS } from './derive.js';
 
+/** JSON projection of an event, shared by the CLI and the server. */
+export function eventJson(e: EventSummary) {
+  return {
+    id: e.id,
+    name: e.name,
+    source: e.source,
+    folder_path: e.folder_path,
+    clip_count: e.clip_count,
+    start: e.start,
+    end: e.end,
+  };
+}
+
 export { deriveEvents } from './derive.js';
 export type { DerivedEvent } from './derive.js';
 
