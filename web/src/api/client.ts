@@ -4,6 +4,8 @@ import type {
   Thumbnail,
   Facets,
   SimilarityCluster,
+  EventItem,
+  EventClip,
   PaginatedResponse,
   ApiResponse,
   ClipSearchParams,
@@ -89,4 +91,38 @@ export async function markBest(clusterId: number, clipId: number): Promise<void>
 
 export async function fetchSimilarByClip(clipId: number): Promise<ApiResponse<SimilarityCluster[]>> {
   return fetchJson(`${BASE}/similarity/by-clip/${clipId}`);
+}
+
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
+
+export async function fetchEvents(projectId: number): Promise<ApiResponse<EventItem[]>> {
+  return fetchJson(`${BASE}/projects/${projectId}/events`);
+}
+
+export async function fetchEventClips(eventId: number): Promise<ApiResponse<EventClip[]>> {
+  return fetchJson(`${BASE}/events/${eventId}/clips`);
+}
+
+export async function renameEvent(eventId: number, name: string): Promise<void> {
+  await fetchJson(`${BASE}/events/${eventId}`, {
+    method: 'PATCH',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function mergeEvents(targetId: number, otherIds: number[]): Promise<void> {
+  await fetchJson(`${BASE}/events/${targetId}/merge`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ other_ids: otherIds }),
+  });
+}
+
+export async function splitEvent(eventId: number, atClipId: number): Promise<void> {
+  await fetchJson(`${BASE}/events/${eventId}/split`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ at_clip_id: atClipId }),
+  });
 }

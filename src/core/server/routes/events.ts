@@ -34,6 +34,22 @@ export function createEventRoutes(db: Database.Database): Hono {
     return c.json({ data: events.listByProject(id).map(withThumbnails) });
   });
 
+  app.get('/events/:id/clips', (c) => {
+    const id = Number(c.req.param('id'));
+    if (!events.findById(id)) return c.json({ error: 'Event not found' }, 404);
+    const data = events.clipsOf(id).map((clip) => {
+      const [first] = thumbs.findByClip(clip.id);
+      return {
+        id: clip.id,
+        file_name: path.basename(clip.file_path),
+        recorded_at: clip.recorded_at,
+        duration_sec: clip.duration_sec,
+        thumbnail: first ? `/media/thumbnails/${path.basename(first.file_path)}` : null,
+      };
+    });
+    return c.json({ data });
+  });
+
   app.patch('/events/:id', async (c) => {
     const id = Number(c.req.param('id'));
     if (!events.findById(id)) return c.json({ error: 'Event not found' }, 404);

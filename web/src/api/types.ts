@@ -113,3 +113,22 @@ export interface ClipSearchParams {
   page?: number;
   per_page?: number;
 }
+
+export interface EventItem {
+  id: number;
+  name: string;
+  source: 'folder' | 'time';
+  folder_path: string | null;
+  clip_count: number;
+  start: string | null;
+  end: string | null;
+  thumbnails: string[];
+}
+
+export interface EventClip {
+  id: number;
+  file_name: string;
+  recorded_at: string | null;
+  duration_sec: number;
+  thumbnail: string | null;
+}

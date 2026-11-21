@@ -91,6 +91,20 @@ describe('Event API routes', () => {
     expect((await send('POST', `/events/${first.id}/split`, { at_clip_id: 9999 })).status).toBe(400);
   });
 
+  it('GET event clips: ordered clips with file name and thumbnail', async () => {
+    const a = add('/v/A/a.mp4', '2025-05-27T08:00:00Z');
+    const b = add('/v/A/b.mp4', '2025-05-27T08:10:00Z', 0);
+    assignEvents(db, projectId);
+    const [e] = (await json(await send('GET', `/projects/${projectId}/events`))).data;
+    const res = await send('GET', `/events/${e.id}/clips`);
+    expect(res.status).toBe(200);
+    expect((await json(res)).data).toEqual([
+      { id: a.id, file_name: 'a.mp4', recorded_at: '2025-05-27T08:00:00Z', duration_sec: 10, thumbnail: `/media/thumbnails/c${a.id}_0.jpg` },
+      { id: b.id, file_name: 'b.mp4', recorded_at: '2025-05-27T08:10:00Z', duration_sec: 10, thumbnail: null },
+    ]);
+    expect((await send('GET', '/events/999/clips')).status).toBe(404);
+  });
+
   it('unknown project -> 404', async () => {
     expect((await send('GET', '/projects/999/events')).status).toBe(404);
   });

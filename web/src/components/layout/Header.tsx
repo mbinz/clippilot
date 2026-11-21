@@ -5,8 +5,8 @@ import type { Project } from '../../api/types';
 interface HeaderProps {
   selectedProjectId: number | undefined;
   onProjectChange: (projectId: number | undefined) => void;
-  activeTab: 'browse' | 'similarity';
-  onTabChange: (tab: 'browse' | 'similarity') => void;
+  activeTab: 'browse' | 'events' | 'similarity';
+  onTabChange: (tab: 'browse' | 'events' | 'similarity') => void;
 }
 
 export function Header({ selectedProjectId, onProjectChange, activeTab, onTabChange }: HeaderProps) {
@@ -30,6 +30,16 @@ export function Header({ selectedProjectId, onProjectChange, activeTab, onTabCha
             }`}
           >
             Browse
+          </button>
+          <button
+            onClick={() => onTabChange('events')}
+            className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+              activeTab === 'events'
+                ? 'bg-gray-700 text-white'
+                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+            }`}
+          >
+            Events
           </button>
           <button
             onClick={() => onTabChange('similarity')}
