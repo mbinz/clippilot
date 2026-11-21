@@ -5,7 +5,8 @@ Update this file whenever the answer to any of those questions shifts.
 
 ## Version & state
 
-**2026-11-21:** re-planned around events + scene board (see "Re-plan 2026-11-21"). Next: M2.7 analysis groundwork.
+**2026-11-21:** re-planned around events + scene board (see "Re-plan 2026-11-21"). M2.7 ✅ and M2.8 ✅ (576 tests).
+Next: user ingests + analyzes `03 Arrifana` (and checks a > 20 MB proxy via Files API), then M3.
 
 `v0.1.0` — ingest (resumable) / analyze with timestamped highlights / search / summary; OTIO + FCPXML export verified in free Resolve (M1). No story/storyboard workflow yet (M3).
 Solo project, MIT. Run via `tsx`, no compiled binary.
@@ -524,7 +525,7 @@ Done when: typecheck (incl. web) + test:all green; `grep -rn "ai_quality_\|ai_ed
 Round 2 (round_id 3, taste profile v1): precision 0.75, missed 0.125/clip, speed flags 0 (v1 fixed slow-mo on faces);
 2× not_highlight on plain sea surface, 1× too short. Calibration closed 2026-11-21 (3 rounds) — see re-plan.
 
-### M2.7 — Analysis groundwork  ← NEXT
+### M2.7 — Analysis groundwork ✅ 2026-11-21 (b282c87…54f41b9, spike a2b0f2b)
 Slices (each test-first, implementer; one commit per behavior):
 - **G1 Remove taste-profile learning.** Delete `core/calibration/taste-profile.ts`, profile loading in `gemini-client`,
   `buildUserPrompt(profile)` → plain prompt, `clips.analysis_profile_version` writes (column may stay), SKILL.md "Taste
@@ -634,13 +635,28 @@ Every slice: failing test first, `npm run typecheck && npm run test:all` green, 
   moments with 👍 and no shake reason. Report a table per metric (shaky vs steady distribution) and which metric +
   threshold separates them best, with misclassifications. Planner decides before any production code.
 
-### M2.8 — Events
+### M2.8 — Events ✅ 2026-11-21 (d8b65de…462665a; code done, Arrifana run pending)
 - Migration: `events` (id, project_id, name, source `folder | time`, folder_path, sort order) + `clips.event_id`.
 - Ingest/backfill: deepest folder → event; files without a folder event (flat list, or loose next to folders) → recording-time
   groups (gap > 45 min = new event, name "Tue 27 May, 08:34"); loose files next to folder events join the nearest event by time.
 - CLI: `events list --json`, `events rename|merge|split` (split at a clip/time). Summary groups by event.
 - Web: simple events view (name, time range, clip count, thumbnail strip; rename / merge / split).
 - Then: ingest + analyze `03 Arrifana` (104 clips, ~US$1, user runs analyze).
+
+#### M2.7 / M2.8 results (2026-11-21)
+- G1–G5, G7 built by the implementer, reviewed by the planner. G5 real-API path untested — **user check:** analyze a
+  proxy > 18 MB. G7 assumes `recorded_at` = clip start; groups recompute only when `analyze` processed clips.
+- **G6 decision: no automatic `shake` issue.** Spike (`npx tsx scripts/spikes/shake-spike.ts`, pilot, read-only):
+  deshake motion/jitter/jerk overlap fully between shaky and steady (pans jitter as much as shake); YDIF tracks content;
+  only `blurdetect` mean > 9.5 had 0 false positives (recall 4/9) but sits exactly at the steady max (overfit, n=29) and
+  measures blur, not shake. Labels were weak: no verdict carried a shake reason. → Deferred: collect 5–10 explicit
+  "shake" 👎 on the M4 board, then re-test deshake jitter; maybe a provisional `blurry` flag.
+- M2.8 verified on a pilot DB copy: flat Delfine folder → one time event (33 clips, max gap 27 min); browser check of
+  the Events tab: split, rename, merge all work, no console errors.
+- Deferred from these slices: event names/times use the machine's timezone, not the footage's (Delfine shows 10:34,
+  local Portugal time was 09:34); rename field should select its text on open; incremental `assignEvents` may create a
+  second "Undated" event; `createDb` doesn't await `ensureDir` (race on a fresh dir); `calibrate sample|status` commands
+  remain but are undocumented; web UI doesn't show the audio tag or dup groups yet (M4).
 
 #### M2.8 implementation specs (planner, 2026-11-21)
 Slices E1→E5, test-first, one commit each. Migration 015 (013/014 are taken by G4/G7).
@@ -737,7 +753,7 @@ Done when: `events rebuild` on a copy of the pilot DB gives sensible events; the
 
 ## Quality / test coverage map
 
-`npm run test:all` runs 36 test files / 392 tests. State per module:
+`npm run test:all` runs 54 test files / 576 tests (2026-11-21; per-module table below predates M2.7). State per module:
 
 | Module | Source | Tests | Coverage |
 |---|---|---|---|
