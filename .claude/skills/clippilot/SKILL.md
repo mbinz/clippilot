@@ -53,6 +53,7 @@ on success. Always pass `--json` so output is parseable.
 | `clippilot search "<query>" --json [--min-tier hero|solid|filler] [--limit N]` | User asks "find me clips about X". FTS over scenes, summary, keywords, location, people. `--min-tier` keeps clips with at least one moment at or above that tier. |
 | `clippilot get-clip <id>` | User asks about one specific clip in detail (you already have its ID). |
 | `clippilot summary [--project <name>] [--top N] --json` | Overview of a project: scene hints, places, moments, best highlights. Run after analyze, before storyboarding. |
+| `clippilot events list [--project <name>] --json` | Events: clips grouped by folder (deepest folder) or by recording time (gap > 45 min). See "Events" below. |
 | `clippilot similar <id>` | User asks "what other takes of this exist" or "any duplicates of clip N". |
 | `clippilot mark-best <id> [--group <gid>]` | User picks the best take among similar clips. Defaults to all groups containing the clip. |
 | `clippilot tag <id> [-l <location>] [-t a,b,c] [--people n,m] --json` | User adds metadata. |
@@ -64,6 +65,17 @@ on success. Always pass `--json` so output is parseable.
 
 All other behavior — search, contact-sheet, get-clip, similar, mark-best,
 tag, export — is conversational and you should use it freely.
+
+## Events
+
+An **event** groups clips that were shot together: one per deepest source folder, or, for flat folders and loose
+files, a run of recordings less than 45 minutes apart (named like `Tue 27 May, 08:34`). Every clip has an `event_id`
+and `summary --json` lists `events: [{id, name, clips, duration_sec, highlights}]` in time order.
+
+- `clippilot events list --json` returns `[{id, name, source, folder_path, clip_count, start, end}]`.
+- `clippilot events rename <id> "<name>"`, `events merge <targetId> <otherId...>`, `events split <id> --at-clip <clipId>` (that clip and all later ones move to a new event) print the resulting event(s) as JSON.
+- `clippilot events rebuild [--project <name>] [--reset]` assigns events to clips that have none (ingest does this automatically); `--reset` throws away existing events and edits first.
+- Events are the user's naming. **Propose renames, merges and splits in chat; don't apply them without the user's go-ahead.**
 
 ## How to "chat with material"
 

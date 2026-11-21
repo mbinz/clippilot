@@ -28,6 +28,7 @@ export interface ProjectSummary {
   places: NameCount[];
   moments: NameCount[];
   best_highlights: SummaryHighlight[];
+  events: Array<{ id: number; name: string; clips: number; duration_sec: number; highlights: number }>;
 }
 
 interface Bucket {
@@ -89,7 +90,7 @@ export function parseScenes(json: string | null): Array<{ setting?: unknown; act
 export function buildProjectSummary(
   clips: Clip[],
   highlights: HighlightRecord[],
-  opts: { top: number },
+  opts: { top: number; events?: Array<{ id: number; name: string }> },
 ): ProjectSummary {
   const places = new NameCounter();
   const moments = new NameCounter();
@@ -117,11 +118,23 @@ export function buildProjectSummary(
     }
   }
 
+  const eventStats = new Map<number, { clips: number; duration_sec: number; highlights: number }>();
+  for (const e of opts.events ?? []) eventStats.set(e.id, { clips: 0, duration_sec: 0, highlights: 0 });
+  for (const c of clips) {
+    const st = c.event_id === null || c.event_id === undefined ? undefined : eventStats.get(c.event_id);
+    if (st) {
+      st.clips++;
+      st.duration_sec += c.duration_sec;
+    }
+  }
+
   const best: SummaryHighlight[] = [];
   for (const h of highlights) {
     const c = byId.get(h.clip_id);
     if (!c) continue;
     hints.get(c.scene_hint)!.highlights++;
+    const est = c.event_id === null || c.event_id === undefined ? undefined : eventStats.get(c.event_id);
+    if (est) est.highlights++;
     best.push({
       highlight_id: h.id,
       clip_id: h.clip_id,
@@ -154,5 +167,6 @@ export function buildProjectSummary(
     places: places.result(),
     moments: moments.result(),
     best_highlights: best.slice(0, opts.top),
+    events: (opts.events ?? []).map((e) => ({ id: e.id, name: e.name, ...eventStats.get(e.id)! })),
   };
 }

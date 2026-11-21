@@ -4,6 +4,7 @@ import { createDb } from '../../db/connection.js';
 import { runMigrations } from '../../db/migrations/runner.js';
 import { ClipRepository } from '../../db/repositories/clip.repository.js';
 import { HighlightRepository } from '../../db/repositories/highlight.repository.js';
+import { EventRepository } from '../../db/repositories/event.repository.js';
 import { ProjectRepository } from '../../db/repositories/project.repository.js';
 import { resolveDbPath } from '../../utils/fs.js';
 import { buildProjectSummary } from '../../core/summary.js';
@@ -45,7 +46,7 @@ export function registerSummaryCommand(parent: Command): void {
         const summary = buildProjectSummary(
           new ClipRepository(db).listByProject(project.id),
           new HighlightRepository(db).listByProject(project.id),
-          { top },
+          { top, events: new EventRepository(db).listByProject(project.id) },
         );
 
         if (options.json) {
@@ -59,6 +60,12 @@ export function registerSummaryCommand(parent: Command): void {
         console.log(chalk.bold('\nScene hints'));
         for (const s of summary.scene_hints) {
           console.log(`  ${s.scene_hint ?? '(none)'}: ${s.clips} clips, ${formatDuration(s.duration_sec)}, ${s.highlights} highlights`);
+        }
+        if (summary.events.length > 0) {
+          console.log(chalk.bold('\nEvents'));
+          for (const e of summary.events) {
+            console.log(`  ${e.name}: ${e.clips} clips, ${formatDuration(e.duration_sec)}, ${e.highlights} highlights`);
+          }
         }
         console.log(chalk.bold('\nPlaces'));
         for (const p of summary.places.slice(0, 10)) console.log(`  ${p.name} (${p.clips})`);
