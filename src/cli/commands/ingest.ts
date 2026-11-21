@@ -9,6 +9,7 @@ import { ProjectRepository } from '../../db/repositories/project.repository.js';
 import { ThumbnailRepository } from '../../db/repositories/thumbnail.repository.js';
 import { resolveDbPath } from '../../utils/fs.js';
 import { ingestDirectory } from '../../core/ingest/index.js';
+import { assignEvents } from '../../core/events/index.js';
 import { createProgressBar } from '../formatters/progress.js';
 import { logger } from '../../utils/logger.js';
 
@@ -67,6 +68,8 @@ export function registerIngestCommand(parent: Command): void {
         });
 
         if (barStarted) bar.stop();
+
+        assignEvents(db, project.id);
 
         console.log('');
         console.log(chalk.green(`Ingest complete for project "${projectName}"`));

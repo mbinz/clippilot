@@ -41,7 +41,7 @@ describe('migrations', () => {
     runMigrations(db);
 
     const migrations = db.prepare('SELECT * FROM _migrations ORDER BY version').all() as any[];
-    expect(migrations).toHaveLength(14);
+    expect(migrations).toHaveLength(15);
     expect(migrations[0].version).toBe(1);
     expect(migrations[1].version).toBe(2);
     expect(migrations[2].version).toBe(3);
@@ -52,6 +52,7 @@ describe('migrations', () => {
     expect(migrations[9].version).toBe(10);
     expect(migrations[10].version).toBe(11);
     expect(migrations[13].version).toBe(14);
+    expect(migrations[14].version).toBe(15);
     expect(migrations[11].version).toBe(12);
     expect(migrations[12].version).toBe(13);
   });
@@ -61,7 +62,7 @@ describe('migrations', () => {
     runMigrations(db); // should not throw
 
     const migrations = db.prepare('SELECT * FROM _migrations').all();
-    expect(migrations).toHaveLength(14);
+    expect(migrations).toHaveLength(15);
   });
 
   it('creates indexes', () => {
