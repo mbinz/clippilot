@@ -20,7 +20,7 @@ export interface RoundSummary {
 export class CalibrationRepository {
   constructor(private db: Database.Database) {}
 
-  importRound(projectId: number | null, profileVersion: number, data: VerdictExport): { round_id: number; metrics: RoundMetrics } {
+  importRound(projectId: number | null, analysisVersion: number, data: VerdictExport): { round_id: number; metrics: RoundMetrics } {
     const tx = this.db.transaction(() => {
       const findHl = this.db.prepare('SELECT * FROM highlights WHERE id = ?');
       const snapshots = new Map<number, any>();
@@ -34,7 +34,7 @@ export class CalibrationRepository {
 
       const roundId = Number(
         this.db.prepare('INSERT INTO calibration_rounds (project_id, profile_version) VALUES (?, ?)')
-          .run(projectId, profileVersion).lastInsertRowid,
+          .run(projectId, analysisVersion).lastInsertRowid,
       );
       const insHl = this.db.prepare(`INSERT INTO highlight_verdicts
         (round_id, highlight_id, clip_id, verdicts, note, start_sec, end_sec, description, tier, shot, role, suggested_speed)

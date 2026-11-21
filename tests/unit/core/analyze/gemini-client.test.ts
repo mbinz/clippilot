@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { GeminiClient } from '../../../../src/core/analyze/gemini-client.js';
+import { GeminiClient, buildRequest } from '../../../../src/core/analyze/gemini-client.js';
+import { SYSTEM_PROMPT, USER_PROMPT } from '../../../../src/core/analyze/prompts.js';
 import type { AppConfig } from '../../../../src/types/config.js';
 
 const validResponse = JSON.stringify({
@@ -49,5 +50,15 @@ describe('GeminiClient parse retries', () => {
     const client = new GeminiClient(config, generate);
     await expect(client.analyzeVideo(proxy)).rejects.toThrow(/3 attempts/);
     expect(generate).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('buildRequest', () => {
+  it('sends exactly USER_PROMPT as the text part, with no profile appended', () => {
+    const req = buildRequest('m', 'QUJD');
+    const parts = req.contents[0].parts;
+    expect(parts[0]).toEqual({ inlineData: { mimeType: 'video/mp4', data: 'QUJD' } });
+    expect(parts[1]).toEqual({ text: USER_PROMPT });
+    expect(req.config.systemInstruction).toBe(SYSTEM_PROMPT);
   });
 });

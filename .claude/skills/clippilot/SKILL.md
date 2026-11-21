@@ -85,33 +85,11 @@ For most conversational requests:
    then tell them the path. DaVinci Resolve is where the visual edit
    actually happens.
 
-## Taste calibration (before analyzing a whole project)
+## Reviewing moments
 
-Highlight selection is tuned to the user via a **taste profile**: short explicit rules in
-`~/.clippilot/taste-profile.v<N>.md` (highest N wins; `CLIPPILOT_HOME` overrides the dir), appended to
-the Gemini prompt. It is per user and carries across projects. Run a few rounds when the user starts a
-new project or says highlights don't match their taste:
-
-1. **Sample.** `clippilot calibrate sample --n 8` (prints JSON) → `clip_ids` (fresh, never-reviewed, biased to
-   hard clips: people, shaky (a moment with the `shake` issue), long, no highlights). Tell the user which clips and why (`reasons`).
-2. **Analyze with the current profile.** Confirm cost (~US$0.01/clip), then
-   `clippilot analyze --clips <ids> --force`.
-3. **Review.** `clippilot review-highlights --clips <ids> -o <abs path>` and `open` it. The user marks
-   verdicts, missed moments, notes, then clicks **Export verdicts**.
-4. **Import.** `clippilot review import <export path>` (prints JSON) → `metrics` (precision, flags, missed per
-   clip, `stop_rule_met`).
-5. **Learn — propose, don't apply.** Read the metrics and every note / missed-moment note (and
-   `get-clip` the flagged clips). Propose a **diff** to the newest profile: add, sharpen or remove
-   rules. Rules must be concrete and checkable ("people: prefer genuine laughter or reactions with eyes
-   visible; avoid mid-sentence talking"), and the profile stays short (≈ 15 rules max — merge, don't
-   pile up). **Only taste goes into the profile.** Route these elsewhere instead of writing rules:
-   camera shake (Gemini samples ~1 fps and can't see it → pipeline fix, STATUS M2.7) and sub-second
-   timing precision (trim in the storyboard).
-6. **On approval** write the next version `taste-profile.v<N+1>.md` (never edit an old version), and
-   tell the user the new version number.
-7. **Repeat** from step 1 on fresh clips. Stop when `stop_rule_met` (precision ≥ 0.8 and ≤ 0.3 missed
-   moments per reviewed clip) or after 3 rounds; then offer the full `analyze` of the project.
-   `clippilot calibrate status --json` shows the trend across rounds — show it to the user.
+`clippilot review-highlights --clips <ids> -o <abs path>` renders a review page for the given clips (thumbs up/down
+per moment, missed moments); open it for the user. `clippilot review import <export path>` stores the exported
+verdicts as history only. There is no taste profile.
 
 ## JSON shape (read once, then trust)
 

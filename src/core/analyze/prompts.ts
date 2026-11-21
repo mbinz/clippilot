@@ -42,13 +42,3 @@ slowmo: beurteile pro Moment, ob er in einem Reise-Montage-Video verlangsamt (Ze
 setting und activity: kurze englische Tags in Kleinbuchstaben (lowercase), je 1-3 Wörter (1-3 words), z.B. "marina", "open sea", "dolphin watching". Keine ganzen Sätze, wiederverwendbar über Clips hinweg.
 `;
 
-
-export interface PromptProfile {
-  version: number;
-  text: string;
-}
-
-export function buildUserPrompt(profile: PromptProfile | null): string {
-  if (!profile) return USER_PROMPT;
-  return `${USER_PROMPT}\n\nVorlieben dieses Editors (befolgen):\n${profile.text}`;
-}

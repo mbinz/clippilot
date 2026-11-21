@@ -65,18 +65,9 @@ describe('analyzeClips with highlights', () => {
     const after = hlRepo.findByClip(clip.id);
     expect(after.map((h) => h.description)).toEqual(['Gull']);
   });
-  it('stores analysis_profile_version from the client, or null when it has none', async () => {
+  it('leaves analysis_profile_version NULL (taste profiles are gone)', async () => {
     const a = insertClip();
-    const withProfile = { profileVersion: 4, analyzeVideo: async () => response([]) };
-    await analyzeClips([a], DEFAULT_CONFIG, clipRepo, () => {}, hlRepo, withProfile);
-    expect((clipRepo.findById(a.id) as any).analysis_profile_version).toBe(4);
-
-    const b = clipRepo.insert({
-      project_id: null, file_path: '/v/b.mp4', proxy_path: null, file_hash: 'h2', file_size: 10,
-      duration_sec: 4.3, resolution: null, fps: null, nb_frames: null, has_video: 1, has_audio: 1,
-      codec: null, recorded_at: null, start_timecode: null, location: null, manual_tags: null, people: null,
-    });
-    await analyzeClips([b], DEFAULT_CONFIG, clipRepo, () => {}, hlRepo, { analyzeVideo: async () => response([]) });
-    expect((clipRepo.findById(b.id) as any).analysis_profile_version).toBeNull();
+    await analyzeClips([a], DEFAULT_CONFIG, clipRepo, () => {}, hlRepo, { analyzeVideo: async () => response([]) });
+    expect((clipRepo.findById(a.id) as any).analysis_profile_version).toBeNull();
   });
 });
