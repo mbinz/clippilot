@@ -549,6 +549,91 @@ Slices (each test-first, implementer; one commit per behavior):
   whose mid-frame thumbnails are near-identical (perceptual hash) within the same day → same `dup_group`. Pool shows
   one stack. Migration + repo + JSON. Tests with synthetic clips.
 
+#### M2.7 implementation specs (planner, 2026-11-21)
+Branch: the M2.7 worktree branch. Order: A = G1→G4, B = G5 + G7, C = G6 spike (report only, no production code).
+Every slice: failing test first, `npm run typecheck && npm run test:all` green, one commit per slice.
+
+**G1 — remove taste profile**
+- Delete `src/core/calibration/taste-profile.ts` and `tests/unit/core/calibration/taste-profile.test.ts`.
+- `prompts.ts`: delete `PromptProfile` + `buildUserPrompt`; `gemini-client.ts` sends `USER_PROMPT` directly; drop the
+  `profile` ctor param and `profileVersion`. Keep the injected `generate` param.
+- `analyze/index.ts`: no longer writes `analysis_profile_version` (column stays, left NULL; `ClipRepository` keeps
+  accepting it as optional). Update `analyze-clips.test.ts` "stores analysis_profile_version" → asserts it is NULL.
+- `review-import.ts`: profile version argument becomes constant `0`.
+- SKILL.md: replace the whole "Taste calibration" section with ≤ 4 lines: `review-highlights` renders a review page for
+  given clips (👍/👎 per moment, missed moments); `review import` stores the verdicts as history only. No profile.
+- Test first: `gemini-client.test.ts` — the prompt part sent is exactly `USER_PROMPT` (capture via injected generate or a
+  spy on the parts builder; if the injected seam can't see the prompt, extract `buildRequest(base64)` and test that).
+- Done when: `grep -rn "taste-profile\|buildUserPrompt\|profileVersion" src tests .claude/skills` is empty.
+
+**G2 — prompt cleanup** (tests in `prompts.test.ts`, assert on `SYSTEM_PROMPT` / `USER_PROMPT` text)
+- SYSTEM_PROMPT: "Video-Analyse-Assistent für Reisevideos" (no "Familien-").
+- Example JSON lists every enum value: `"slowmo": "none | light | strong"` (others already do).
+- Slow-mo paragraph: remove "Haare oder Stoff im Wind"; "Wasser, Wellen" → "Wasser nur mit einem Ereignis (Welle bricht,
+  Spritzer, Tier, Boot)"; keep the rest.
+- "0 bis 5 herausragende Momente des Clips (leeres Array, wenn es keine gibt)" → "0 bis 5 brauchbare Momente für einen
+  Reise-Montage-Film (leeres Array, wenn nichts taugt)".
+- Drop `description_de`: prompt example, `SceneSchema`, `sampling.ts` parts list, `web/src/api/types.ts`,
+  `ClipDetail.tsx` (show `description_en` only), fixtures in schema/gemini-client/analyze-clips tests. Old DB rows that
+  still contain it in JSON are harmless (zod strips unknown keys on parse; readers just ignore it).
+- Assertions: prompt does not contain "Familien", "Haare", "herausragende", "description_de"; contains
+  `"none | light | strong"` and "brauchbare Momente".
+
+**G3 — minimum moment length 3 s** (`highlights.ts`, `highlights.test.ts`)
+- Pipeline: clamp to [0, duration] → drop if < 0.5 s (junk, as today) → if length < 3 s widen around the midpoint to 3 s;
+  if that crosses 0 or duration, shift to stay inside; if duration < 3 s the moment becomes [0, duration] → sort → round.
+- Table test cases (duration, in → out): (13, [1,2] → [0,3]); (13, [5,6] → [4,7]); (13, [12,12.9] → [10,13]);
+  (13, [4,8] → [4,8] unchanged); (2.4, [0.5,1.5] → [0,2.4]); (13, [5,5.3] → dropped).
+- The existing "drops zero-length and too-short entries" test expects `[[1,2]]` → becomes `[[0,3]]` (spec change, say so).
+
+**G4 — audio tag** (migration 013)
+- Schema: `audio_keep: z.boolean().default(false)`, `audio_type: z.enum(['ambient','speech','music','noise']).default('noise')`.
+- Prompt: example JSON gets `"audio_keep": false` and `"audio_type": "ambient | speech | music | noise"`; one German
+  paragraph: audio_keep = true, wenn der Originalton es wert ist, unter oder statt Musik gehört zu werden (Lachen,
+  Wellenrauschen mit Ereignis, Ansage, Live-Musik); audio_type = was hauptsächlich zu hören ist.
+- Migration `013_moment_audio.ts`: `highlights.audio_keep INTEGER NOT NULL DEFAULT 0`, `audio_type TEXT NOT NULL DEFAULT 'noise'`.
+  Register in runner. Test like `migration-012.test.ts` (columns exist, defaults on old rows).
+- `normalizeHighlights` passes both through; `HighlightRepository` insert/record; `highlightsToJson` emits
+  `audio_keep` as boolean; `review-data.ts` carries both; review page shows a pill `🔊 <type>` only when `audio_keep`.
+- Tests: schema defaults, normalize pass-through, repo round-trip (boolean ↔ 0/1), JSON projection, review-data field.
+
+**G5 — Files API for large proxies** (`gemini-client.ts`)
+- Threshold constant `INLINE_MAX_BYTES = 18 * 1024 * 1024` (headroom under the ~20 MB request cap; base64 grows 33 %, so
+  compare against raw file size × 4/3 — i.e. inline only if `Math.ceil(size/3)*4 <= INLINE_MAX_BYTES`).
+- Introduce a `VideoTransport` seam: `{ upload(path): Promise<{name, uri, mimeType}>, waitActive(name): Promise<void>,
+  remove(name): Promise<void> }`, default backed by `ai.files.upload / ai.files.get (poll every 2 s, max 120 s, throw on
+  FAILED) / ai.files.delete`. `generate` receives a part (`inlineData` or `fileData {fileUri, mimeType}`) instead of base64.
+- Large path: upload once per `analyzeVideo` call (not per retry), retries reuse the uri, `remove` in `finally`
+  (also on error; a failing remove is swallowed).
+- Tests (fake transport + fake generate): small file → inline, no upload; large file (temp file > threshold, or inject a
+  size function) → upload, waitActive, fileData part, remove called once; generate throws → remove still called;
+  waitActive throws → no generate, remove called, GeminiApiError surfaces.
+- Done when green; real-API check is the user's (note in STATUS).
+
+**G7 — duplicate groups** (migration 014, pure function + recompute after analyze)
+- Migration `014_dup_groups.ts`: `highlights.dup_group INTEGER NULL` + index.
+- Pure `assignDupGroups(moments: {id, clip_id, start_sec, end_sec, recorded_at: string|null, hash: bigint|null}[]): Map<id, group>`
+  in `src/core/similarity/dup-groups.ts`, using the existing `UnionFind`. Two moments of **different clips** join when
+  (a) both clips have `recorded_at` and the wall-clock ranges `[recorded_at+start, recorded_at+end]` overlap by ≥ 1 s, or
+  (b) both hashes exist, same local calendar day of `recorded_at`, and Hamming distance ≤ 6 (of 64). Singletons get NULL;
+  groups numbered 1..n in order of their lowest moment id.
+- Hash: 64-bit dHash (sharp: grayscale, resize 9×8, compare adjacent pixels) of the clip thumbnail whose
+  `timestamp_sec` is nearest the moment midpoint; no thumbnail → NULL. `src/core/similarity/dhash.ts`.
+- `HighlightRepository.setDupGroups(projectId, map)` (clears the project's groups first). `analyze` command recomputes for
+  the project after a run. `highlightsToJson` emits `dup_group`.
+- Tests: dup-groups table (overlap, 0.5 s overlap → no, same clip never groups, hash near/far, different day, transitive
+  chain A~B~C → one group, missing data → no group); dhash on two generated sharp images (same → 0, inverted → large);
+  repo round-trip; JSON field. Assumption to note: `recorded_at` = clip start.
+
+**G6 — shake spike (C, report only)**
+- Pilot: `~/Video/ClipPilot M2 Pilot/` (DB `.clippilot/clippilot.db`, open **read-only**; never write the DB, never touch originals).
+- For every pilot moment compute on the proxy, over [start,end]: (1) mean |motion vector| from `mestimate`
+  (via `-vf mestimate,metadata` or the `codecview`-free route that works with our build), (2) `signalstats` YDIF mean,
+  (3) `blurdetect` mean. Script under `scripts/spikes/shake-spike.ts` (committed, not wired into the CLI).
+- Label set: shaky = clips #26, #30, #16 (and any moment with a 👎 reason `shake` in calibration verdicts); steady =
+  moments with 👍 and no shake reason. Report a table per metric (shaky vs steady distribution) and which metric +
+  threshold separates them best, with misclassifications. Planner decides before any production code.
+
 ### M2.8 — Events
 - Migration: `events` (id, project_id, name, source `folder | time`, folder_path, sort order) + `clips.event_id`.
 - Ingest/backfill: deepest folder → event; files without a folder event (flat list, or loose next to folders) → recording-time
