@@ -26,7 +26,9 @@ export const USER_PROMPT = `Analysiere diesen Videoclip. Antworte als JSON mit f
       "role": "establishing | action | reaction | detail | transition",
       "issues": ["shake | blur | obstructed | overexposed | underexposed"],
       "slowmo": "none | light | strong",
-      "slowmo_reason": "Short reason in English, empty if none"
+      "slowmo_reason": "Short reason in English, empty if none",
+      "audio_keep": false,
+      "audio_type": "ambient | speech | music | noise"
     }
   ]
 }
@@ -38,6 +40,7 @@ shot: Einstellungsgröße: "wide" = Totale, Überblick über den Ort; "medium" =
 role: Funktion im Schnitt: "establishing" = zeigt Ort oder Situation zu Beginn einer Szene; "action" = Handlung oder Bewegung im Mittelpunkt; "reaction" = Reaktion oder Stimmung einer Person; "detail" = Zwischenschnitt auf ein Detail; "transition" = verbindet zwei Szenen (z.B. Schwenk, Weg, Übergang).
 issues: nur tatsächlich sichtbare Probleme in genau diesem Moment, sonst leeres Array: "shake" = verwackelt; "blur" = unscharf; "obstructed" = Sicht verdeckt (Finger, Gegenstand, Person im Bild); "overexposed" = überbelichtet; "underexposed" = unterbelichtet.
 slowmo: beurteile pro Moment, ob er in einem Reise-Montage-Video verlangsamt (Zeitlupe) besser aussähe: "none", "light" oder "strong". Ja (light) bei fließender oder schneller Bewegung mit visuellem Gewinn: Wasser nur mit einem Ereignis (Welle bricht, Spritzer, Tier, Boot), Sport und Action, sanfte Schwenks über Landschaft. "none" bei Sprache, Personen die in die Kamera sprechen, Momenten die vom Ton oder von komischem Timing in Echtzeit leben, und statischen Einstellungen. "strong" nur für kurze, schnelle Action-Spitzen. slowmo_reason: kurze englische Begründung (leer bei "none").
+audio_keep = true, wenn der Originalton es wert ist, unter oder statt Musik gehört zu werden (Lachen, Wellenrauschen mit Ereignis, Ansage, Live-Musik), sonst false. audio_type = was hauptsächlich zu hören ist: "ambient" = Umgebungsgeräusche, "speech" = Sprache, "music" = Musik, "noise" = nur Wind, Rauschen oder Störgeräusche.
 setting und activity: kurze englische Tags in Kleinbuchstaben (lowercase), je 1-3 Wörter (1-3 words), z.B. "marina", "open sea", "dolphin watching". Keine ganzen Sätze, wiederverwendbar über Clips hinweg.
 `;
 

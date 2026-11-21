@@ -16,6 +16,8 @@ export interface NormalizedHighlight {
   slowmo: SlowmoLevel;
   slowmo_reason: string;
   suggested_speed: number;
+  audio_keep: boolean;
+  audio_type: NonNullable<HighlightResponse['audio_type']>;
 }
 
 /**
@@ -74,6 +76,8 @@ export function normalizeHighlights(
         slowmo,
         slowmo_reason: h.slowmo_reason ?? '',
         suggested_speed: suggestedSpeed(slowmo, fps),
+        audio_keep: h.audio_keep ?? false,
+        audio_type: h.audio_type ?? 'noise',
       };
     });
 }

@@ -67,7 +67,7 @@ const MOMENT = { start_sec: 2.5, end_sec: 6, description: 'Wave crashes on rocks
 describe('ClipAnalysisResponseSchema highlights', () => {
   it('parses a response with highlights and defaults issues/slowmo', () => {
     const result = ClipAnalysisResponseSchema.parse({ ...VALID_RESPONSE, highlights: [MOMENT] });
-    expect(result.highlights).toEqual([{ ...MOMENT, issues: [], slowmo: 'none', slowmo_reason: '' }]);
+    expect(result.highlights).toEqual([{ ...MOMENT, issues: [], slowmo: 'none', slowmo_reason: '', audio_keep: false, audio_type: 'noise' }]);
   });
 
   it('defaults highlights to [] when missing', () => {
@@ -115,5 +115,19 @@ describe('HighlightSchema slowmo', () => {
   it('accepts light/strong and rejects other values', () => {
     expect(HighlightSchema.parse({ ...MOMENT, slowmo: 'strong', slowmo_reason: 'waves' }).slowmo).toBe('strong');
     expect(() => HighlightSchema.parse({ ...MOMENT, slowmo: 'extreme' })).toThrow();
+  });
+});
+
+describe('HighlightSchema audio tag', () => {
+  it('defaults audio_keep=false and audio_type=noise', () => {
+    const h = HighlightSchema.parse(MOMENT);
+    expect(h.audio_keep).toBe(false);
+    expect(h.audio_type).toBe('noise');
+  });
+  it('accepts every audio_type and rejects unknown ones', () => {
+    for (const audio_type of ['ambient', 'speech', 'music', 'noise']) {
+      expect(HighlightSchema.parse({ ...MOMENT, audio_keep: true, audio_type }).audio_type).toBe(audio_type);
+    }
+    expect(() => HighlightSchema.parse({ ...MOMENT, audio_type: 'silence' })).toThrow();
   });
 });

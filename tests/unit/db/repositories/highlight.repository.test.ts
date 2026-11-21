@@ -106,4 +106,15 @@ describe('HighlightRepository', () => {
     expect(a).toMatchObject({ slowmo: 'strong', slowmo_reason: 'water', suggested_speed: 0.25 });
     expect(b).toMatchObject({ slowmo: 'none', slowmo_reason: '', suggested_speed: 1 });
   });
+
+  it('round-trips audio_keep (boolean <-> 0/1) and audio_type, defaulting to 0 / noise', () => {
+    const clip = clips.insert(makeClip());
+    repo.replaceForClip(clip.id, [
+      { ...item(1, 4, 'laugh', 'hero'), audio_keep: true, audio_type: 'speech' },
+      item(5, 8, 'plain'),
+    ]);
+    const [a, b] = repo.findByClip(clip.id);
+    expect(a).toMatchObject({ audio_keep: 1, audio_type: 'speech' });
+    expect(b).toMatchObject({ audio_keep: 0, audio_type: 'noise' });
+  });
 });

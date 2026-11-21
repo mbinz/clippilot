@@ -105,7 +105,7 @@ JSON-encoded text columns:
 - There are no clip-level scores (no overall/quality/editorial numbers, no suggested use): they did not discriminate.
   Judge a clip by its moments instead.
 - `get-clip` and `search --json` carry `highlights` per clip (the moments):
-  `[{id, start_sec, end_sec, description, tier, shot, role, issues, slowmo, slowmo_reason, suggested_speed}]`
+  `[{id, start_sec, end_sec, description, tier, shot, role, issues, slowmo, slowmo_reason, suggested_speed, audio_keep, audio_type}]`
   - `tier`: `hero` (would open or anchor a scene) | `solid` (good usable shot) | `filler` (only to fill a gap)
   - `shot`: `wide` | `medium` | `close` | `detail`
   - `role`: `establishing` | `action` | `reaction` | `detail` | `transition`

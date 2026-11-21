@@ -102,3 +102,11 @@ describe('normalizeHighlights tags', () => {
     expect((out[0] as Record<string, unknown>).quality).toBeUndefined();
   });
 });
+
+describe('normalizeHighlights audio', () => {
+  it('passes audio_keep and audio_type through, defaulting to false / noise', () => {
+    const out = normalizeHighlights([{ ...h(1, 4), audio_keep: true, audio_type: 'ambient' as const }, h(6, 9)], 13);
+    expect(out[0]).toMatchObject({ audio_keep: true, audio_type: 'ambient' });
+    expect(out[1]).toMatchObject({ audio_keep: false, audio_type: 'noise' });
+  });
+});

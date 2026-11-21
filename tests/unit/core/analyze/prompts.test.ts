@@ -60,3 +60,12 @@ describe("prompt cleanup", () => {
     expect(USER_PROMPT).toContain("0 bis 5 brauchbare Momente für einen Reise-Montage-Film (leeres Array, wenn nichts taugt)");
   });
 });
+
+describe("audio tag prompt", () => {
+  it("shows audio_keep and audio_type in the example and explains them", () => {
+    expect(USER_PROMPT).toContain('"audio_keep": false');
+    expect(USER_PROMPT).toContain('"audio_type": "ambient | speech | music | noise"');
+    expect(USER_PROMPT).toMatch(/audio_keep = true, wenn der Originalton/);
+    expect(USER_PROMPT).toMatch(/audio_type = was hauptsächlich zu hören ist/);
+  });
+});

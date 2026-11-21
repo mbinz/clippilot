@@ -56,6 +56,7 @@ const STYLE = `
   .shotrole{font-size:12px;color:var(--muted)}
   .issues{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
   .issue{font-size:11px;padding:2px 8px;border-radius:999px;background:rgba(255,107,107,.12);color:var(--bad)}
+  .audio{font-size:12px;padding:2px 8px;border-radius:999px;background:rgba(124,156,255,.16);color:var(--accent);font-weight:600}
   .slowmo{font-size:12px;padding:2px 8px;border-radius:999px;background:rgba(124,156,255,.16);color:var(--accent);font-weight:600}
   .spd{font-size:12px;padding:2px 8px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer}
   .spd.on{border-color:var(--accent);color:var(--accent)}
@@ -337,6 +338,10 @@ function highlightCard(h, i) {
     top.insertBefore(badge, anchor.nextSibling);
     top.insertBefore(spd, badge.nextSibling);
     if (h.slowmo_reason) card.insertBefore(el('div', { class: 'slowwhy', text: h.slowmo_reason }), card.querySelector('.desc').nextSibling);
+  }
+  if (h.audio_keep) {
+    var top2 = card.querySelector('.h-top');
+    top2.insertBefore(el('span', { class: 'audio', text: '🔊 ' + h.audio_type, title: 'Keep the original sound' }), top2.querySelector('.thumbs'));
   }
   card.setAttribute('data-i', String(i));
   card.addEventListener('click', function () { playHighlight(i); });

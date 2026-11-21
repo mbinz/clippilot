@@ -33,6 +33,8 @@ export interface Moment {
   shot: string | null;
   role: string | null;
   issues: string[];
+  audio_keep?: boolean;
+  audio_type?: string;
 }
 
 export interface Scene {

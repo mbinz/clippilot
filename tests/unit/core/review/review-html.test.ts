@@ -11,7 +11,7 @@ const data: ReviewData = {
     clip_id: 1, file_name: 'a.mp4', file_path: '/v/a.mp4', scene_hint: 'A', duration_sec: 10,
     proxy_url: 'file:///p/a.mp4', ai_summary: 's', places: ['beach'], moments: ['surf'],
     fps: 25,
-    highlights: [{ highlight_id: 5, start_sec: 1, end_sec: 3, description: evil, tier: 'solid', shot: 'wide', role: 'action', issues: [], slowmo: 'none', slowmo_reason: '', suggested_speed: 1 }],
+    highlights: [{ highlight_id: 5, start_sec: 1, end_sec: 3, description: evil, tier: 'solid', shot: 'wide', role: 'action', issues: [], slowmo: 'none', slowmo_reason: '', suggested_speed: 1, audio_keep: true, audio_type: 'ambient' }],
   }],
 };
 
@@ -42,5 +42,10 @@ describe('renderReviewHtml', () => {
   it('is self-contained (no external resources)', () => {
     expect(html).not.toMatch(/<script[^>]+src=/);
     expect(html).not.toMatch(/<link[^>]+href=/);
+  });
+
+  it('renders a sound pill only for moments with audio_keep', () => {
+    expect(html).toContain("h.audio_keep");
+    expect(html).toContain("'🔊 ' + h.audio_type");
   });
 });

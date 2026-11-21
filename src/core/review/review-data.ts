@@ -16,6 +16,8 @@ export interface ReviewHighlight {
   slowmo: string;
   slowmo_reason: string;
   suggested_speed: number;
+  audio_keep: boolean;
+  audio_type: string;
 }
 
 export interface ReviewClip {
@@ -100,6 +102,8 @@ export function buildReviewData(
             slowmo: h.slowmo,
             slowmo_reason: h.slowmo_reason,
             suggested_speed: h.suggested_speed,
+            audio_keep: Boolean(h.audio_keep),
+            audio_type: h.audio_type,
           })),
       };
     });

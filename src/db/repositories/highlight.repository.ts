@@ -2,6 +2,7 @@ import type Database from 'better-sqlite3';
 import type { Tier } from '../../core/tiers.js';
 
 export type Shot = 'wide' | 'medium' | 'close' | 'detail';
+export type AudioType = 'ambient' | 'speech' | 'music' | 'noise';
 export type Role = 'establishing' | 'action' | 'reaction' | 'detail' | 'transition';
 
 export interface HighlightRecord {
@@ -17,6 +18,8 @@ export interface HighlightRecord {
   slowmo: 'none' | 'light' | 'strong';
   slowmo_reason: string;
   suggested_speed: number;
+  audio_keep: 0 | 1;
+  audio_type: AudioType;
   created_at: string;
 }
 
@@ -31,6 +34,8 @@ export interface InsertHighlight {
   slowmo?: 'none' | 'light' | 'strong';
   slowmo_reason?: string;
   suggested_speed?: number;
+  audio_keep?: boolean;
+  audio_type?: AudioType;
 }
 
 export class HighlightRepository {
@@ -43,7 +48,7 @@ export class HighlightRepository {
   constructor(private db: Database.Database) {
     this.stmtDelete = db.prepare('DELETE FROM highlights WHERE clip_id = ?');
     this.stmtInsert = db.prepare(
-      'INSERT INTO highlights (clip_id, start_sec, end_sec, description, tier, shot, role, issues, slowmo, slowmo_reason, suggested_speed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO highlights (clip_id, start_sec, end_sec, description, tier, shot, role, issues, slowmo, slowmo_reason, suggested_speed, audio_keep, audio_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     );
     this.stmtFindByClip = db.prepare(
       'SELECT * FROM highlights WHERE clip_id = ? ORDER BY start_sec ASC, id ASC',
@@ -63,7 +68,8 @@ export class HighlightRepository {
       for (const h of items) {
         this.stmtInsert.run(clipId, h.start_sec, h.end_sec, h.description, h.tier,
           h.shot ?? null, h.role ?? null, JSON.stringify(h.issues ?? []),
-          h.slowmo ?? 'none', h.slowmo_reason ?? '', h.suggested_speed ?? 1);
+          h.slowmo ?? 'none', h.slowmo_reason ?? '', h.suggested_speed ?? 1,
+          h.audio_keep ? 1 : 0, h.audio_type ?? 'noise');
       }
     })();
   }

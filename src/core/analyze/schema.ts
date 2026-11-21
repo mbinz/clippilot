@@ -21,6 +21,8 @@ export const HighlightSchema = z.object({
   issues: z.array(z.enum(['shake', 'blur', 'obstructed', 'overexposed', 'underexposed'])).default([]),
   slowmo: z.enum(['none', 'light', 'strong']).default('none'),
   slowmo_reason: z.string().default(''),
+  audio_keep: z.boolean().default(false),
+  audio_type: z.enum(['ambient', 'speech', 'music', 'noise']).default('noise'),
 });
 
 export type SlowmoLevel = z.infer<typeof HighlightSchema>['slowmo'];
