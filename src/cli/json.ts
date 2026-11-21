@@ -31,17 +31,18 @@ export interface HighlightJson {
   suggested_speed: number;
   audio_keep: boolean;
   audio_type: string;
+  dup_group: number | null;
 }
 
 /** DB records carry `issues` as a JSON string; the CLI emits a real array. */
 export function highlightsToJson(
-  items: Array<Omit<HighlightJson, 'issues' | 'audio_keep'> & { issues: string | string[]; audio_keep: boolean | number }>,
+  items: Array<Omit<HighlightJson, 'issues' | 'audio_keep' | 'dup_group'> & { issues: string | string[]; audio_keep: boolean | number; dup_group?: number | null }>,
 ): HighlightJson[] {
-  return items.map(({ id, start_sec, end_sec, description, tier, shot, role, issues, slowmo, slowmo_reason, suggested_speed, audio_keep, audio_type }) => ({
+  return items.map(({ id, start_sec, end_sec, description, tier, shot, role, issues, slowmo, slowmo_reason, suggested_speed, audio_keep, audio_type, dup_group }) => ({
     id, start_sec, end_sec, description, tier, shot, role,
     issues: typeof issues === 'string' ? (parseJson(issues) as string[] | null) ?? [] : issues,
     slowmo, slowmo_reason, suggested_speed,
-    audio_keep: Boolean(audio_keep), audio_type,
+    audio_keep: Boolean(audio_keep), audio_type, dup_group: dup_group ?? null,
   }));
 }
 

@@ -82,7 +82,12 @@ describe('clipToJson', () => {
   it('highlightsToJson passes slowmo fields through and exposes tier/shot/role/issues (issues parsed to an array)', () => {
     const rec = { id: 3, start_sec: 1, end_sec: 2, description: 'd', tier: 'hero', shot: 'close', role: 'reaction', issues: '["shake"]', slowmo: 'light', slowmo_reason: 'waves', suggested_speed: 0.5, audio_keep: 1, audio_type: 'ambient', clip_id: 9, created_at: 'x' };
     expect(highlightsToJson([rec])).toEqual([
-      { id: 3, start_sec: 1, end_sec: 2, description: 'd', tier: 'hero', shot: 'close', role: 'reaction', issues: ['shake'], slowmo: 'light', slowmo_reason: 'waves', suggested_speed: 0.5, audio_keep: true, audio_type: 'ambient' },
+      { id: 3, start_sec: 1, end_sec: 2, description: 'd', tier: 'hero', shot: 'close', role: 'reaction', issues: ['shake'], slowmo: 'light', slowmo_reason: 'waves', suggested_speed: 0.5, audio_keep: true, audio_type: 'ambient', dup_group: null },
     ]);
+  });
+
+  it('highlightsToJson emits dup_group', () => {
+    const rec = { id: 3, start_sec: 1, end_sec: 2, description: 'd', tier: 'hero', shot: null, role: null, issues: '[]', slowmo: 'none', slowmo_reason: '', suggested_speed: 1, audio_keep: 0, audio_type: 'noise', dup_group: 4 };
+    expect(highlightsToJson([rec])[0].dup_group).toBe(4);
   });
 });

@@ -117,4 +117,25 @@ describe('HighlightRepository', () => {
     expect(a).toMatchObject({ audio_keep: 1, audio_type: 'speech' });
     expect(b).toMatchObject({ audio_keep: 0, audio_type: 'noise' });
   });
+
+  it('setDupGroups writes groups, clears the project first, and leaves other projects alone', () => {
+    const projects = new ProjectRepository(db);
+    const p1 = projects.findOrCreate('one');
+    const p2 = projects.findOrCreate('two');
+    const c1 = clips.insert(makeClip({ project_id: p1.id }));
+    const c2 = clips.insert(makeClip({ project_id: p2.id, file_hash: 'hash-b', file_path: '/videos/b.mp4' }));
+    repo.replaceForClip(c1.id, [item(1, 2, 'a'), item(3, 4, 'b')]);
+    repo.replaceForClip(c2.id, [item(1, 2, 'c')]);
+    const [a, b] = repo.findByClip(c1.id);
+    const [c] = repo.findByClip(c2.id);
+    expect(a.dup_group).toBeNull();
+
+    repo.setDupGroups(p2.id, new Map([[c.id, 1]]));
+    repo.setDupGroups(p1.id, new Map([[a.id, 1], [b.id, 1]]));
+    expect(repo.findByClip(c1.id).map((h) => h.dup_group)).toEqual([1, 1]);
+
+    repo.setDupGroups(p1.id, new Map([[b.id, 2]]));
+    expect(repo.findByClip(c1.id).map((h) => h.dup_group)).toEqual([null, 2]);
+    expect(repo.findByClip(c2.id)[0].dup_group).toBe(1);
+  });
 });

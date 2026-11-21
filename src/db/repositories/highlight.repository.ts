@@ -20,6 +20,7 @@ export interface HighlightRecord {
   suggested_speed: number;
   audio_keep: 0 | 1;
   audio_type: AudioType;
+  dup_group: number | null;
   created_at: string;
 }
 
@@ -44,6 +45,8 @@ export class HighlightRepository {
   private stmtFindByClip: Database.Statement;
   private stmtListByProject: Database.Statement;
   private stmtListAll: Database.Statement;
+  private stmtClearDup: Database.Statement;
+  private stmtSetDup: Database.Statement;
 
   constructor(private db: Database.Database) {
     this.stmtDelete = db.prepare('DELETE FROM highlights WHERE clip_id = ?');
@@ -53,6 +56,10 @@ export class HighlightRepository {
     this.stmtFindByClip = db.prepare(
       'SELECT * FROM highlights WHERE clip_id = ? ORDER BY start_sec ASC, id ASC',
     );
+    this.stmtClearDup = db.prepare(
+      'UPDATE highlights SET dup_group = NULL WHERE clip_id IN (SELECT id FROM clips WHERE project_id = ?)',
+    );
+    this.stmtSetDup = db.prepare('UPDATE highlights SET dup_group = ? WHERE id = ?');
     this.stmtListAll = db.prepare('SELECT * FROM highlights ORDER BY clip_id ASC, start_sec ASC, id ASC');
     this.stmtListByProject = db.prepare(`
       SELECT h.* FROM highlights h
@@ -84,5 +91,13 @@ export class HighlightRepository {
 
   listAll(): HighlightRecord[] {
     return this.stmtListAll.all() as HighlightRecord[];
+  }
+
+  /** Replace the project's duplicate-group numbers (clears them first). */
+  setDupGroups(projectId: number, groups: Map<number, number>): void {
+    this.db.transaction(() => {
+      this.stmtClearDup.run(projectId);
+      for (const [id, group] of groups) this.stmtSetDup.run(group, id);
+    })();
   }
 }

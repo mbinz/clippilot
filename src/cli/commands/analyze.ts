@@ -7,6 +7,8 @@ import { ProjectRepository } from '../../db/repositories/project.repository.js';
 import { HighlightRepository } from '../../db/repositories/highlight.repository.js';
 import { resolveDbPath } from '../../utils/fs.js';
 import { loadConfig } from '../../core/config/manager.js';
+import { recomputeDupGroups } from '../../core/similarity/dup-groups.js';
+import { ThumbnailRepository } from '../../db/repositories/thumbnail.repository.js';
 import { analyzeClips } from '../../core/analyze/index.js';
 import { parseClipIds } from '../../core/calibration/sampling.js';
 import { createProgressBar } from '../formatters/progress.js';
@@ -66,6 +68,11 @@ export function registerAnalyzeCommand(parent: Command): void {
         const result = await analyzeClips(pending, config, clipRepo, (current, filename) => {
           bar.update(current, { filename });
         }, highlightRepo);
+
+        const projectIds = new Set(pending.map((c) => c.project_id).filter((id): id is number => id !== null));
+        for (const projectId of projectIds) {
+          await recomputeDupGroups(projectId, { clips: clipRepo, highlights: highlightRepo, thumbnails: new ThumbnailRepository(db) });
+        }
 
         bar.stop();
         console.log('');
