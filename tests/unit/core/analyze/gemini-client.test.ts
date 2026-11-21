@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { GeminiClient, buildRequest } from '../../../../src/core/analyze/gemini-client.js';
+import { GeminiClient, buildRequest, INLINE_MAX_BYTES, type VideoTransport } from '../../../../src/core/analyze/gemini-client.js';
 import { SYSTEM_PROMPT, USER_PROMPT } from '../../../../src/core/analyze/prompts.js';
 import type { AppConfig } from '../../../../src/types/config.js';
 
@@ -55,10 +55,101 @@ describe('GeminiClient parse retries', () => {
 
 describe('buildRequest', () => {
   it('sends exactly USER_PROMPT as the text part, with no profile appended', () => {
-    const req = buildRequest('m', 'QUJD');
+    const req = buildRequest('m', { inlineData: { mimeType: 'video/mp4', data: 'QUJD' } });
     const parts = req.contents[0].parts;
     expect(parts[0]).toEqual({ inlineData: { mimeType: 'video/mp4', data: 'QUJD' } });
     expect(parts[1]).toEqual({ text: USER_PROMPT });
     expect(req.config.systemInstruction).toBe(SYSTEM_PROMPT);
+  });
+});
+
+describe('buildRequest with a file part', () => {
+  it('passes a fileData part through', () => {
+    const part = { fileData: { fileUri: 'files/abc', mimeType: 'video/mp4' } };
+    const req = buildRequest('m', part);
+    expect(req.contents[0].parts[0]).toEqual(part);
+    expect(req.contents[0].parts[1]).toEqual({ text: USER_PROMPT });
+  });
+});
+
+describe('GeminiClient transport selection', () => {
+  let dir: string;
+  let proxy: string;
+  const config = { gemini_api_key: 'k', gemini_model: 'm' } as AppConfig;
+
+  beforeAll(() => {
+    dir = mkdtempSync(path.join(tmpdir(), 'gemini-transport-'));
+    proxy = path.join(dir, 'proxy.mp4');
+    writeFileSync(proxy, 'tiny');
+  });
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+  const fakeTransport = (): VideoTransport & {
+    upload: ReturnType<typeof vi.fn>; waitActive: ReturnType<typeof vi.fn>; remove: ReturnType<typeof vi.fn>;
+  } => ({
+    upload: vi.fn().mockResolvedValue({ name: 'files/x', uri: 'https://files/x', mimeType: 'video/mp4' }),
+    waitActive: vi.fn().mockResolvedValue(undefined),
+    remove: vi.fn().mockResolvedValue(undefined),
+  });
+  const large = async () => INLINE_MAX_BYTES; // base64 size = 4/3 of this, over the limit
+
+  it('INLINE_MAX_BYTES is 18 MiB', () => {
+    expect(INLINE_MAX_BYTES).toBe(18 * 1024 * 1024);
+  });
+
+  it('small file goes inline without upload', async () => {
+    const t = fakeTransport();
+    const generate = vi.fn().mockResolvedValue(validResponse);
+    await new GeminiClient(config, generate, t).analyzeVideo(proxy);
+    expect(t.upload).not.toHaveBeenCalled();
+    expect(generate.mock.calls[0][0]).toHaveProperty('inlineData');
+  });
+
+  it('file whose base64 size is exactly at the limit stays inline', async () => {
+    const t = fakeTransport();
+    const generate = vi.fn().mockResolvedValue(validResponse);
+    const size = async () => (INLINE_MAX_BYTES / 4) * 3;
+    await new GeminiClient(config, generate, t, size).analyzeVideo(proxy);
+    expect(t.upload).not.toHaveBeenCalled();
+  });
+
+  it('large file uploads once, waits, uses fileData, removes once', async () => {
+    const t = fakeTransport();
+    const generate = vi.fn().mockResolvedValueOnce('{"scenes": [ {').mockResolvedValueOnce(validResponse);
+    await new GeminiClient(config, generate, t, large).analyzeVideo(proxy);
+    expect(t.upload).toHaveBeenCalledTimes(1);
+    expect(t.waitActive).toHaveBeenCalledWith('files/x');
+    expect(generate).toHaveBeenCalledTimes(2);
+    for (const call of generate.mock.calls) {
+      expect(call[0]).toEqual({ fileData: { fileUri: 'https://files/x', mimeType: 'video/mp4' } });
+    }
+    expect(t.remove).toHaveBeenCalledTimes(1);
+    expect(t.remove).toHaveBeenCalledWith('files/x');
+  });
+
+  it('removes the file even when generate throws', async () => {
+    const t = fakeTransport();
+    const generate = vi.fn().mockRejectedValue(new Error('boom'));
+    await expect(new GeminiClient(config, generate, t, large).analyzeVideo(proxy)).rejects.toThrow(/boom/);
+    expect(t.remove).toHaveBeenCalledTimes(1);
+  });
+
+  it('swallows a failing remove', async () => {
+    const t = fakeTransport();
+    t.remove.mockRejectedValue(new Error('gone'));
+    const generate = vi.fn().mockResolvedValue(validResponse);
+    const result = await new GeminiClient(config, generate, t, large).analyzeVideo(proxy);
+    expect(result.clip_summary).toBe('A boat docks in a marina.');
+  });
+
+  it('waitActive failure: no generate, remove called, GeminiApiError surfaces', async () => {
+    const t = fakeTransport();
+    t.waitActive.mockRejectedValue(new Error('FAILED processing'));
+    const generate = vi.fn();
+    const p = new GeminiClient(config, generate, t, large).analyzeVideo(proxy);
+    await expect(p).rejects.toMatchObject({ name: 'GeminiApiError' });
+    await expect(new GeminiClient(config, generate, t, large).analyzeVideo(proxy)).rejects.toThrow(/FAILED processing/);
+    expect(generate).not.toHaveBeenCalled();
+    expect(t.remove).toHaveBeenCalledTimes(2);
   });
 });
