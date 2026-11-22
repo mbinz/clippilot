@@ -85,7 +85,7 @@ describe('applyDraft', () => {
     expect(tree.scenes[0].event).toMatchObject({ id: ev });
     expect(tree.scenes[0].notes).toBe('n');
     const [a, b] = tree.scenes[0].panels;
-    expect(a).toMatchObject({ state: 'filled', source: 'ai', start_sec: 1, end_sec: 5, speed: 0.5, moment_id: m[0] });
+    expect(a).toMatchObject({ state: 'filled', source: 'ai', start_sec: 2, end_sec: 4, speed: 0.5, moment_id: m[0] });
     expect(b).toMatchObject({ state: 'filled', start_sec: 7, end_sec: 9, speed: 1 });
     expect(tree.scenes[1].panels[0]).toMatchObject({ state: 'candidates', source: 'ai' });
     expect(tree.scenes[1].panels[0].candidates.map((c) => c.id)).toEqual([m[2], m[3]]);
@@ -204,5 +204,12 @@ describe('applyDraft', () => {
 
   it('rejects an unknown cut', () => {
     expect(() => t.svc.applyDraft(999, { scenes: [] }, { mode: 'append' })).toThrow(/not found/);
+  });
+
+  it('draft panels without explicit in/out/speed get the default range', () => {
+    const clip = t.addClip({ fps: 25, duration: 60 });
+    const [long] = t.addMoments(clip.id, [{ start_sec: 10, end_sec: 30, suggested_speed: 0.5 }]);
+    t.svc.applyDraft(cutId, { scenes: [{ name: 'S', panels: [{ intent: 'x', moment_id: long }] }] }, { mode: 'replace' });
+    expect(t.svc.getCut(cutId)!.scenes[0].panels[0]).toMatchObject({ start_sec: 18, end_sec: 22, speed: 1 });
   });
 });

@@ -258,6 +258,22 @@ describe('Cut API routes', () => {
       expect(h[0]).toMatchObject({ undone: false });
     });
 
+    it('unreject route restores the moment, is logged as "Undo 👎" and undoable; needs cut_id', async () => {
+      await ok('POST', `/moments/${ma[1]}/reject`, { reason: 'shake', cut_id: cutId });
+      expect((await send('POST', `/moments/${ma[1]}/unreject`, {})).status).toBe(400);
+      const r = await ok('POST', `/moments/${ma[1]}/unreject`, { cut_id: cutId });
+      expect(r.history.undo_label).toBe('Undo \u{1F44E}');
+      expect(t.db.prepare('SELECT status, reject_reason FROM highlights WHERE id = ?').get(ma[1])).toEqual({ status: 'proposed', reject_reason: null });
+      await ok('POST', `/cuts/${cutId}/undo`);
+      expect(t.db.prepare('SELECT status FROM highlights WHERE id = ?').get(ma[1])).toEqual({ status: 'rejected' });
+    });
+
+    it('scene create accepts event_id', async () => {
+      const ev = Number(t.db.prepare("INSERT INTO events (project_id, name, source) VALUES (?, 'E', 'folder')").run(t.projectId).lastInsertRowid);
+      const s = await ok('POST', `/cuts/${cutId}/scenes`, { name: 'B', event_id: ev });
+      expect(s.event_id).toBe(ev);
+    });
+
     it('undo / redo restore state and report labels; empty history is a 400', async () => {
       expect((await send('POST', `/cuts/${cutId}/undo`)).status).toBe(400);
       const panel = await ok('POST', `/scenes/${sceneId}/panels`, { intent: 'wave' });

@@ -166,7 +166,8 @@ export function createCutRoutes(db: Database.Database, options: CutRoutesOptions
     return guard(() => {
       const name = str(body.name, 'name');
       const position = body.position === undefined ? undefined : int(body.position, 'position');
-      return logged(cutId, labels.addScene(name), () => svc.addScene(cutId, name, { position }));
+      const eventId = body.event_id === undefined || body.event_id === null ? undefined : int(body.event_id, 'event_id');
+      return logged(cutId, labels.addScene(name), () => svc.addScene(cutId, name, { position, eventId }));
     })(c);
   });
 
@@ -311,6 +312,18 @@ export function createCutRoutes(db: Database.Database, options: CutRoutesOptions
       return logged(cutId, labels.reject(momentId, reason), () => {
         svc.rejectMoment(momentId, reason);
         return { id: momentId, status: 'rejected' };
+      });
+    })(c);
+  });
+
+  app.post('/moments/:id/unreject', async (c) => {
+    const body = await bodyOf(c);
+    return guard(() => {
+      const momentId = id(c);
+      const cutId = cutOf(body, svc.projectIdOfMoment(momentId));
+      return logged(cutId, labels.unreject(), () => {
+        svc.unrejectMoment(momentId);
+        return { id: momentId, status: 'proposed' };
       });
     })(c);
   });

@@ -16,6 +16,7 @@ export const labels = {
   place: (svc: StoryboardService, id: number) => `Place moment in panel ${svc.panelNo(id)}`,
   pick: (svc: StoryboardService, id: number) => `Pick candidate for panel ${svc.panelNo(id)}`,
   reject: (momentId: number, reason?: string) => (reason?.trim() ? `\u{1F44E} ${reason.trim()}` : `Reject moment ${momentId}`),
+  unreject: () => 'Undo \u{1F44E}',
   hideClip: (svc: StoryboardService, id: number) => `Hide clip ${svc.clipFileName(id)}`,
   unhideClip: (svc: StoryboardService, id: number) => `Unhide clip ${svc.clipFileName(id)}`,
   renameCut: (name: string) => `Rename cut to "${name}"`,

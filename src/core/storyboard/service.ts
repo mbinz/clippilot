@@ -7,6 +7,7 @@ import { speedAllowed } from '../analyze/highlights.js';
 import { BriefSchema, BriefStateSchema, formatIssues, type Draft } from './schema.js';
 import { applyDraft as applyDraftImpl } from './draft.js';
 import * as ops from './history.js';
+import { defaultRange } from './range.js';
 import { isTier, tierRankSql, type Tier } from '../tiers.js';
 
 export const MAIN_CUT_NAME = 'Main';
@@ -36,7 +37,7 @@ export interface CutTree {
 
 export interface AddPanelInput {
   intent?: string;
-  /** Fill from this moment (in/out/speed default to the moment's). Does not confirm the moment. */
+  /** Fill from this moment (in/out/speed default to `defaultRange`). A user-sourced panel confirms the moment. */
   momentId?: number;
   candidates?: number[];
   startSec?: number;
@@ -286,7 +287,7 @@ export class StoryboardService {
 
   // ---------- scenes ----------
 
-  addScene(cutId: number, name: string, opts: { position?: number } = {}): Scene {
+  addScene(cutId: number, name: string, opts: { position?: number; eventId?: number | null } = {}): Scene {
     if (!this.findCut(cutId)) throw new Error(`Cut ${cutId} not found`);
     return this.tx(() => {
       const ids = this.sceneIds(cutId);
@@ -294,6 +295,7 @@ export class StoryboardService {
         .run(cutId, -1_000_000, name);
       const id = Number(r.lastInsertRowid);
       this.writeOrder('scenes', this.insertAt(ids, id, opts.position));
+      if (opts.eventId !== undefined && opts.eventId !== null) this.setSceneEvent(id, opts.eventId);
       return this.scene(id);
     });
   }
@@ -339,9 +341,11 @@ export class StoryboardService {
         this.assertUsable(m);
         state = 'filled';
         clipId = m.clip_id;
-        start = input.startSec ?? m.start_sec;
-        end = input.endSec ?? m.end_sec;
-        speed = input.speed ?? m.suggested_speed;
+        const d = defaultRange(m, this.clip(m.clip_id));
+        start = input.startSec ?? d.start_sec;
+        end = input.endSec ?? d.end_sec;
+        speed = input.speed ?? d.speed;
+        if (input.source === 'user') this.confirmMoment(m.id);
       } else if (input.candidates?.length) {
         for (const id of input.candidates) this.assertUsable(this.moment(id));
         state = 'candidates';
@@ -390,7 +394,8 @@ export class StoryboardService {
     const s = round2(Math.max(0, Math.min(startSec, dur)));
     const e = round2(Math.max(0, Math.min(endSec, dur)));
     if (e - s < MIN_PANEL_SEC) throw new Error(`Trim must leave at least ${MIN_PANEL_SEC} s`);
-    this.db.prepare('UPDATE story_segments SET start_sec = ?, end_sec = ? WHERE id = ?').run(s, e, id);
+    this.db.prepare("UPDATE story_segments SET start_sec = ?, end_sec = ?, source = 'user' WHERE id = ?").run(s, e, id);
+    this.confirmPanelMoment(p);
   }
 
   setSpeed(id: number, speed: number): void {
@@ -401,7 +406,17 @@ export class StoryboardService {
       const fps = this.clip(p.clip_id).fps;
       if (!speedAllowed(speed, fps)) throw new Error(`Speed ${speed} needs a higher frame rate (clip is ${fps ?? 'unknown'} fps)`);
     }
-    this.db.prepare('UPDATE story_segments SET speed = ? WHERE id = ?').run(speed, id);
+    this.db.prepare("UPDATE story_segments SET speed = ?, source = 'user' WHERE id = ?").run(speed, id);
+    this.confirmPanelMoment(p);
+  }
+
+  private confirmMoment(momentId: number): void {
+    this.db.prepare("UPDATE highlights SET status = 'confirmed', reject_reason = NULL WHERE id = ?").run(momentId);
+  }
+
+  /** The user touched a filled panel: its moment counts as confirmed. */
+  private confirmPanelMoment(p: Panel): void {
+    if (p.moment_id !== null) this.confirmMoment(p.moment_id);
   }
 
   // ---------- moments ----------
@@ -431,11 +446,12 @@ export class StoryboardService {
     this.panel(panelId);
     const m = this.moment(momentId);
     this.assertUsable(m);
+    const d = defaultRange(m, this.clip(m.clip_id));
     this.tx(() => {
       this.db.prepare(`
         UPDATE story_segments SET state = 'filled', source = 'user', clip_id = ?, moment_id = ?,
                start_sec = ?, end_sec = ?, speed = ? WHERE id = ?
-      `).run(m.clip_id, m.id, m.start_sec, m.end_sec, m.suggested_speed, panelId);
+      `).run(m.clip_id, m.id, d.start_sec, d.end_sec, d.speed, panelId);
       this.db.prepare('DELETE FROM panel_candidates WHERE panel_id = ?').run(panelId);
       this.db.prepare("UPDATE highlights SET status = 'confirmed', reject_reason = NULL WHERE id = ?").run(momentId);
     });
@@ -453,6 +469,12 @@ export class StoryboardService {
       this.db.prepare("UPDATE highlights SET status = 'rejected', reject_reason = ? WHERE id = ?").run(reason ?? null, momentId);
       this.detachMoments([momentId]);
     });
+  }
+
+  /** Undo a rejection: the moment is proposed again (it is not re-added to any panel). */
+  unrejectMoment(momentId: number): void {
+    this.moment(momentId);
+    this.db.prepare("UPDATE highlights SET status = 'proposed', reject_reason = NULL WHERE id = ?").run(momentId);
   }
 
   hideClip(clipId: number): void {

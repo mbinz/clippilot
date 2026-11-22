@@ -30,7 +30,7 @@ describe('cutToSegments', () => {
     const { segments, skipped_gaps } = cutToSegments(t.db, cutId);
     expect(skipped_gaps).toBe(1);
     expect(segments.map((s) => [s.position, s.clip_id, s.start_sec, s.end_sec, s.speed, s.scene_name])).toEqual([
-      [1, a, 2, 6, 0.5, 'Arrival'],
+      [1, a, 3, 5, 0.5, 'Arrival'],
       [2, a, 10, 14, 1, null],
       [3, b, 1, 4, 1, 'Beach'],
     ]);
@@ -43,6 +43,14 @@ describe('cutToSegments', () => {
     const { segments, skipped_gaps } = cutToSegments(t.db, cutId);
     expect(skipped_gaps).toBe(0);
     expect(segments.map((x) => [x.clip_id, x.start_sec, x.end_sec])).toEqual([[b, 1, 4]]);
+  });
+
+  it('a candidates panel exports the first candidate at its default range (4 s centred, gated speed)', () => {
+    const long = t.addMoments(b, [{ start_sec: 10, end_sec: 30, suggested_speed: 0.5 }]);
+    const s = t.svc.addScene(cutId, 'S');
+    t.svc.addPanel(s.id, { intent: 'pick', candidates: [long[0]] });
+    const { segments } = cutToSegments(t.db, cutId);
+    expect(segments.map((x) => [x.start_sec, x.end_sec, x.speed])).toEqual([[18, 22, 1]]);
   });
 
   it('a user trim and speed override the moment', () => {

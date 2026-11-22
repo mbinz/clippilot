@@ -3,10 +3,11 @@ import type Database from 'better-sqlite3';
 import type { Clip } from '../../types/clip.js';
 import type { ExportSegment } from '../../types/export.js';
 import { StoryboardService } from './service.js';
+import { defaultRange } from './range.js';
 
 /**
  * Flatten a cut into export segments in scene/panel order. Filled panels export their own clip/in/out/speed,
- * candidate panels their first candidate (at the moment's range and suggested speed), gaps are skipped.
+ * candidate panels their first candidate (at its default range and gated suggested speed), gaps are skipped.
  * The first segment of each scene carries the scene name (the exporters turn it into a marker).
  */
 export function cutToSegments(
@@ -35,9 +36,10 @@ export function cutToSegments(
       } else if (panel.state === 'candidates' && panel.candidates.length > 0) {
         const m = panel.candidates[0];
         clipId = m.clip_id;
-        start = m.start_sec;
-        end = m.end_sec;
-        speed = m.suggested_speed;
+        const d = defaultRange(m, { fps: (clipStmt.get(m.clip_id) as Clip).fps });
+        start = d.start_sec;
+        end = d.end_sec;
+        speed = d.speed;
       }
       if (clipId === null) {
         skipped++;

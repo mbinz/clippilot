@@ -308,8 +308,8 @@ export function registerCutCommands(parent: Command): void {
     }));
 
   // ---------- moment / moments ----------
-  parent.command('moment').description('Moment decisions')
-    .command('reject <id>')
+  const momentCmd = parent.command('moment').description('Moment decisions');
+  momentCmd.command('reject <id>')
     .description('Reject a moment (it leaves candidate lists; a panel using it becomes a gap)')
     .option('--reason <text>', 'Why')
     .option('--cut <id>', 'Cut to log the undo step on (default: Main)')
@@ -317,6 +317,15 @@ export function registerCutCommands(parent: Command): void {
       const cutId = logCutOf(svc, o.cut, svc.projectIdOfMoment(toId(id)));
       svc.command(cutId, labels.reject(toId(id), o.reason), () => svc.rejectMoment(toId(id), o.reason));
       print({ ok: true, id: toId(id), status: 'rejected' });
+    }));
+
+  momentCmd.command('unreject <id>')
+    .description('Undo a rejection: the moment is proposed again')
+    .option('--cut <id>', 'Cut to log the undo step on (default: Main)')
+    .action((id: string, o) => withSvc(({ svc }) => {
+      const cutId = logCutOf(svc, o.cut, svc.projectIdOfMoment(toId(id)));
+      svc.command(cutId, labels.unreject(), () => svc.unrejectMoment(toId(id)));
+      print({ ok: true, id: toId(id), status: 'proposed' });
     }));
 
   parent.command('moments').description('Moments for drafting')
