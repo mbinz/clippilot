@@ -54,6 +54,7 @@ on success. Always pass `--json` so output is parseable.
 | `clippilot get-clip <id>` | User asks about one specific clip in detail (you already have its ID). |
 | `clippilot summary [--project <name>] [--top N] --json` | Overview of a project: scene hints, places, moments, best highlights. Run after analyze, before storyboarding. |
 | `clippilot events list [--project <name>] --json` | Events: clips grouped by folder (deepest folder) or by recording time (gap > 45 min). See "Events" below. |
+| `clippilot cut show --json` / `cut brief` / `cut apply --file f.json` / `moments list --json` | The storyboard: brief, draft, read back. See "Storyboard" below. |
 | `clippilot similar <id>` | User asks "what other takes of this exist" or "any duplicates of clip N". |
 | `clippilot mark-best <id> [--group <gid>]` | User picks the best take among similar clips. Defaults to all groups containing the clip. |
 | `clippilot tag <id> [-l <location>] [-t a,b,c] [--people n,m] --json` | User adds metadata. |
@@ -76,6 +77,34 @@ and `summary --json` lists `events: [{id, name, clips, duration_sec, highlights}
 - `clippilot events rename <id> "<name>"`, `events merge <targetId> <otherId...>`, `events split <id> --at-clip <clipId>` (that clip and all later ones move to a new event) print the resulting event(s) as JSON.
 - `clippilot events rebuild [--project <name>] [--reset]` assigns events to clips that have none (ingest does this automatically); `--reset` throws away existing events and edits first.
 - Events are the user's naming. **Propose renames, merges and splits in chat; don't apply them without the user's go-ahead.**
+
+## Storyboard
+
+A project's film is a **Cut** made of **Scenes** (usually one per event) made of **Panels** (one shot each). A panel is
+`filled` (clip + in/out + speed), `candidates` (2-5 moments, the user picks) or `gap` (nothing fits yet).
+Commands without a cut id work on the project's cut "Main" (created on first use).
+
+Workflow:
+1. `clippilot moments list --json [--event <id>] [--min-tier solid]` for compact drafting rows (hidden clips and rejected
+   moments are left out).
+2. **Brief first.** Write `{target_sec, audience, mood, must_have:[{moment_id?, text}], ending, notes?}` to a file and run
+   `clippilot cut brief --set-file brief.json` (state `proposed`). Show it to the user and **wait for their ok**; only then
+   `clippilot cut brief --confirm`. Do not draft before the brief is confirmed.
+3. Draft JSON `{scenes:[{name, event_id?, notes?, panels:[{intent, moment_id? | candidates?: [2-5 ids], start_sec?, end_sec?, speed?}]}]}`
+   and run `clippilot cut apply --file draft.json` (add `--append` to add scenes instead of replacing). All ids are
+   validated at once; fix every reported error and re-run. Replace keeps panels the user placed.
+4. `clippilot cut show --json` to read the result back; summarise it for the user (totals, gaps).
+5. Hand off: `clippilot export --cut <id> --format otio --output <abs path>` (see the verbs table).
+
+Edit verbs: `scene add|rename|move|delete|set-event`, `panel add|move|delete|intent|trim|speed|place|pick`,
+`moment reject <id> [--reason]`, `clip hide|unhide <id>`. `panel place` and `panel pick` confirm the moment.
+
+Rules when drafting:
+- At most one member of a `dup_group` per cut.
+- Prefer `hero` and `solid` moments; use `filler` only to bridge.
+- Respect `audio_keep`: do not slow down or replace a moment whose audio matters.
+- Use `candidates` when two or three moments fit equally; leave a `gap` rather than forcing a poor shot.
+- Moments the user marked `confirmed` or placed themselves are decisions: do not move them without asking.
 
 ## How to "chat with material"
 
@@ -136,9 +165,8 @@ the AI fields and moments are populated; `pending`/`error` means they aren't yet
   leave empty cells.
 - **Originals are never touched.** Exports reference original file paths.
   Proxies and thumbnails live under `.clippilot/`.
-- **No story builder yet (M3).** "Propose a sequence" means *you* reason about
-  ordering using `get-clip` data, then call `export --clips <id,id,...>`
-  in your chosen order. Persistent cuts/scenes/panels arrive with M3.
+- **Sequences live in the Storyboard** (see above): build them with `cut apply`, not by ad-hoc `export --clips` lists.
+  `export --clips <id,id,...>` still exports whole clips in the order given.
 
 ## Notes on slow / side-effecty commands
 

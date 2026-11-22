@@ -6,6 +6,7 @@ import type { EventRecord } from '../../db/repositories/event.repository.js';
 import { speedAllowed } from '../analyze/highlights.js';
 import { BriefSchema, BriefStateSchema, formatIssues, type Draft } from './schema.js';
 import { applyDraft as applyDraftImpl } from './draft.js';
+import { isTier, tierRankSql, type Tier } from '../tiers.js';
 
 export const MAIN_CUT_NAME = 'Main';
 export const MIN_PANEL_SEC = 0.5;
@@ -41,6 +42,25 @@ export interface AddPanelInput {
   endSec?: number;
   speed?: number;
   source?: PanelSource;
+}
+
+export interface MomentRow {
+  id: number;
+  clip_id: number;
+  event_id: number | null;
+  start_sec: number;
+  end_sec: number;
+  tier: string;
+  shot: string | null;
+  role: string | null;
+  issues: string[];
+  slowmo: string;
+  suggested_speed: number;
+  audio_keep: boolean;
+  audio_type: string;
+  dup_group: number | null;
+  status: string;
+  description: string;
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -331,6 +351,26 @@ export class StoryboardService {
   }
 
   // ---------- moments ----------
+
+  /** Compact moment rows for drafting; hidden clips are excluded, rejected ones only on request. */
+  listMoments(projectId: number, opts: { eventId?: number; minTier?: Tier; includeRejected?: boolean } = {}): MomentRow[] {
+    if (opts.minTier !== undefined && !isTier(opts.minTier)) throw new Error(`Invalid tier "${opts.minTier}"`);
+    const where = ['c.project_id = ?', 'c.hidden = 0'];
+    const params: unknown[] = [projectId];
+    if (opts.eventId !== undefined) { where.push('c.event_id = ?'); params.push(opts.eventId); }
+    if (opts.minTier !== undefined) { where.push(`${tierRankSql('h.tier')} >= ${tierRankSql('?')}`); params.push(opts.minTier); }
+    if (!opts.includeRejected) where.push("h.status <> 'rejected'");
+    const rows = this.db.prepare(`
+      SELECT h.*, c.event_id FROM highlights h JOIN clips c ON c.id = h.clip_id
+      WHERE ${where.join(' AND ')} ORDER BY h.clip_id, h.start_sec, h.id
+    `).all(...params) as (HighlightRecord & { event_id: number | null })[];
+    return rows.map((h) => ({
+      id: h.id, clip_id: h.clip_id, event_id: h.event_id, start_sec: h.start_sec, end_sec: h.end_sec,
+      tier: h.tier, shot: h.shot, role: h.role, issues: JSON.parse(h.issues || '[]') as string[],
+      slowmo: h.slowmo, suggested_speed: h.suggested_speed, audio_keep: Boolean(h.audio_keep),
+      audio_type: h.audio_type, dup_group: h.dup_group, status: h.status, description: h.description,
+    }));
+  }
 
   placeMoment(panelId: number, momentId: number): void {
     this.panel(panelId);
