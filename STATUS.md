@@ -658,14 +658,22 @@ Every slice: failing test first, `npm run typecheck && npm run test:all` green, 
   second "Undated" event; `createDb` doesn't await `ensureDir` (race on a fresh dir); `calibrate sample|status` commands
   remain but are undocumented; web UI doesn't show the audio tag or dup groups yet (M4).
 
-#### K1 — Gemini key from launchctl (planner, 2026-11-22)
-The key lives in the macOS `launchctl` env; shells started by the desktop app don't inherit it, so `analyze` in a new
-working dir had no key. `loadConfig` resolution order: `GEMINI_API_KEY` env → `.clippilot/config.json` → on darwin only,
-`launchctl getenv GEMINI_API_KEY` (via `execFileSync`, trimmed; empty output, non-zero exit or missing binary → no key,
-never throws). Injectable `launchctlGetenv` param (default real) so tests never shell out; never log the value.
-Tests (new `tests/unit/core/config/manager.test.ts`, temp dir): env wins over file and launchctl; file wins over
-launchctl (launchctl not called); launchctl used when both missing; non-darwin → not called; getter throws / returns
-'' → key stays default. Done when: `analyze` from a fresh dir finds the key with no env var set.
+#### K1 — Global config (planner, 2026-11-22; replaces the launchctl fallback)
+The key was only in `~/Video/Portugal/.clippilot/config.json` (per working dir), so a new working dir had no key. A
+launchctl fallback (6543cc7) was built first but is useless — the key isn't in launchctl (`launchctl getenv` exits 0
+even when unset) — so it is **reverted** (`git revert 6543cc7`, keep its test file's env save/restore pattern).
+- Global config file: `$CLIPPILOT_HOME/config.json`, else `~/.clippilot/config.json`. `globalConfigPath()` exported.
+- `loadConfig(basePath, globalPath = globalConfigPath())` merge order (later wins): DEFAULT_CONFIG → global file →
+  project `.clippilot/config.json` → `GEMINI_API_KEY` env. Nested `proxy` / `quality_weights` merged the same way.
+  Missing files are fine; a broken JSON file throws a clear error naming the file (as today for the project file).
+  Edge: if `basePath` resolves to the home dir, project and global path are the same file — read it once.
+- `clippilot config set <key> <value>` gains `--global` (writes the global file, creates the dir, file mode 0600);
+  without it, behavior unchanged. `config get`/list unchanged.
+- Never print key values in tests or output.
+- Tests (`tests/unit/core/config/manager.test.ts`, temp dirs for both paths): global only → used; project overrides
+  global per key (key and an unrelated field); env overrides both; nested proxy merge across all three; broken global
+  JSON → error names the file; `saveConfig` global write creates dir + 0600. Plus a CLI test for `config set --global`.
+- Done when: the key moved to the global file (planner does that) and `analyze` from a fresh dir finds it.
 
 #### M2.8 implementation specs (planner, 2026-11-21)
 Slices E1→E5, test-first, one commit each. Migration 015 (013/014 are taken by G4/G7).
