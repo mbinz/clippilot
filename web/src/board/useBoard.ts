@@ -10,6 +10,8 @@ export interface Toast {
   undo: boolean;
   /** Bumps on every toast so identical texts restart the timer. */
   n: number;
+  /** Stay visible longer (long messages such as an export path). */
+  sticky?: boolean;
 }
 
 /**
@@ -26,8 +28,8 @@ export function useBoard(projectId: number | undefined) {
   const [toast, setToast] = useState<Toast | null>(null);
   const toastN = useRef(0);
 
-  const say = useCallback((text: string, undo = false) => {
-    setToast({ text, undo, n: ++toastN.current });
+  const say = useCallback((text: string, undo = false, sticky = false) => {
+    setToast({ text, undo, sticky, n: ++toastN.current });
   }, []);
 
   const reload = useCallback(async (id: number, pid: number) => {

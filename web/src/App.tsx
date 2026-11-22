@@ -5,6 +5,7 @@ import { ClipGrid } from './components/clips/ClipGrid';
 import { ClipDetail } from './components/clips/ClipDetail';
 import { EventsView } from './components/events/EventsView';
 import { SimilarityView } from './components/similarity/SimilarityView';
+import { BoardView } from './components/board/BoardView';
 import { useClips } from './hooks/useClips';
 import { useFacets } from './hooks/useFacets';
 import { useClipDetail } from './hooks/useClipDetail';
@@ -14,7 +15,7 @@ import type { Clip, ClipSearchParams } from './api/types';
 const EMPTY_FILTERS: ClipSearchParams = {};
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'browse' | 'events' | 'similarity'>('browse');
+  const [activeTab, setActiveTab] = useState<'browse' | 'events' | 'similarity' | 'board'>('browse');
   const [selectedProjectId, setSelectedProjectId] = useState<number | undefined>();
   const [filters, setFilters] = useState<ClipSearchParams>(EMPTY_FILTERS);
   const [searchText, setSearchText] = useState('');
@@ -86,6 +87,10 @@ export function App() {
         ) : activeTab === 'events' ? (
           <main className="flex-1 overflow-hidden">
             <EventsView projectId={selectedProjectId} />
+          </main>
+        ) : activeTab === 'board' ? (
+          <main className="flex-1 overflow-hidden">
+            <BoardView projectId={selectedProjectId} />
           </main>
         ) : (
           <main className="flex-1 overflow-hidden">

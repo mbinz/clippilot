@@ -1,1 +1,48 @@
 @import "tailwindcss";
+
+/* Scene board colour tokens (mockups/scene-board-v2.html). One meaning per colour:
+   focus = selection/primary, ai = AI proposed, mine = confirmed by the user, attn = needs a decision, bad = rejected/destructive. */
+@theme {
+  --color-bd-bg: #0e0f12;
+  --color-bd-s1: #16181d;
+  --color-bd-s2: #1d2026;
+  --color-bd-line: #272a31;
+  --color-bd-line2: #363a43;
+  --color-bd-text: #eceef2;
+  --color-bd-muted: #8a909c;
+  --color-bd-dim: #5d636e;
+  --color-bd-focus: #f4f5f7;
+  --color-bd-ai: #a78bfa;
+  --color-bd-mine: #34d399;
+  --color-bd-attn: #fbbf24;
+  --color-bd-bad: #f87171;
+}
+
+/* Trim handles: two stacked range inputs whose tracks ignore the pointer; only the thumbs grab. */
+.tl-range {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  background: none;
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.tl-range::-webkit-slider-runnable-track { background: transparent; }
+.tl-range::-webkit-slider-thumb {
+  pointer-events: auto;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 26px;
+  cursor: ew-resize;
+  background: transparent;
+}
+.tl-range::-moz-range-thumb {
+  pointer-events: auto;
+  width: 14px;
+  height: 26px;
+  border: 0;
+  cursor: ew-resize;
+  background: transparent;
+}
