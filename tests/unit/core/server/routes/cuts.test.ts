@@ -282,4 +282,43 @@ describe('Cut API routes', () => {
       expect((await send('GET', '/cuts/9999/history')).status).toBe(404);
     });
   });
+  describe('export', () => {
+    let exportDir: string;
+    let cutId: number;
+    let sceneId: number;
+
+    beforeEach(async () => {
+      exportDir = fs.mkdtempSync(path.join(os.tmpdir(), 'clippilot-export-'));
+      app = createCutRoutes(t.db, { basePath: exportDir });
+      cutId = (await ok('POST', `/projects/${t.projectId}/cuts`, { name: 'Main' })).id;
+      sceneId = (await ok('POST', `/cuts/${cutId}/scenes`, { name: 'Arrival' })).id;
+    });
+
+    it('writes <base>/exports/<project> \u2013 <cut>.otio and reports counts', async () => {
+      await ok('POST', `/scenes/${sceneId}/panels`, { intent: 'a', moment_id: ma[0] });
+      await ok('POST', `/scenes/${sceneId}/panels`, { intent: 'pick', candidates: [mb[0], ma[1]] });
+      await ok('POST', `/scenes/${sceneId}/panels`, { intent: 'gap' });
+      const r = await ok('POST', `/cuts/${cutId}/export`, { format: 'otio' });
+      const file = path.join(exportDir, 'exports', 'p \u2013 Main.otio');
+      expect(r).toMatchObject({ path: file, format: 'otio', clips: 2, scenes: 1, skipped_gaps: 1 });
+      const otio = JSON.parse(fs.readFileSync(file, 'utf-8'));
+      expect(otio.OTIO_SCHEMA).toMatch(/^Timeline\./);
+      expect(fs.readFileSync(file, 'utf-8')).toContain('Arrival');
+    });
+
+    it('defaults to otio and picks the most common clip rate as timeline fps', async () => {
+      await ok('POST', `/scenes/${sceneId}/panels`, { moment_id: mb[0] });
+      await ok('POST', `/scenes/${sceneId}/panels`, { moment_id: ma[0] });
+      await ok('POST', `/scenes/${sceneId}/panels`, { moment_id: ma[1] });
+      expect((await ok('POST', `/cuts/${cutId}/export`, {})).fps).toBe(60);
+    });
+
+    it('a cut without filled panels is a 400; unknown format 400; unknown cut 404', async () => {
+      await ok('POST', `/scenes/${sceneId}/panels`, { intent: 'gap' });
+      expect((await send('POST', `/cuts/${cutId}/export`, { format: 'otio' })).status).toBe(400);
+      await ok('POST', `/scenes/${sceneId}/panels`, { moment_id: ma[0] });
+      expect((await send('POST', `/cuts/${cutId}/export`, { format: 'xyz' })).status).toBe(400);
+      expect((await send('POST', '/cuts/9999/export', { format: 'otio' })).status).toBe(404);
+    });
+  });
 });

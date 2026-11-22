@@ -19,7 +19,7 @@ export function Toast({ toast, onUndo }: Props) {
   if (!toast) return null;
   return (
     <div
-      className={`fixed bottom-5 left-1/2 z-30 flex -translate-x-1/2 items-center gap-3 rounded-[10px] border border-bd-line2 bg-bd-s2 px-3.5 py-[9px] text-bd-text transition-opacity ${
+      className={`fixed bottom-5 left-1/2 z-30 flex max-w-[90vw] break-all -translate-x-1/2 items-center gap-3 rounded-[10px] border border-bd-line2 bg-bd-s2 px-3.5 py-[9px] text-bd-text transition-opacity ${
         shown ? 'opacity-100' : 'pointer-events-none opacity-0'
       }`}
     >

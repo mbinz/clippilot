@@ -34,7 +34,7 @@ export function createApp(options: ServerOptions): Hono {
   app.route('/api/facets', createFacetRoutes(db));
   app.route('/api/similarity', createSimilarityRoutes(db));
   app.route('/api', createEventRoutes(db));
-  app.route('/api', createCutRoutes(db));
+  app.route('/api', createCutRoutes(db, { basePath }));
 
   // Serve thumbnails from .clippilot/thumbnails/
   const thumbnailDir = path.resolve(basePath, '.clippilot', 'thumbnails');

@@ -9,6 +9,10 @@ import { PanelStrip } from './PanelStrip';
 import { MomentPool } from './MomentPool';
 import { PanelDrawer } from './PanelDrawer';
 import { MomentDrawer } from './MomentDrawer';
+import { BriefModal } from './BriefModal';
+import { PreviewModal, type PreviewItem } from './PreviewModal';
+import { panelMedia } from './media';
+import { exportCut } from '../../board/api';
 import { Toast } from './Toast';
 import { btnGhost, intentFrom } from './ui';
 
@@ -52,6 +56,9 @@ export function BoardView({ projectId }: Props) {
   const [momentId, setMomentId] = useState<number | null>(null);
   /** Empty/candidate panel the user selected before opening a moment: the "Place in panel N" target. */
   const [panelTarget, setPanelTarget] = useState<number | null>(null);
+  const [briefOpen, setBriefOpen] = useState(false);
+  const [preview, setPreview] = useState<PreviewItem[] | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (projectId === undefined) return;
@@ -93,8 +100,14 @@ export function BoardView({ projectId }: Props) {
   const closeDrawer = () => select({ panel: null, moment: null });
 
   // Keyboard: ⌘Z / ⇧⌘Z (not while typing), Esc closes the drawer.
-  const kb = useRef({ undo: board.undo, redo: board.redo, closeDrawer });
-  kb.current = { undo: board.undo, redo: board.redo, closeDrawer };
+  const kb = useRef({ undo: board.undo, redo: board.redo, closeDrawer, escape: () => {} });
+  kb.current = {
+    undo: board.undo,
+    redo: board.redo,
+    closeDrawer,
+    // Esc closes the topmost layer: preview, then brief, then the drawer.
+    escape: () => (preview ? setPreview(null) : briefOpen ? setBriefOpen(false) : closeDrawer()),
+  };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = document.activeElement as HTMLElement | null;
@@ -104,7 +117,7 @@ export function BoardView({ projectId }: Props) {
         if (e.shiftKey) void kb.current.redo();
         else void kb.current.undo();
       }
-      if (e.key === 'Escape') kb.current.closeDrawer();
+      if (e.key === 'Escape') kb.current.escape();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
@@ -153,6 +166,22 @@ export function BoardView({ projectId }: Props) {
     }
   };
 
+  const openPreview = (list: BoardScene[]) => {
+    setPreview(list.flatMap((s) => s.panels.map((panel) => ({ scene: s, panel, src: panelMedia(panel, momentsById).src }))));
+  };
+  const doExport = async () => {
+    if (board.cutId === null) return;
+    setExporting(true);
+    try {
+      const r = await exportCut(board.cutId, 'otio');
+      board.say(`Wrote ${r.path} \u2014 ${r.clips} clips, ${r.scenes} scene markers, ${r.skipped_gaps} gaps skipped`, false, true);
+    } catch (err) {
+      board.say(err instanceof Error ? err.message : String(err));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-bd-bg text-[13px] leading-[1.45] text-bd-text">
       <BoardToolbar
@@ -166,6 +195,10 @@ export function BoardView({ projectId }: Props) {
         onNextChoose={() => choose[0] && select({ scene: choose[0].sceneId, panel: choose[0].panelId, moment: null })}
         onUndo={board.undo}
         onRedo={board.redo}
+        onBrief={() => setBriefOpen(true)}
+        onPreview={() => openPreview(scenes)}
+        onExport={() => void doExport()}
+        exporting={exporting}
       />
 
       <div className="relative grid min-h-0 flex-1 grid-cols-[200px_minmax(0,1fr)] overflow-hidden">
@@ -192,6 +225,7 @@ export function BoardView({ projectId }: Props) {
               {scene.event?.name ?? ''} {'·'} {scene.panels.length} panels {'·'} {fmtClock(sceneLength(scene))}
             </span>
             <div className="flex-1" />
+            <button className={btnGhost} onClick={() => openPreview([scene])}>{'\u25b6'} Scene</button>
           </div>
 
           <PanelStrip
@@ -266,6 +300,20 @@ export function BoardView({ projectId }: Props) {
           )}
         </aside>
       </div>
+
+      {briefOpen && (
+        <BriefModal
+          brief={tree.brief}
+          state={tree.brief_state}
+          momentsById={momentsById}
+          onClose={() => setBriefOpen(false)}
+          onConfirm={async (b) => {
+            const r = await actions.saveBrief(b, 'confirmed');
+            if (r) setBriefOpen(false);
+          }}
+        />
+      )}
+      {preview && <PreviewModal items={preview} onClose={() => setPreview(null)} />}
 
       <Toast toast={board.toast} onUndo={() => void board.undo()} />
     </div>

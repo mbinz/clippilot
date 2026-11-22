@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { Hono, type Context } from 'hono';
 import type Database from 'better-sqlite3';
@@ -5,11 +6,18 @@ import { ProjectRepository } from '../../../db/repositories/project.repository.j
 import { ThumbnailRepository } from '../../../db/repositories/thumbnail.repository.js';
 import { StoryboardService, type PanelNode } from '../../storyboard/service.js';
 import { labels } from '../../storyboard/labels.js';
+import { cutToSegments } from '../../storyboard/export.js';
+import { exportSegments } from '../../export/index.js';
 
 type Body = Record<string, unknown>;
 
+export interface CutRoutesOptions {
+  /** Folder that holds `.clippilot` (the project folder); exports are written to `<basePath>/exports/`. */
+  basePath?: string;
+}
+
 /** Mounted at /api: storyboard (cut / scene / panel) routes, thin wrappers over StoryboardService. */
-export function createCutRoutes(db: Database.Database): Hono {
+export function createCutRoutes(db: Database.Database, options: CutRoutesOptions = {}): Hono {
   const app = new Hono();
   const svc = new StoryboardService(db);
   const projects = new ProjectRepository(db);
@@ -321,6 +329,44 @@ export function createCutRoutes(db: Database.Database): Hono {
       const clipId = id(c);
       const cutId = cutOf(body, svc.projectIdOfClip(clipId));
       return logged(cutId, labels.unhideClip(svc, clipId), () => { svc.unhideClip(clipId); return { id: clipId, hidden: false }; });
+    })(c);
+  });
+
+  // ---------- export ----------
+  app.post('/cuts/:id/export', async (c) => {
+    const cutId = id(c);
+    const tree = svc.getCut(cutId);
+    if (!tree) return c.json({ error: 'Cut not found' }, 404);
+    const body = await bodyOf(c);
+    return guard(() => {
+      const format = body.format === undefined ? 'otio' : body.format;
+      if (format !== 'otio') throw new Error(`Unsupported export format "${String(format)}" (use otio)`);
+      const { segments, skipped_gaps } = cutToSegments(db, cutId);
+      if (segments.length === 0) throw new Error(`Cut ${cutId} has no filled panels to export (${skipped_gaps} gap(s))`);
+
+      // OTIO conforms each clip to its own rate; the timeline rate is the most common clip rate.
+      const counts = new Map<number, number>();
+      for (const sg of segments) if (sg.fps > 0) counts.set(sg.fps, (counts.get(sg.fps) ?? 0) + 1);
+      const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+      if (!top) throw new Error('Could not detect frame rate from clips. Re-ingest the footage.');
+      const fps = top[0];
+
+      const res = segments.find((sg) => sg.resolution)?.resolution?.match(/^(\d+)x(\d+)$/);
+      const projectName = projects.findById(tree.cut.project_id)?.name ?? 'Project';
+      const title = `${projectName} \u2013 ${tree.cut.name}`;
+      const output = exportSegments(segments, {
+        title, fps, format: 'otio',
+        width: res ? Number(res[1]) : undefined,
+        height: res ? Number(res[2]) : undefined,
+      });
+      const dir = path.resolve(options.basePath ?? process.cwd(), 'exports');
+      fs.mkdirSync(dir, { recursive: true });
+      const file = path.join(dir, `${title.replace(/[\\/:*?"<>|]/g, '-')}.otio`);
+      fs.writeFileSync(file, output, 'utf-8');
+      return {
+        path: file, format: 'otio', fps, clips: segments.length,
+        scenes: segments.filter((sg) => sg.scene_name).length, skipped_gaps,
+      };
     })(c);
   });
 
