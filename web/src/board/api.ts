@@ -36,8 +36,8 @@ export const fetchMoments = (projectId: number) =>
 export const undoCut = (cutId: number) => call<Mutation<{ label: string }>>('POST', `/cuts/${cutId}/undo`);
 export const redoCut = (cutId: number) => call<Mutation<{ label: string }>>('POST', `/cuts/${cutId}/redo`);
 
-export const addScene = (cutId: number, name: string, position?: number) =>
-  call<Mutation<{ id: number }>>('POST', `/cuts/${cutId}/scenes`, { name, position });
+export const addScene = (cutId: number, name: string, position?: number, eventId?: number | null) =>
+  call<Mutation<{ id: number }>>('POST', `/cuts/${cutId}/scenes`, { name, position, event_id: eventId ?? undefined });
 export const renameScene = (sceneId: number, name: string) => call<Mutation>('PATCH', `/scenes/${sceneId}`, { name });
 export const moveScene = (sceneId: number, position: number) => call<Mutation>('POST', `/scenes/${sceneId}/move`, { position });
 export const deleteScene = (sceneId: number) => call<Mutation>('DELETE', `/scenes/${sceneId}`);
@@ -56,6 +56,8 @@ export const deletePanel = (panelId: number) => call<Mutation>('DELETE', `/panel
 
 export const rejectMoment = (momentId: number, cutId: number, reason: string) =>
   call<Mutation>('POST', `/moments/${momentId}/reject`, { cut_id: cutId, reason });
+export const unrejectMoment = (momentId: number, cutId: number) =>
+  call<Mutation>('POST', `/moments/${momentId}/unreject`, { cut_id: cutId });
 export const hideClip = (clipId: number, cutId: number) => call<Mutation>('POST', `/clips/${clipId}/hide`, { cut_id: cutId });
 export const unhideClip = (clipId: number, cutId: number) => call<Mutation>('POST', `/clips/${clipId}/unhide`, { cut_id: cutId });
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { BoardMoment, BoardPanel } from '../../board/types';
 import { fmtSec, panelLength, panelRange } from '../../board/logic';
 import { VideoThumb } from './VideoThumb';
@@ -16,6 +16,12 @@ interface Props {
 
 export function PanelStrip({ panels, selectedId, momentsById, onSelect, onAdd, onDropMoment }: Props) {
   const [drop, setDrop] = useState<number | 'add' | null>(null);
+  const selectedRef = useRef<HTMLDivElement>(null);
+
+  // Keep the selected panel visible (e.g. after "N to choose" jumps to a panel outside the strip's viewport).
+  useEffect(() => {
+    selectedRef.current?.scrollIntoView?.({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }, [selectedId]);
 
   const over = (key: number | 'add') => (e: React.DragEvent) => {
     e.preventDefault();
@@ -44,6 +50,7 @@ export function PanelStrip({ panels, selectedId, momentsById, onSelect, onAdd, o
         return (
           <div
             key={p.id}
+            ref={p.id === selectedId ? selectedRef : undefined}
             className="group w-[200px] flex-none cursor-pointer"
             onClick={() => onSelect(p.id)}
             onDragOver={over(p.id)}

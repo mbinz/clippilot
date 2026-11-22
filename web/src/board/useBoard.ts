@@ -117,7 +117,8 @@ export function useBoard(projectId: number | undefined) {
     dismissToast: () => setToast(null),
     undo, redo, act,
     actions: {
-      addScene: (name: string, position?: number) => act(`Add scene "${name}"`, () => api.addScene(cutId!, name, position)),
+      addScene: (name: string, position?: number, eventId?: number | null) =>
+        act(`Add scene "${name}"`, () => api.addScene(cutId!, name, position, eventId)),
       renameScene: (id: number, name: string) => act(`Rename scene to "${name}"`, () => api.renameScene(id, name)),
       moveScene: (id: number, position: number) => act('Move scene', () => api.moveScene(id, position)),
       deleteScene: (id: number, name: string) => act(`Delete scene "${name}"`, () => api.deleteScene(id)),
@@ -130,6 +131,7 @@ export function useBoard(projectId: number | undefined) {
       pickCandidate: (panelId: number, momentId: number) => act('Choose candidate', () => api.pickCandidate(panelId, momentId)),
       deletePanel: (id: number, no: number) => act(`Delete panel ${no}`, () => api.deletePanel(id)),
       rejectMoment: (id: number, reason: string) => act(`\u{1F44E} ${reason}`, () => api.rejectMoment(id, cutId!, reason)),
+      unrejectMoment: (id: number) => act('Undo \u{1F44E}', () => api.unrejectMoment(id, cutId!)),
       hideClip: (id: number, name: string) => act(`Hide clip ${name}`, () => api.hideClip(id, cutId!)),
       unhideClip: (id: number, name: string) => act(`Unhide clip ${name}`, () => api.unhideClip(id, cutId!)),
       saveBrief: (brief: Parameters<typeof api.saveBrief>[1], state: 'proposed' | 'confirmed') =>

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Header } from './components/layout/Header';
 import { FilterPanel } from './components/filters/FilterPanel';
 import { ClipGrid } from './components/clips/ClipGrid';
@@ -10,6 +10,7 @@ import { useClips } from './hooks/useClips';
 import { useFacets } from './hooks/useFacets';
 import { useClipDetail } from './hooks/useClipDetail';
 import { useDebounce } from './hooks/useDebounce';
+import { fetchProjects } from './api/client';
 import type { Clip, ClipSearchParams } from './api/types';
 
 const EMPTY_FILTERS: ClipSearchParams = {};
@@ -20,6 +21,16 @@ export function App() {
   const [filters, setFilters] = useState<ClipSearchParams>(EMPTY_FILTERS);
   const [searchText, setSearchText] = useState('');
   const [selectedClipId, setSelectedClipId] = useState<number | null>(null);
+
+  // The board needs a project: pick it automatically when there is exactly one.
+  useEffect(() => {
+    if (activeTab !== 'board' || selectedProjectId !== undefined) return;
+    let cancelled = false;
+    fetchProjects()
+      .then((res) => { if (!cancelled && res.data.length === 1) setSelectedProjectId(res.data[0].id); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [activeTab, selectedProjectId]);
 
   const debouncedSearch = useDebounce(searchText, 300);
 

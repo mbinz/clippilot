@@ -207,7 +207,7 @@ export function BoardView({ projectId }: Props) {
           selectedId={scene.id}
           onSelect={(id) => select({ scene: id, panel: null, moment: null })}
           onAdd={async () => {
-            const r = await actions.addScene('New scene', sceneIdx + 1);
+            const r = await actions.addScene('New scene', sceneIdx + 1, scene.event_id);
             if (r) select({ scene: r.id, panel: null, moment: null });
           }}
           onMove={(dir) => void actions.moveScene(scene.id, sceneIdx + dir)}
@@ -283,7 +283,6 @@ export function BoardView({ projectId }: Props) {
               sameClip={moments.filter((m) => m.clip_id === selMoment.clip_id)}
               sceneName={scene.name}
               target={placeTarget ? { no: placeTarget.scene.panels.indexOf(placeTarget.panel) + 1 } : null}
-              canUndoReject={Boolean(history.can_undo && history.undo_label && /^(\u{1F44E}|Reject moment)/u.test(history.undo_label))}
               onClose={closeDrawer}
               onPlace={() => void placeSelectedMoment(selMoment)}
               onReject={async (reason) => {
@@ -295,7 +294,7 @@ export function BoardView({ projectId }: Props) {
                 if (r) select({ moment: null });
               }}
               onUnhide={() => void actions.unhideClip(selMoment.clip_id, selMoment.clip?.file_name ?? `clip ${selMoment.clip_id}`)}
-              onUndoReject={() => void board.undo()}
+              onUndoReject={() => void actions.unrejectMoment(selMoment.id)}
             />
           )}
         </aside>

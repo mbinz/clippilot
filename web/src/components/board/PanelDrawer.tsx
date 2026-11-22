@@ -72,7 +72,7 @@ export function PanelDrawer(p: Props) {
         <div className="mt-2.5 flex items-center gap-2 text-xs text-bd-muted">
           {panel.source === 'user'
             ? <><span className={tagMine}>YOURS</span> confirmed</>
-            : <><span className={tagAi}>AI</span> proposed {'—'} placing a moment makes it yours</>}
+            : <><span className={tagAi}>AI</span> proposed {'—'} trimming, speed or placing makes it yours</>}
         </div>
         <p className="mt-2.5 text-[12.5px] text-[#cfd3db]">{panel.moment?.description}</p>
         <div className="mt-4">

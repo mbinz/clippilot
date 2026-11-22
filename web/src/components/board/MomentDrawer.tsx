@@ -13,8 +13,6 @@ interface Props {
   sceneName: string;
   /** Empty or candidate panel the user came from: "Place in panel N". */
   target: { no: number } | null;
-  /** The last history entry is this moment's rejection, so "Undo 👎" can use the server undo. */
-  canUndoReject: boolean;
   onClose: () => void;
   onPlace: () => void;
   onReject: (reason: string) => void;
@@ -65,14 +63,7 @@ export function MomentDrawer(p: Props) {
       <div className="mt-4 flex flex-wrap gap-1.5">
         {rejected || hidden ? (
           rejected ? (
-            <button
-              className={btn}
-              disabled={!p.canUndoReject}
-              onClick={p.onUndoReject}
-              title={p.canUndoReject ? undefined : 'Use Undo in the header to restore this moment'}
-            >
-              Undo {'\u{1F44E}'}
-            </button>
+            <button className={btn} onClick={p.onUndoReject}>Undo {'\u{1F44E}'}</button>
           ) : (
             <button className={btn} onClick={p.onUnhide}>Unhide clip</button>
           )
