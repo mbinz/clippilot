@@ -931,6 +931,24 @@ Two implementer runs: **A = U1–U3 (server)**, then **B = W1–W3 (web)**. Test
 - Export button → server route `POST /api/cuts/:id/export {format:'otio'}` writing to `<project>/exports/<project> – <cut>.otio`
   (add the route in W3 with a test; reuse `cutToSegments` + OTIO writer) → toast with the path.
 
+**F1/F2 — fixes after the planner's browser check (2026-11-22)** (one run; F1 server test-first, F2 web)
+- F1a `defaultRange(moment, clip)` in `src/core/storyboard/`: speed = `suggested_speed` if `speedAllowed` for the clip's
+  fps else 1; source window = min(moment length, `PANEL_DEFAULT_SEC`=4 × speed), centred on the moment, clamped to it.
+  Used by `placeMoment` / pick, `addPanel` with a moment, draft panels without explicit in/out/speed, and the export /
+  tree fallback for candidate panels (so preview, totals and export agree). Today place stores the full moment (up to
+  21 s) and an un-gated 0.5 on 25 fps clips.
+- F1b `addPanel` with a moment marks it confirmed (like place).
+- F1c trim or speed change on a filled panel makes it `source='user'` and confirms its moment (user touched it);
+  intent edits don't.
+- F1d `unrejectMoment` (status back to proposed, reason cleared) + `POST /api/moments/:id/unreject {cut_id}` + CLI
+  `moment unreject`, all logged ("Undo 👎" label).
+- F1e `addScene` accepts `event_id` (if not already) — web passes the current scene's event.
+- F2 web: Board auto-selects the project when exactly one exists; selecting a panel (incl. via "N to choose") scrolls it
+  into view in the strip; "Undo 👎" / restore in the moment drawer uses unreject (enabled always); new scene inherits the
+  current scene's event; AI panel copy back to "trimming, speed or placing makes it yours".
+- Tests: defaultRange table (long moment → 4 s centred; slow-mo on 50 fps → 2 s source at 0.5; 0.5 suggested on 25 fps →
+  speed 1, 4 s; short moment → whole); place/addPanel/trim/speed effects; unreject route + undo; draft default range.
+
 Verification (planner): run `clippilot ui` in `~/Video/ClipPilot Arrifana` (dist built) against a **copy** first, then the real
 cut; check every interaction incl. undo/redo in the browser.
 
