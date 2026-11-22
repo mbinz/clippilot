@@ -4,6 +4,8 @@ import type { Clip } from '../../types/clip.js';
 import type { HighlightRecord } from '../../db/repositories/highlight.repository.js';
 import type { EventRecord } from '../../db/repositories/event.repository.js';
 import { speedAllowed } from '../analyze/highlights.js';
+import { BriefSchema, BriefStateSchema, formatIssues, type Draft } from './schema.js';
+import { applyDraft as applyDraftImpl } from './draft.js';
 
 export const MAIN_CUT_NAME = 'Main';
 export const MIN_PANEL_SEC = 0.5;
@@ -191,6 +193,21 @@ export class StoryboardService {
       scenes: nodes,
       totals,
     };
+  }
+
+  setBrief(cutId: number, brief: unknown, state: 'proposed' | 'confirmed'): void {
+    if (!this.findCut(cutId)) throw new Error(`Cut ${cutId} not found`);
+    const st = BriefStateSchema.safeParse(state);
+    if (!st.success) throw new Error(`Invalid brief state "${state}" (use proposed or confirmed)`);
+    const parsed = BriefSchema.safeParse(brief);
+    if (!parsed.success) throw new Error(`Invalid brief: ${formatIssues(parsed.error).join('; ')}`);
+    this.db.prepare("UPDATE stories SET brief = ?, brief_state = ?, updated_at = datetime('now') WHERE id = ?")
+      .run(JSON.stringify(parsed.data), st.data, cutId);
+  }
+
+  /** Validate and apply a draft in one transaction; throws DraftValidationError listing every problem. */
+  applyDraft(cutId: number, draft: Draft | unknown, opts: { mode: 'replace' | 'append' }): { scenes: number; panels: number } {
+    return applyDraftImpl(this.db, this, cutId, draft, opts);
   }
 
   // ---------- scenes ----------
