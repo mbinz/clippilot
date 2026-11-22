@@ -28,6 +28,7 @@ export interface Clip {
   ai_visual_keywords: string | null;
   analysis_profile_version: number | null;
   event_id: number | null;
+  hidden: number;
 }
 
 export type AnalysisStatus = 'pending' | 'analyzing' | 'done' | 'error';

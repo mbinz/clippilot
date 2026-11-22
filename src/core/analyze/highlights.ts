@@ -3,6 +3,18 @@ import type { HighlightResponse, SlowmoLevel } from './schema.js';
 const MIN_LENGTH_SEC = 0.5;
 const MIN_MOMENT_SEC = 3;
 
+/** Minimum source fps for 50 % / 25 % playback (assumes a 25 fps timeline). */
+export const MIN_FPS_HALF_SPEED = 48;
+export const MIN_FPS_QUARTER_SPEED = 90;
+
+/** Whether footage at `fps` has enough frames for playback at `speed` (1, 0.5 or 0.25). */
+export function speedAllowed(speed: number, fps: number | null | undefined): boolean {
+  if (speed === 1) return true;
+  if (speed === 0.5) return !!fps && fps >= MIN_FPS_HALF_SPEED;
+  if (speed === 0.25) return !!fps && fps >= MIN_FPS_QUARTER_SPEED;
+  return false;
+}
+
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 export interface NormalizedHighlight {
@@ -25,8 +37,8 @@ export interface NormalizedHighlight {
  * whether the footage has enough frames for it is decided here (assumes a 25 fps timeline).
  */
 export function suggestedSpeed(slowmo: SlowmoLevel, fps: number | null | undefined): number {
-  if (slowmo === 'none' || !fps || fps < 48) return 1;
-  if (slowmo === 'strong' && fps >= 90) return 0.25;
+  if (slowmo === 'none' || !fps || fps < MIN_FPS_HALF_SPEED) return 1;
+  if (slowmo === 'strong' && fps >= MIN_FPS_QUARTER_SPEED) return 0.25;
   return 0.5;
 }
 

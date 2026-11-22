@@ -21,6 +21,8 @@ export interface HighlightRecord {
   audio_keep: 0 | 1;
   audio_type: AudioType;
   dup_group: number | null;
+  status: 'proposed' | 'confirmed' | 'rejected';
+  reject_reason: string | null;
   created_at: string;
 }
 
