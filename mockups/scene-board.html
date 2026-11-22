@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scene board mockup</title>
+<!-- M4 mockup. Static, no backend. Data: scene-board.data.js (gitignored, see scripts/mockups/extract-mockup-data.ts). -->
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a; --line2:#3a4150;
+    --text:#e8eaf0; --muted:#8b93a3; --accent:#7c9cff;
+    --ai:#b48cff; --user:#3ecf8e; --bad:#ff6b6b; --warn:#ffb547;
+    --hero:#ffcf5c; --solid:#7c9cff; --filler:#6b7385;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);font:13px/1.45 -apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif;display:flex;flex-direction:column;overflow:hidden}
+  button{font:inherit;color:inherit}
+  .btn{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer;white-space:nowrap}
+  .btn:hover{border-color:var(--line2)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#0b0d12;font-weight:600}
+  .btn.ghost{background:none;border-color:transparent;color:var(--muted)}
+  .btn.ghost:hover{color:var(--text);border-color:var(--line)}
+  .btn:disabled{opacity:.35;cursor:not-allowed}
+  .pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:1px 7px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+  .muted{color:var(--muted)}
+
+  /* header */
+  header{display:flex;align-items:center;gap:14px;padding:10px 18px;border-bottom:1px solid var(--line);flex:none}
+  header h1{font-size:14px;margin:0;font-weight:600}
+  header .crumb{color:var(--muted);white-space:nowrap}
+  .brief-chip{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:5px 10px;cursor:pointer;max-width:520px}
+  .brief-chip:hover{border-color:var(--line2)}
+  .brief-chip .txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .state-dot{width:8px;height:8px;border-radius:50%;flex:none}
+  .totals{display:flex;gap:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .totals b{color:var(--text);font-weight:600}
+  .meter{width:120px;height:6px;border-radius:3px;background:var(--panel2);overflow:hidden;align-self:center}
+  .meter span{display:block;height:100%;background:var(--accent)}
+  .spacer{flex:1}
+
+  /* layout */
+  .app{flex:1;display:grid;grid-template-columns:230px minmax(0,1fr) 320px;min-height:0}
+  aside,section,.inspector{min-height:0;overflow:auto}
+  aside{border-right:1px solid var(--line);padding:14px 10px}
+  .inspector{border-left:1px solid var(--line);padding:14px 16px}
+  section{padding:16px 20px 40px}
+  h2{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 8px;font-weight:600}
+
+  /* scene outline */
+  .scene-item{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;cursor:pointer;border:1px solid transparent}
+  .scene-item:hover{background:var(--panel)}
+  .scene-item.sel{background:var(--panel2);border-color:var(--line2)}
+  .scene-item .n{width:18px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .scene-item .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .scene-item .dots{display:flex;gap:2px}
+  .scene-item .dots i{width:6px;height:6px;border-radius:2px;background:var(--line2)}
+  .scene-item .dots i.f{background:var(--accent)} .scene-item .dots i.c{background:var(--warn)} .scene-item .dots i.g{background:none;border:1px dashed var(--muted)}
+  .scene-tools{display:flex;gap:4px;margin-top:10px}
+  .legend{margin-top:22px;display:grid;gap:6px;color:var(--muted);font-size:12px}
+  .legend span{display:flex;align-items:center;gap:8px}
+  .sw{width:18px;height:12px;border-radius:3px;flex:none}
+
+  /* scene head */
+  .scene-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .scene-head h3{margin:0;font-size:17px;font-weight:600}
+  .scene-head h3[contenteditable]:focus{outline:1px solid var(--accent);border-radius:4px}
+
+  /* panel strip */
+  .strip{display:flex;gap:10px;overflow-x:auto;padding:4px 2px 12px;min-height:200px;align-items:flex-start}
+  .panel{flex:none;width:176px;border-radius:10px;background:var(--panel);border:2px solid var(--line);cursor:pointer;position:relative;transition:transform .08s}
+  .panel:hover{transform:translateY(-1px)}
+  .panel.ai{border-style:dashed;border-color:color-mix(in srgb,var(--ai) 70%,transparent)}
+  .panel.user{border-color:var(--user)}
+  .panel.sel{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 55%,transparent)}
+  .panel.drop{box-shadow:0 0 0 3px var(--accent);transform:scale(1.02)}
+  .panel .no{position:absolute;top:6px;left:6px;font-size:11px;background:#000a;padding:0 6px;border-radius:6px;font-variant-numeric:tabular-nums}
+  .panel .src{position:absolute;top:6px;right:6px;font-size:10px;font-weight:700;padding:0 6px;border-radius:6px;letter-spacing:.04em}
+  .panel.ai .src{background:var(--ai);color:#160b2b} .panel.user .src{background:var(--user);color:#07170f}
+  .panel .img{height:99px;border-radius:8px 8px 0 0;background:#000 center/cover no-repeat;position:relative}
+  .panel .speed{position:absolute;bottom:6px;left:6px;font-size:11px;background:#000b;padding:0 6px;border-radius:6px}
+  .panel .dur{position:absolute;bottom:6px;right:6px;font-size:11px;background:#000b;padding:0 6px;border-radius:6px;font-variant-numeric:tabular-nums}
+  .panel .body{padding:7px 9px 9px}
+  .panel .intent{font-size:12px;line-height:1.35;height:33px;overflow:hidden}
+  .panel .state{margin-top:5px;font-size:11px;color:var(--muted)}
+  .panel.gap{background:repeating-linear-gradient(135deg,var(--panel) 0 10px,#1a1d25 10px 20px)}
+  .panel.gap .img{background:none;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;border-bottom:1px dashed var(--line2)}
+  .cands{height:99px;display:grid;grid-template-columns:1fr 1fr;gap:2px;border-radius:8px 8px 0 0;overflow:hidden}
+  .cands div{background:#000 center/cover no-repeat;position:relative}
+  .cands div:first-child{grid-row:span 2}
+  .cands div span{position:absolute;bottom:3px;left:3px;font-size:10px;background:#000b;border-radius:4px;padding:0 4px}
+  .add-panel{flex:none;width:70px;height:150px;border:2px dashed var(--line2);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer;font-size:22px}
+  .add-panel:hover{color:var(--text);border-color:var(--muted)}
+  .add-panel.drop{border-color:var(--accent);color:var(--accent)}
+
+  /* pool */
+  .pool-head{display:flex;align-items:center;gap:10px;margin:22px 0 10px}
+  .pool-head h2{margin:0}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg button{background:none;border:0;padding:4px 10px;cursor:pointer;color:var(--muted)}
+  .seg button.on{background:var(--panel2);color:var(--text)}
+  .seg button:disabled{opacity:.3;cursor:not-allowed}
+  .role-group{margin-bottom:16px}
+  .role-group h4{margin:0 0 6px;font-size:12px;font-weight:600;color:var(--muted);display:flex;gap:8px;align-items:center}
+  .pool{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .m{background:var(--panel);border:1px solid var(--line);border-radius:9px;overflow:hidden;cursor:grab;position:relative}
+  .m:hover{border-color:var(--line2)}
+  .m .img{height:84px;background:#000 center/cover no-repeat;position:relative}
+  .m .tier{position:absolute;top:5px;left:5px;font-size:10px;font-weight:700;padding:0 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.04em}
+  .tier.hero{background:var(--hero);color:#2b1e00} .tier.solid{background:var(--solid);color:#0b0d12} .tier.filler{background:var(--filler);color:#0b0d12}
+  .m .icons{position:absolute;bottom:5px;right:5px;display:flex;gap:3px;font-size:11px}
+  .m .icons span{background:#000b;border-radius:5px;padding:0 4px}
+  .m .used{position:absolute;top:5px;right:5px;font-size:10px;background:var(--accent);color:#0b0d12;border-radius:6px;padding:0 6px;font-weight:700}
+  .m .used.u{background:var(--user)}
+  .m .desc{padding:6px 8px 4px;font-size:11.5px;line-height:1.3;height:44px;overflow:hidden;color:#cfd3dc}
+  .m .meta{padding:0 8px 7px;font-size:10.5px;color:var(--muted);display:flex;gap:6px}
+  .m .acts{position:absolute;inset:0 0 auto 0;height:84px;display:none;align-items:center;justify-content:center;gap:6px;background:#000a}
+  .m:hover .acts{display:flex}
+  .m .acts button{background:var(--panel2);border:1px solid var(--line2);border-radius:7px;padding:3px 8px;cursor:pointer;font-size:12px}
+  .m .acts button:hover{border-color:var(--text)}
+  .m.rejected{opacity:.45} .m.rejected .img{filter:grayscale(1)}
+  .m.flash{animation:flash .6s}
+  @keyframes flash{from{box-shadow:0 0 0 3px var(--user)}to{box-shadow:none}}
+  .more{font-size:12px;color:var(--accent);cursor:pointer;background:none;border:0;padding:4px 0}
+  .hidden-link{margin-top:10px}
+
+  /* inspector */
+  .insp-img{height:170px;border-radius:10px;background:#000 center/cover no-repeat;margin-bottom:10px;position:relative}
+  .field{margin:14px 0}
+  .field label{display:block;font-size:11px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em}
+  .field textarea,.field input[type=text],.field input[type=number],.field select{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:7px 9px;font:inherit}
+  .field textarea{min-height:54px;resize:vertical}
+  .trim{position:relative;height:34px;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+  .trim .sel{position:absolute;top:0;bottom:0;background:color-mix(in srgb,var(--accent) 30%,transparent);border-left:2px solid var(--accent);border-right:2px solid var(--accent)}
+  .trim .mom{position:absolute;bottom:2px;height:4px;background:var(--hero);border-radius:2px;opacity:.8}
+  .trim input{position:absolute;inset:0;width:100%;margin:0;background:none;pointer-events:none;-webkit-appearance:none;appearance:none}
+  .trim input::-webkit-slider-thumb{pointer-events:auto;-webkit-appearance:none;width:12px;height:34px;background:transparent;cursor:ew-resize}
+  .trim-lbl{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:4px;font-variant-numeric:tabular-nums}
+  .row{display:flex;gap:6px;flex-wrap:wrap}
+  .note{font-size:11.5px;color:var(--muted);margin-top:6px}
+  .cand-list{display:grid;gap:6px}
+  .cand{display:flex;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:5px;cursor:pointer}
+  .cand:hover{border-color:var(--user)}
+  .cand div{width:64px;height:38px;border-radius:5px;background:#000 center/cover no-repeat;flex:none}
+  .cand p{margin:0;font-size:11.5px;line-height:1.3;flex:1}
+  .empty-insp{color:var(--muted);margin-top:40px;text-align:center;line-height:1.7}
+
+  /* modals */
+  .modal-bg{position:fixed;inset:0;background:#000b;display:none;align-items:center;justify-content:center;z-index:20}
+  .modal-bg.on{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--line2);border-radius:14px;width:min(560px,92vw);max-height:88vh;overflow:auto;padding:20px 22px}
+  .modal h3{margin:0 0 4px;font-size:16px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .musthave{display:flex;gap:8px;align-items:center;background:var(--panel2);border-radius:8px;padding:5px 8px;margin-bottom:5px}
+  .musthave div{width:48px;height:28px;border-radius:4px;background:#000 center/cover;flex:none}
+  .musthave span{flex:1;font-size:12px}
+  .badge-ai{background:var(--ai);color:#160b2b;font-weight:700;font-size:10px;padding:1px 7px;border-radius:6px}
+  .badge-ok{background:var(--user);color:#07170f;font-weight:700;font-size:10px;padding:1px 7px;border-radius:6px}
+
+  .player{width:min(960px,94vw)}
+  .screen{aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden;position:relative}
+  .screen .frame{position:absolute;inset:0;background:center/cover no-repeat;animation:kb linear forwards}
+  @keyframes kb{from{transform:scale(1)}to{transform:scale(1.08)}}
+  .screen .title{position:absolute;left:24px;bottom:22px;font-size:22px;font-weight:600;text-shadow:0 2px 12px #000;opacity:0;transition:opacity .4s}
+  .screen .title.on{opacity:1}
+  .screen .spd{position:absolute;top:14px;right:16px;font-size:12px;background:#000a;padding:2px 8px;border-radius:6px}
+  .ptrack{display:flex;gap:2px;margin-top:10px;height:8px}
+  .ptrack span{background:var(--line2);border-radius:2px;position:relative;overflow:hidden}
+  .ptrack span i{position:absolute;inset:0;width:0;background:var(--accent)}
+  .ptrack span.gap{background:none;border:1px dashed var(--line2)}
+
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line2);padding:10px 16px;border-radius:10px;opacity:0;transition:opacity .25s;z-index:30;max-width:80vw}
+  .toast.on{opacity:1}
+  .kbd{font-size:11px;color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <h1>ClipPilot</h1>
+  <span class="crumb">03 Arrifana › Cut <b style="color:var(--text)">Main</b></span>
+  <div class="brief-chip" id="briefChip" title="Edit brief"></div>
+  <div class="spacer"></div>
+  <div class="totals" id="totals"></div>
+  <button class="btn" id="previewCut">▶ Preview cut</button>
+  <button class="btn primary" id="exportBtn">Export to Resolve</button>
+</header>
+
+<div class="app">
+  <aside>
+    <h2>Scenes</h2>
+    <div id="scenes"></div>
+    <div class="scene-tools">
+      <button class="btn ghost" id="addScene">+ Scene</button>
+      <button class="btn ghost" id="sceneUp" title="Move up">↑</button>
+      <button class="btn ghost" id="sceneDown" title="Move down">↓</button>
+      <button class="btn ghost" id="sceneDel" title="Delete scene">🗑</button>
+    </div>
+    <div class="legend">
+      <span><i class="sw" style="border:2px dashed var(--ai)"></i>AI pick (proposed)</span>
+      <span><i class="sw" style="border:2px solid var(--user)"></i>Your pick (confirmed)</span>
+      <span><i class="sw" style="background:var(--warn)"></i>Candidates — choose one</span>
+      <span><i class="sw" style="border:1px dashed var(--muted)"></i>Gap — nothing found yet</span>
+    </div>
+  </aside>
+
+  <section>
+    <div class="scene-head">
+      <h3 id="sceneName" contenteditable spellcheck="false"></h3>
+      <span class="pill" id="sceneEvent"></span>
+      <span class="pill" id="sceneDur"></span>
+      <div class="spacer"></div>
+      <button class="btn" id="previewScene">▶ Preview scene</button>
+    </div>
+    <div class="strip" id="strip"></div>
+    <div class="kbd">Drag a moment onto a panel to place it (= confirm). Drop on <b>+</b> for a new panel. Click a panel to edit it.</div>
+
+    <div class="pool-head">
+      <h2>Moment pool</h2>
+      <div class="seg" id="poolScope">
+        <button data-v="event" class="on">This scene's event</button>
+        <button data-v="all">All events</button>
+      </div>
+      <span class="muted" id="poolCount"></span>
+    </div>
+    <div id="pool"></div>
+  </section>
+
+  <div class="inspector" id="inspector"></div>
+</div>
+
+<div class="modal-bg" id="briefModal"><div class="modal" id="briefBody"></div></div>
+<div class="modal-bg" id="playerModal"><div class="modal player" id="playerBody"></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="scene-board.data.js"></script>
+<script>
+const D = window.DATA;
+const clipById = Object.fromEntries(D.clips.map(c => [c.id, c]));
+const momById = Object.fromEntries(D.moments.map(m => [m.id, m]));
+const eventById = Object.fromEntries(D.events.map(e => [e.id, e]));
+const evOf = m => clipById[m.clip_id].event_id;
+const thumb = id => D.thumbs[id] ? `url(${D.thumbs[id]})` : 'none';
+const fmt = s => { s = Math.max(0, Math.round(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+const fmt1 = s => s.toFixed(1) + ' s';
+
+/* ---------- state: a draft as Claude would write it via `cut apply` ---------- */
+const st = {
+  brief: {
+    state: 'proposed', target_sec: 150, audience: 'Family & grandparents', mood: 'Warm, sunny, playful — ocean energy',
+    must_have: [{ moment_id: 145, text: 'Dolphins next to the boat' }, { moment_id: 128, text: 'Her face when she sees them' }, { moment_id: 4, text: 'Giggling sticker face' }],
+    ending: 'Quiet evening at the house, girls with ice cream', notes: '',
+  },
+  status: {}, rejectReason: {}, hidden: new Set(),
+  sel: { scene: 0, panel: null }, poolScope: 'event', showFiller: {}, showHidden: false,
+  scenes: [],
+};
+let pid = 1;
+const P = (intent, o = {}) => ({ id: pid++, intent, source: 'ai', speed: 1, cands: [], ...o });
+// Claude trims each pick to ~4 s of timeline around the moment's middle (slowed shots use less source).
+const filled = (intent, mid, o = {}) => {
+  const m = momById[mid], speed = m.suggested_speed || 1, want = 4 * speed;
+  const mid_ = (m.start_sec + m.end_sec) / 2, len = Math.min(m.end_sec - m.start_sec, want);
+  const start = +(Math.max(m.start_sec, mid_ - len / 2)).toFixed(1);
+  return P(intent, { state: 'filled', moment_id: mid, clip_id: m.clip_id, start, end: +(start + len).toFixed(1), speed, ...o });
+};
+const cands = (intent, ids) => P(intent, { state: 'candidates', cands: ids });
+const gap = intent => P(intent, { state: 'gap' });
+
+st.scenes = [
+  { id: 1, name: 'Cliffs of Arrifana', event_id: 1, panels: [
+    filled('Open big: waves against the cliffs', 17),
+    filled('Where we are — the whole coastline', 22),
+    filled('Family at the viewpoint', 14),
+    cands('Wind in the hair, a tender moment', [15, 35, 16]),
+    filled('Girls run ahead on the path', 25),
+    filled('Through the old archway', 33, { speed: 1 }),
+  ]},
+  { id: 2, name: 'Beach day', event_id: 1, panels: [
+    filled('The beach from above', 76),
+    filled('Mum watches the little one in the waves', 47),
+    filled('Bucket and shovel', 49),
+    cands('Mum on the beach, laughing', [67, 55, 65]),
+    filled('The kiss', 62, { source: 'user' }),
+    gap('Kids jumping into a wave'),
+  ]},
+  { id: 3, name: 'Dolphin trip', event_id: 2, panels: [
+    filled('Life jacket on — getting ready', 82),
+    filled('Ready to go, smiles on the boat', 85),
+    filled('Leaving the harbour', 102),
+    filled('"Look, over there!"', 107),
+    filled('Waiting, eyes on the water', 128, { source: 'user' }),
+    filled('Two dolphins alongside', 145),
+    cands('Dolphin jumps / splashes', [139, 140, 143]),
+    filled('Kids can\'t stop laughing', 123),
+  ]},
+  { id: 4, name: 'Praia do Odeceixe', event_id: 4, panels: [
+    filled('Walking down to the beach', 151),
+    filled('Panorama of Odeceixe', 153),
+    filled('A surfer catches a wave', 156),
+    filled('Sisters build in the sand', 170),
+    filled('Mum and both girls together', 177),
+  ]},
+  { id: 5, name: 'Evening at the house', event_id: 3, panels: [
+    filled('Sticker face, giggling', 4, { source: 'user' }),
+    filled('Ice cream on the patio', 11),
+    gap('Sunset / last look at the sea'),
+  ]},
+];
+// panels placed by the user = confirmed moments
+st.scenes.forEach(s => s.panels.forEach(p => { if (p.source === 'user' && p.moment_id) st.status[p.moment_id] = 'confirmed'; }));
+
+/* ---------- helpers ---------- */
+const scene = () => st.scenes[st.sel.scene];
+const panelById = id => { for (const s of st.scenes) for (const p of s.panels) if (p.id === id) return p; return null; };
+const selPanel = () => st.sel.panel ? panelById(st.sel.panel) : null;
+const exportMoment = p => p.state === 'filled' ? momById[p.moment_id] : p.state === 'candidates' ? momById[p.cands[0]] : null;
+const panelLen = p => {
+  if (p.state === 'filled') return (p.end - p.start) / p.speed;
+  if (p.state === 'candidates') { const m = momById[p.cands[0]]; return m ? Math.min(m.end_sec - m.start_sec, 4 * (m.suggested_speed || 1)) / (m.suggested_speed || 1) : 0; }
+  return 0;
+};
+const sceneLen = s => s.panels.reduce((a, p) => a + panelLen(p), 0);
+const usage = () => { const u = {}; st.scenes.forEach(s => s.panels.forEach(p => { if (p.state === 'filled') u[p.moment_id] = p.source; if (p.state === 'candidates') p.cands.forEach(c => u[c] ??= 'cand'); })); return u; };
+const speedOk = (clip, sp) => sp === 1 || (sp === 0.5 && clip.fps >= 48) || (sp === 0.25 && clip.fps >= 90);
+const toast = t => { const el = document.getElementById('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('on'), 2600); };
+
+function place(panel, mid) {
+  const m = momById[mid];
+  Object.assign(panel, { state: 'filled', moment_id: mid, clip_id: m.clip_id, start: m.start_sec, end: m.end_sec, speed: speedOk(clipById[m.clip_id], m.suggested_speed) ? m.suggested_speed : 1, source: 'user', cands: [] });
+  st.status[mid] = 'confirmed';
+}
+function reject(mid, reason) {
+  st.status[mid] = 'rejected'; st.rejectReason[mid] = reason;
+  st.scenes.forEach(s => s.panels.forEach(p => {
+    p.cands = p.cands.filter(c => c !== mid);
+    if (p.state === 'candidates' && p.cands.length === 0) p.state = 'gap';
+    if (p.state === 'filled' && p.moment_id === mid) Object.assign(p, { state: 'gap', moment_id: null, clip_id: null });
+  }));
+}
+function hideClip(cid) {
+  st.hidden.add(cid);
+  D.moments.filter(m => m.clip_id === cid).forEach(m => {
+    st.scenes.forEach(s => s.panels.forEach(p => {
+      p.cands = p.cands.filter(c => c !== m.id);
+      if (p.state === 'candidates' && p.cands.length === 0) p.state = 'gap';
+      if (p.state === 'filled' && p.moment_id === m.id) Object.assign(p, { state: 'gap', moment_id: null, clip_id: null });
+    }));
+  });
+}
+
+/* ---------- render ---------- */
+function render() { renderHeader(); renderScenes(); renderScene(); renderPool(); renderInspector(); }
+
+function renderHeader() {
+  const b = st.brief;
+  document.getElementById('briefChip').innerHTML =
+    `<i class="state-dot" style="background:${b.state === 'confirmed' ? 'var(--user)' : 'var(--ai)'}"></i>
+     <span class="txt"><b>Brief</b> · ${fmt(b.target_sec)} · ${b.audience} · ${b.mood}</span>
+     ${b.state === 'confirmed' ? '<span class="badge-ok">OK</span>' : '<span class="badge-ai">PROPOSED</span>'}`;
+  let total = 0, n = 0, f = 0, c = 0, g = 0, u = 0;
+  st.scenes.forEach(s => s.panels.forEach(p => { n++; total += panelLen(p); if (p.state === 'filled') f++; if (p.state === 'candidates') c++; if (p.state === 'gap') g++; if (p.source === 'user') u++; }));
+  const pct = Math.min(100, total / b.target_sec * 100);
+  document.getElementById('totals').innerHTML =
+    `<span><b style="color:${total > b.target_sec * 1.1 ? 'var(--warn)' : 'var(--text)'}">${fmt(total)}</b> / ${fmt(b.target_sec)}</span><span class="meter"><span style="width:${pct}%;background:${total > b.target_sec * 1.1 ? 'var(--warn)' : 'var(--accent)'}"></span></span>
+     <span><b>${n}</b> panels</span><span style="color:var(--warn)"><b style="color:var(--warn)">${c}</b> to choose</span>
+     <span><b>${g}</b> gaps</span><span style="color:var(--user)"><b style="color:var(--user)">${u}</b> yours</span>`;
+}
+
+function renderScenes() {
+  document.getElementById('scenes').innerHTML = st.scenes.map((s, i) =>
+    `<div class="scene-item ${i === st.sel.scene ? 'sel' : ''}" data-i="${i}">
+      <span class="n">${i + 1}</span><span class="name">${s.name}</span>
+      <span class="dots">${s.panels.map(p => `<i class="${p.state[0]}"></i>`).join('')}</span>
+    </div>`).join('');
+}
+
+function renderScene() {
+  const s = scene();
+  const nameEl = document.getElementById('sceneName');
+  if (document.activeElement !== nameEl) nameEl.textContent = s.name;
+  document.getElementById('sceneEvent').innerHTML = `📁 ${eventById[s.event_id]?.name ?? '—'}`;
+  document.getElementById('sceneDur').textContent = `${fmt(sceneLen(s))} · ${s.panels.length} panels`;
+  const strip = document.getElementById('strip');
+  strip.innerHTML = s.panels.map((p, i) => {
+    let img, state;
+    if (p.state === 'filled') {
+      const clip = clipById[p.clip_id];
+      img = `<div class="img" style="background-image:${thumb(p.moment_id)}">
+        ${p.speed !== 1 ? `<span class="speed">🐢 ${p.speed * 100} %</span>` : ''}<span class="dur">${fmt1(panelLen(p))}</span></div>`;
+      state = `${clip.file}`;
+    } else if (p.state === 'candidates') {
+      img = `<div class="cands">${p.cands.slice(0, 3).map((c, k) => `<div style="background-image:${thumb(c)}">${k === 0 ? '<span>1st</span>' : ''}</div>`).join('')}</div>`;
+      state = `<span style="color:var(--warn)">● ${p.cands.length} candidates — pick one</span>`;
+    } else {
+      img = `<div class="img">nothing yet — drop a moment</div>`;
+      state = 'gap';
+    }
+    return `<div class="panel ${p.state} ${p.state === 'gap' ? '' : p.source} ${p.id === st.sel.panel ? 'sel' : ''}" data-pid="${p.id}">
+      <span class="no">${i + 1}</span>${p.state !== 'gap' ? `<span class="src">${p.source === 'ai' ? 'AI' : 'YOU'}</span>` : ''}
+      ${img}<div class="body"><div class="intent">${p.intent}</div><div class="state">${state}</div></div></div>`;
+  }).join('') + `<div class="add-panel" id="addPanel" title="New panel">+</div>`;
+}
+
+const ROLES = ['establishing', 'action', 'reaction', 'detail', 'transition'];
+const TIER = { hero: 0, solid: 1, filler: 2 };
+function poolCard(m, used) {
+  const clip = clipById[m.clip_id];
+  const st8 = st.status[m.id];
+  const icons = [m.slowmo !== 'none' && clip.fps >= 48 ? '🐢' : '', m.audio_keep ? `🔊` : '', ...(m.issues || []).map(x => '⚠ ' + x)].filter(Boolean);
+  return `<div class="m ${st8 === 'rejected' ? 'rejected' : ''}" draggable="${st8 !== 'rejected'}" data-mid="${m.id}" title="${m.description.replace(/"/g, '&quot;')}">
+    <div class="img" style="background-image:${thumb(m.id)}">
+      <span class="tier ${m.tier}">${m.tier}</span>
+      ${used ? `<span class="used ${used === 'user' ? 'u' : ''}">${used === 'cand' ? 'candidate' : 'in cut'}</span>` : ''}
+      <span class="icons">${icons.map(i => `<span>${i}</span>`).join('')}</span>
+    </div>
+    <div class="acts">${st8 === 'rejected'
+      ? `<button data-act="unreject">Undo 👎</button>`
+      : `${st.sel.panel ? '<button data-act="place">Place</button>' : ''}<button data-act="reject">👎</button><button data-act="hide" title="Hide the whole clip">Hide clip</button>`}</div>
+    <div class="desc">${m.description}</div>
+    <div class="meta"><span>${m.shot}</span><span>${fmt1(m.end_sec - m.start_sec)}</span><span>${clip.file}</span>${st8 === 'rejected' ? `<span style="color:var(--bad)">👎 ${st.rejectReason[m.id] || ''}</span>` : ''}</div>
+  </div>`;
+}
+function renderPool() {
+  const s = scene(); const used = usage();
+  document.querySelectorAll('#poolScope button').forEach(b => b.classList.toggle('on', b.dataset.v === st.poolScope));
+  const all = D.moments.filter(m => st.poolScope === 'all' || evOf(m) === s.event_id);
+  const visible = all.filter(m => !st.hidden.has(m.clip_id) && st.status[m.id] !== 'rejected');
+  const hiddenOnes = all.filter(m => st.hidden.has(m.clip_id) || st.status[m.id] === 'rejected');
+  document.getElementById('poolCount').textContent = `${visible.length} moments`;
+  let html = '';
+  for (const r of ROLES) {
+    const ms = visible.filter(m => m.role === r).sort((a, b) => TIER[a.tier] - TIER[b.tier] || a.clip_id - b.clip_id);
+    if (!ms.length) continue;
+    const main = ms.filter(m => m.tier !== 'filler'), fill = ms.filter(m => m.tier === 'filler');
+    const showF = st.showFiller[r];
+    html += `<div class="role-group"><h4>${r[0].toUpperCase() + r.slice(1)} <span class="pill">${ms.length}</span></h4>
+      <div class="pool">${main.concat(showF ? fill : []).map(m => poolCard(m, used[m.id])).join('')}</div>
+      ${fill.length ? `<button class="more" data-filler="${r}">${showF ? 'Hide' : 'Show'} ${fill.length} filler</button>` : ''}</div>`;
+  }
+  if (hiddenOnes.length) {
+    html += `<button class="more hidden-link" id="toggleHidden">${st.showHidden ? 'Hide' : 'Show'} hidden: ${hiddenOnes.length}</button>`;
+    if (st.showHidden) html += `<div class="pool" style="margin-top:8px">${hiddenOnes.map(m => poolCard(m, used[m.id])).join('')}</div>`;
+  }
+  document.getElementById('pool').innerHTML = html || '<p class="muted">No moments for this event.</p>';
+}
+
+function renderInspector() {
+  const el = document.getElementById('inspector');
+  const p = selPanel();
+  if (!p) {
+    el.innerHTML = `<h2>Panel</h2><div class="empty-insp">Select a panel to trim it,<br>change speed or pick a candidate.<br><br>
+      <span class="kbd">Scene ${st.sel.scene + 1} of ${st.scenes.length}</span></div>`;
+    return;
+  }
+  const s = st.scenes.find(s => s.panels.includes(p)); const idx = s.panels.indexOf(p);
+  let body = '';
+  if (p.state === 'filled') {
+    const clip = clipById[p.clip_id], m = momById[p.moment_id];
+    const L = clip.duration_sec, a = p.start / L * 100, b = p.end / L * 100;
+    body = `<div class="insp-img" style="background-image:${thumb(p.moment_id)}"></div>
+      <div class="row"><span class="pill">${p.source === 'ai' ? '<b style="color:var(--ai)">AI pick</b> · proposed' : '<b style="color:var(--user)">Your pick</b> · confirmed'}</span>
+        <span class="pill tier ${m.tier}" style="border:0">${m.tier}</span><span class="pill">${m.shot} · ${m.role}</span></div>
+      <p style="font-size:12px;color:#cfd3dc;margin:10px 0 0">${m.description}</p>
+      ${m.slowmo !== 'none' && m.slowmo_reason ? `<p class="note">🐢 ${m.slowmo_reason}</p>` : ''}
+      ${m.audio_keep ? `<p class="note">🔊 Keep original sound (${m.audio_type})</p>` : ''}
+      <div class="field"><label>Trim · ${clip.file} (${fmt1(L)})</label>
+        <div class="trim"><div class="sel" style="left:${a}%;width:${b - a}%"></div>
+          <div class="mom" style="left:${m.start_sec / L * 100}%;width:${(m.end_sec - m.start_sec) / L * 100}%"></div>
+          <input type="range" id="tIn" min="0" max="${L}" step="0.1" value="${p.start}"><input type="range" id="tOut" min="0" max="${L}" step="0.1" value="${p.end}"></div>
+        <div class="trim-lbl"><span>in ${fmt1(p.start)}</span><span>${fmt1(p.end - p.start)} source → ${fmt1(panelLen(p))} on timeline</span><span>out ${fmt1(p.end)}</span></div>
+        <div class="note">Yellow bar = the moment as analyzed.</div></div>
+      <div class="field"><label>Speed · clip is ${clip.fps} fps</label>
+        <div class="seg" id="speedSeg">${[1, 0.5, 0.25].map(v => `<button data-sp="${v}" class="${p.speed === v ? 'on' : ''}" ${speedOk(clip, v) ? '' : 'disabled title="Not enough frames for clean slow motion"'}>${v * 100} %</button>`).join('')}</div>
+        ${clip.fps < 48 ? `<div class="note">Slow motion needs ≥ 48 fps footage.</div>` : clip.fps < 90 ? `<div class="note">25 % needs ≥ 90 fps footage.</div>` : ''}</div>`;
+  } else if (p.state === 'candidates') {
+    body = `<p class="note" style="margin-top:0">Claude found ${p.cands.length} options. The <b>1st</b> one is exported if you don't choose.</p>
+      <div class="cand-list">${p.cands.map((c, k) => { const m = momById[c]; return `<div class="cand" data-pick="${c}"><div style="background-image:${thumb(c)}"></div>
+        <p>${k === 0 ? '<b>1st · </b>' : ''}${m.description}<br><span class="muted">${m.tier} · ${m.shot} · ${fmt1(m.end_sec - m.start_sec)}</span></p></div>`; }).join('')}</div>
+      <p class="note">Click to pick (= confirmed), or drag any moment from the pool onto the panel.</p>`;
+  } else {
+    body = `<p class="note" style="margin-top:0">Nothing suitable found yet. Drag a moment from the pool onto it — or leave it; gaps are skipped on export.</p>
+      <button class="btn" style="margin-top:8px" onclick="toast('M5: search library / title card / stock for this gap')">Find a filler… (M5)</button>`;
+  }
+  el.innerHTML = `<h2>Panel ${idx + 1} · ${s.name}</h2>
+    <div class="field"><label>Intent</label><textarea id="intent">${p.intent}</textarea></div>
+    ${body}
+    <div class="field"><label>Panel</label><div class="row">
+      <button class="btn" id="pLeft" ${idx === 0 ? 'disabled' : ''}>← Move</button>
+      <button class="btn" id="pRight" ${idx === s.panels.length - 1 ? 'disabled' : ''}>Move →</button>
+      <button class="btn" id="pDel" style="color:var(--bad)">Delete</button>
+      ${p.state === 'filled' ? `<button class="btn" id="pPrev">▶ Play</button>` : ''}</div></div>`;
+}
+
+/* ---------- events ---------- */
+document.getElementById('scenes').addEventListener('click', e => {
+  const it = e.target.closest('.scene-item'); if (!it) return;
+  st.sel = { ...st.sel, scene: +it.dataset.i, panel: null }; render();
+});
+document.getElementById('sceneName').addEventListener('input', e => { scene().name = e.target.textContent.trim() || 'Untitled'; renderScenes(); });
+document.getElementById('addScene').onclick = () => {
+  st.scenes.splice(st.sel.scene + 1, 0, { id: Date.now(), name: 'New scene', event_id: scene().event_id, panels: [gap('Describe the shot you want')] });
+  st.sel = { ...st.sel, scene: st.sel.scene + 1, panel: null }; render();
+};
+document.getElementById('sceneUp').onclick = () => { const i = st.sel.scene; if (i > 0) { [st.scenes[i - 1], st.scenes[i]] = [st.scenes[i], st.scenes[i - 1]]; st.sel.scene--; render(); } };
+document.getElementById('sceneDown').onclick = () => { const i = st.sel.scene; if (i < st.scenes.length - 1) { [st.scenes[i + 1], st.scenes[i]] = [st.scenes[i], st.scenes[i + 1]]; st.sel.scene++; render(); } };
+document.getElementById('sceneDel').onclick = () => { if (st.scenes.length > 1 && confirm(`Delete scene "${scene().name}"?`)) { st.scenes.splice(st.sel.scene, 1); st.sel = { ...st.sel, scene: Math.max(0, st.sel.scene - 1), panel: null }; render(); } };
+
+const strip = document.getElementById('strip');
+strip.addEventListener('click', e => {
+  if (e.target.closest('#addPanel')) { const p = gap('New shot'); scene().panels.push(p); st.sel.panel = p.id; render(); return; }
+  const pe = e.target.closest('.panel'); if (!pe) return;
+  st.sel.panel = st.sel.panel === +pe.dataset.pid ? null : +pe.dataset.pid; renderScene(); renderPool(); renderInspector();
+});
+strip.addEventListener('dragover', e => { const t = e.target.closest('.panel, .add-panel'); if (t) { e.preventDefault(); strip.querySelectorAll('.drop').forEach(x => x !== t && x.classList.remove('drop')); t.classList.add('drop'); } });
+strip.addEventListener('dragleave', e => { const t = e.target.closest('.panel, .add-panel'); if (t && !t.contains(e.relatedTarget)) t.classList.remove('drop'); });
+strip.addEventListener('drop', e => {
+  e.preventDefault(); const mid = +e.dataTransfer.getData('text/plain'); if (!mid) return;
+  const t = e.target.closest('.panel, .add-panel'); if (!t) return;
+  let p;
+  if (t.classList.contains('add-panel')) { p = P(momById[mid].description.split(/[,.]/)[0]); scene().panels.push(p); } else p = panelById(+t.dataset.pid);
+  place(p, mid); st.sel.panel = p.id; render(); toast('Placed — moment confirmed');
+});
+
+const pool = document.getElementById('pool');
+pool.addEventListener('dragstart', e => { const m = e.target.closest('.m'); if (m) e.dataTransfer.setData('text/plain', m.dataset.mid); });
+pool.addEventListener('click', e => {
+  if (e.target.dataset.filler) { const r = e.target.dataset.filler; st.showFiller[r] = !st.showFiller[r]; renderPool(); return; }
+  if (e.target.id === 'toggleHidden') { st.showHidden = !st.showHidden; renderPool(); return; }
+  const act = e.target.dataset.act; const card = e.target.closest('.m'); if (!act || !card) return;
+  const mid = +card.dataset.mid, m = momById[mid];
+  if (act === 'place') { const p = selPanel(); if (p) { place(p, mid); render(); toast('Placed — moment confirmed'); } }
+  if (act === 'reject') {
+    const r = prompt('👎 Why? (optional)\nshake · blur · boring · duplicate · timing · other', ''); if (r === null) return;
+    reject(mid, r); render(); toast('Rejected — removed from the pool' + (r ? ` (${r})` : ''));
+  }
+  if (act === 'unreject') { delete st.status[mid]; render(); }
+  if (act === 'hide') { hideClip(m.clip_id); render(); toast(`Clip ${clipById[m.clip_id].file} hidden (original untouched)`); }
+});
+document.getElementById('poolScope').addEventListener('click', e => { if (e.target.dataset.v) { st.poolScope = e.target.dataset.v; renderPool(); } });
+
+const insp = document.getElementById('inspector');
+insp.addEventListener('input', e => {
+  const p = selPanel(); if (!p) return;
+  if (e.target.id === 'intent') { p.intent = e.target.value; renderScene(); }
+  if (e.target.id === 'tIn' || e.target.id === 'tOut') {
+    const a = +document.getElementById('tIn').value, b = +document.getElementById('tOut').value;
+    if (b - a < 0.5) return renderInspector();
+    p.start = a; p.end = b; p.source = 'user'; st.status[p.moment_id] = 'confirmed';
+    renderHeader(); renderScene();
+    const L = clipById[p.clip_id].duration_sec, sel = insp.querySelector('.trim .sel');
+    sel.style.left = a / L * 100 + '%'; sel.style.width = (b - a) / L * 100 + '%';
+    insp.querySelector('.trim-lbl').innerHTML = `<span>in ${fmt1(a)}</span><span>${fmt1(b - a)} source → ${fmt1(panelLen(p))} on timeline</span><span>out ${fmt1(b)}</span>`;
+  }
+});
+insp.addEventListener('click', e => {
+  const p = selPanel(); if (!p) return;
+  const s = st.scenes.find(s => s.panels.includes(p)); const i = s.panels.indexOf(p);
+  const sp = e.target.dataset.sp; if (sp && !e.target.disabled) { p.speed = +sp; p.source = 'user'; st.status[p.moment_id] = 'confirmed'; render(); }
+  const pick = e.target.closest('[data-pick]'); if (pick) { place(p, +pick.dataset.pick); render(); toast('Picked — moment confirmed'); }
+  if (e.target.id === 'pLeft' && i > 0) { [s.panels[i - 1], s.panels[i]] = [s.panels[i], s.panels[i - 1]]; render(); }
+  if (e.target.id === 'pRight' && i < s.panels.length - 1) { [s.panels[i + 1], s.panels[i]] = [s.panels[i], s.panels[i + 1]]; render(); }
+  if (e.target.id === 'pDel') { s.panels.splice(i, 1); st.sel.panel = null; render(); }
+  if (e.target.id === 'pPrev') play([{ scene: s, p }]);
+});
+
+/* ---------- brief ---------- */
+function openBrief() {
+  const b = st.brief;
+  document.getElementById('briefBody').innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px"><h3>Brief · Main</h3>${b.state === 'confirmed' ? '<span class="badge-ok">CONFIRMED</span>' : '<span class="badge-ai">PROPOSED BY CLAUDE</span>'}</div>
+    <p class="note" style="margin-top:2px">Claude proposed this from the events and their best moments. Adjust anything, then confirm — or just keep going; it works either way.</p>
+    <div class="two"><div class="field"><label>Target length (min)</label><input type="number" id="bLen" step="0.5" value="${b.target_sec / 60}"></div>
+      <div class="field"><label>Audience</label><input type="text" id="bAud" value="${b.audience}"></div></div>
+    <div class="field"><label>Mood</label><input type="text" id="bMood" value="${b.mood}"></div>
+    <div class="field"><label>Must-haves</label>${b.must_have.map(x => `<div class="musthave"><div style="background-image:${thumb(x.moment_id)}"></div><span>${x.text}</span><button class="btn ghost" data-rm="${x.moment_id}">✕</button></div>`).join('')}
+      <div class="note">Add more by asking Claude, or (later) from a moment's menu.</div></div>
+    <div class="field"><label>Ending</label><input type="text" id="bEnd" value="${b.ending}"></div>
+    <div class="field"><label>Notes</label><textarea id="bNotes" placeholder="Anything else Claude should know">${b.notes}</textarea></div>
+    <div class="row" style="justify-content:flex-end;margin-top:6px"><button class="btn" id="bCancel">Close</button><button class="btn primary" id="bOk">Confirm brief</button></div>`;
+  document.getElementById('briefModal').classList.add('on');
+}
+document.getElementById('briefChip').onclick = openBrief;
+document.getElementById('briefBody').addEventListener('click', e => {
+  const b = st.brief;
+  if (e.target.dataset.rm) { b.must_have = b.must_have.filter(x => x.moment_id !== +e.target.dataset.rm); openBrief(); }
+  if (e.target.id === 'bCancel') document.getElementById('briefModal').classList.remove('on');
+  if (e.target.id === 'bOk') {
+    Object.assign(b, { target_sec: Math.round(+document.getElementById('bLen').value * 60), audience: document.getElementById('bAud').value, mood: document.getElementById('bMood').value, ending: document.getElementById('bEnd').value, notes: document.getElementById('bNotes').value, state: 'confirmed' });
+    document.getElementById('briefModal').classList.remove('on'); renderHeader(); toast('Brief confirmed — ask Claude to redraft if it changed a lot');
+  }
+});
+document.querySelectorAll('.modal-bg').forEach(bg => bg.addEventListener('click', e => { if (e.target === bg) { bg.classList.remove('on'); stopPlay(); } }));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { document.querySelectorAll('.modal-bg.on').forEach(bg => bg.classList.remove('on')); stopPlay(); } });
+
+/* ---------- preview (thumbnails stand in for video) ---------- */
+let playT = null;
+function stopPlay() { clearTimeout(playT); playT = null; }
+function play(items) {
+  stopPlay();
+  const seq = items.filter(x => x.p.state !== 'gap' || true);
+  document.getElementById('playerBody').innerHTML = `<div class="screen" id="screen"></div>
+    <div class="ptrack">${seq.map(x => `<span class="${x.p.state === 'gap' ? 'gap' : ''}" style="flex:${Math.max(panelLen(x.p), 1.2)}"><i></i></span>`).join('')}</div>
+    <p class="note">Mockup: a still frame + slow zoom stands in for the proxy video. Gaps are skipped, candidates play their 1st option. Click outside to close.</p>`;
+  document.getElementById('playerModal').classList.add('on');
+  const screen = document.getElementById('screen'), bars = [...document.querySelectorAll('.ptrack span i')];
+  let i = 0, lastScene = null;
+  const step = () => {
+    if (i >= seq.length) { screen.innerHTML += '<div class="title on" style="left:50%;top:50%;bottom:auto;transform:translate(-50%,-50%)">— end —</div>'; return; }
+    const { scene: s, p } = seq[i]; const m = exportMoment(p);
+    if (!m) { bars[i].style.width = '100%'; i++; return step(); }
+    const len = panelLen(p), ms = Math.min(len, 6) * 1000 * 0.6; // compressed: 60 % of real time, max 3.6 s per panel
+    screen.innerHTML = `<div class="frame" style="background-image:${thumb(m.id)};animation-duration:${ms}ms"></div>
+      ${p.speed !== 1 ? `<span class="spd">🐢 ${p.speed * 100} %</span>` : ''}<div class="title" id="ttl">${s.name}</div>`;
+    if (s !== lastScene) { requestAnimationFrame(() => document.getElementById('ttl').classList.add('on')); setTimeout(() => document.getElementById('ttl')?.classList.remove('on'), Math.min(1600, ms - 200)); lastScene = s; }
+    bars[i].style.transition = `width ${ms}ms linear`; requestAnimationFrame(() => bars[i - 1 + 1] && (bars[i].style.width = '100%'));
+    playT = setTimeout(() => { i++; step(); }, ms);
+  };
+  step();
+}
+document.getElementById('previewScene').onclick = () => play(scene().panels.map(p => ({ scene: scene(), p })));
+document.getElementById('previewCut').onclick = () => play(st.scenes.flatMap(s => s.panels.map(p => ({ scene: s, p }))));
+
+document.getElementById('exportBtn').onclick = () => {
+  let n = 0, gaps = 0, slow = 0, total = 0;
+  st.scenes.forEach(s => s.panels.forEach(p => { if (p.state === 'gap') gaps++; else { n++; total += panelLen(p); if (p.speed !== 1) slow++; } }));
+  toast(`Would write "03 Arrifana – Main.otio": ${n} clips, ${st.scenes.length} scene markers, ${slow} slowed, ${fmt(total)} — ${gaps} gaps skipped. Open it in free Resolve.`);
+};
+
+render();
+</script>
+</body>
+</html>

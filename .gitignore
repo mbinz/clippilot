@@ -10,3 +10,4 @@ dist/
 .DS_Store
 *.log
 tests/fixtures/sample-videos/*.mp4
+mockups/*.data.js
