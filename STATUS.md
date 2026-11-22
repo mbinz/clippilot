@@ -658,6 +658,15 @@ Every slice: failing test first, `npm run typecheck && npm run test:all` green, 
   second "Undated" event; `createDb` doesn't await `ensureDir` (race on a fresh dir); `calibrate sample|status` commands
   remain but are undocumented; web UI doesn't show the audio tag or dup groups yet (M4).
 
+#### K1 — Gemini key from launchctl (planner, 2026-11-22)
+The key lives in the macOS `launchctl` env; shells started by the desktop app don't inherit it, so `analyze` in a new
+working dir had no key. `loadConfig` resolution order: `GEMINI_API_KEY` env → `.clippilot/config.json` → on darwin only,
+`launchctl getenv GEMINI_API_KEY` (via `execFileSync`, trimmed; empty output, non-zero exit or missing binary → no key,
+never throws). Injectable `launchctlGetenv` param (default real) so tests never shell out; never log the value.
+Tests (new `tests/unit/core/config/manager.test.ts`, temp dir): env wins over file and launchctl; file wins over
+launchctl (launchctl not called); launchctl used when both missing; non-darwin → not called; getter throws / returns
+'' → key stays default. Done when: `analyze` from a fresh dir finds the key with no env var set.
+
 #### M2.8 implementation specs (planner, 2026-11-21)
 Slices E1→E5, test-first, one commit each. Migration 015 (013/014 are taken by G4/G7).
 
