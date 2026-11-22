@@ -8,7 +8,8 @@ Update this file whenever the answer to any of those questions shifts.
 **2026-11-21:** re-planned around events + scene board (see "Re-plan 2026-11-21"). M2.7 ✅ and M2.8 ✅ (576 tests).
 2026-11-22: global config (K1); `03 Arrifana` ingested into `~/Video/ClipPilot Arrifana/` (104 clips, 0 errors,
 4 folder events: Arrifana 48, Delfine 33, Arrifana Haus 10, Praia do Odeceixe 13) and analyzed: 104/104 (1 retry
-after Gemini omitted `description`), 2 proxies > 18 MB went through the Files API ✅. Next: M3 (specs ready).
+after Gemini omitted `description`), 2 proxies > 18 MB went through the Files API ✅. M3 code ✅ (665 tests).
+Next: Claude proposes the Arrifana brief → user confirms → draft via `cut apply` → Resolve import; M4 mockup feedback.
 
 `v0.1.0` — ingest (resumable) / analyze with timestamped highlights / search / summary; OTIO + FCPXML export verified in free Resolve (M1). No story/storyboard workflow yet (M3).
 Solo project, MIT. Run via `tsx`, no compiled binary.
@@ -746,11 +747,23 @@ Slices E1→E5, test-first, one commit each. Migration 015 (013/014 are taken by
 Done when: `events rebuild` on a copy of the pilot DB gives sensible events; then the user-facing step is ingesting
 `03 Arrifana` + the user running analyze.
 
-### M3 — Storyboard model + CLI
+### M3 — Storyboard model + CLI — code ✅ 2026-11-22 (7d3b8cb…583ec69, 665 tests); Arrifana brief + draft in chat pending
 - Migration: `scenes` (per cut, start event), cut brief, panel `intent` / `state` (filled | candidates | gap) / `speed` /
   `source` (ai | user), panel candidates; moment `status` (proposed | confirmed | rejected); `clips.hidden`.
 - CLI verbs for brief (Claude proposes, user adjusts) / cut / scene / panel; Claude drafts the Arrifana cut in chat.
 - Server routes for the same.
+
+#### M3 results (2026-11-22)
+- S1–S7 built by the implementer, reviewed. Smoke test on a copy of the Arrifana DB: `cut apply` (2 scenes, 6 panels)
+  → `cut show` totals → `export --cut --format otio`: 5 clips, 2 scene markers, gap skipped, 0.5× time warp only on the
+  50 fps clips (a `light` slow-mo moment on 25 fps footage correctly stays 100 %); invalid draft → exit 1 with error list.
+- Rulings on implementer interpretations: `getOrCreateMainCut` creates "Main" if no cut has that name; append adds scenes
+  at the end; replace uses fresh scene ids; brief validates shape only.
+- Deferred: zod shape errors short-circuit id validation (a draft with both kinds reports only the shape errors first);
+  non-JSON `export --cut` doesn't mention skipped gaps; no HTTP route for `cut apply` (CLI only, fine for v1).
+- **M4 mockup** `mockups/scene-board.html` (41d3e66) on real Arrifana data, hand-drafted 5-scene cut; data in gitignored
+  `mockups/scene-board.data.js` (regenerate: `scripts/mockups/extract-mockup-data.ts`). Serve the folder over HTTP to view.
+  Waiting for user feedback before M4 build.
 
 #### M3 implementation specs (planner, 2026-11-22) — Q1–Q3 answered by the user
 Facts: `stories` / `story_segments` are empty in every DB (pilot, Portugal) → reshape freely. Export already supports
