@@ -6,6 +6,7 @@ import type { EventRecord } from '../../db/repositories/event.repository.js';
 import { speedAllowed } from '../analyze/highlights.js';
 import { BriefSchema, BriefStateSchema, formatIssues, type Draft } from './schema.js';
 import { applyDraft as applyDraftImpl } from './draft.js';
+import * as ops from './history.js';
 import { isTier, tierRankSql, type Tier } from '../tiers.js';
 
 export const MAIN_CUT_NAME = 'Main';
@@ -132,6 +133,29 @@ export class StoryboardService {
   private insertAt(list: number[], id: number, position?: number): number[] {
     const at = position === undefined ? list.length : Math.max(0, Math.min(position, list.length));
     return [...list.slice(0, at), id, ...list.slice(at)];
+  }
+
+  // ---------- undo / redo ----------
+
+  /** Run a mutation and log it as one undoable operation on `cutId`. Every route/CLI mutation goes through here. */
+  command<T>(cutId: number, label: string, fn: () => T): T {
+    return ops.command(this.db, cutId, label, fn);
+  }
+
+  undo(cutId: number): { label: string; can_undo: boolean; can_redo: boolean } {
+    return ops.undo(this.db, cutId);
+  }
+
+  redo(cutId: number): { label: string; can_undo: boolean; can_redo: boolean } {
+    return ops.redo(this.db, cutId);
+  }
+
+  history(cutId: number): ops.OperationInfo[] {
+    return ops.history(this.db, cutId);
+  }
+
+  historyState(cutId: number): ops.HistoryState {
+    return ops.historyState(this.db, cutId);
   }
 
   // ---------- cuts ----------
