@@ -122,16 +122,16 @@ describe('Cut API routes', () => {
     await ok('POST', `/panels/${cands.id}/pick`, { moment_id: mb[0] });
     let tree = await ok('GET', `/cuts/${cut.id}`);
     expect(tree.scenes[0].panels[0]).toMatchObject({ state: 'filled', clip_id: clipB });
-    await ok('POST', `/moments/${mb[0]}/reject`, { reason: 'shaky' });
+    await ok('POST', `/moments/${mb[0]}/reject`, { reason: 'shaky', cut_id: cut.id });
     tree = await ok('GET', `/cuts/${cut.id}`);
     expect(tree.scenes[0].panels[0].state).toBe('gap');
 
     const other = await ok('POST', `/scenes/${s.id}/panels`, { moment_id: ma[1] });
-    await ok('POST', `/clips/${clipA}/hide`);
+    await ok('POST', `/clips/${clipA}/hide`, { cut_id: cut.id });
     tree = await ok('GET', `/cuts/${cut.id}`);
     expect(tree.scenes[0].panels.find((x: any) => x.id === other.id).state).toBe('gap');
     expect(t.db.prepare('SELECT hidden FROM clips WHERE id = ?').get(clipA)).toEqual({ hidden: 1 });
-    await ok('POST', `/clips/${clipA}/unhide`);
+    await ok('POST', `/clips/${clipA}/unhide`, { cut_id: cut.id });
     expect(t.db.prepare('SELECT hidden FROM clips WHERE id = ?').get(clipA)).toEqual({ hidden: 0 });
   });
 
@@ -139,6 +139,81 @@ describe('Cut API routes', () => {
     const real = createApp({ db: t.db, basePath: '/nonexistent', port: 0 });
     const res = await real.request(`/api/projects/${t.projectId}/cuts`);
     expect(res.status).toBe(200);
-    expect((await real.request(`/api/clips/${clipA}/hide`, { method: 'POST' })).status).toBe(200);
+    const cut = await ok('POST', `/projects/${t.projectId}/cuts`, { name: 'Main' });
+    const hide = await real.request(`/api/clips/${clipA}/hide`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ cut_id: cut.id }),
+    });
+    expect(hide.status).toBe(200);
+  });
+
+  describe('history', () => {
+    let cutId: number;
+    let sceneId: number;
+    beforeEach(async () => {
+      cutId = (await ok('POST', `/projects/${t.projectId}/cuts`, { name: 'Main' })).id;
+      sceneId = t.svc.addScene(cutId, 'A').id; // direct service call: not logged
+    });
+
+    it('moment and clip routes require a valid cut_id', async () => {
+      for (const [url, body] of [
+        [`/moments/${ma[0]}/reject`, {}], [`/clips/${clipA}/hide`, {}], [`/clips/${clipA}/unhide`, {}],
+        [`/moments/${ma[0]}/reject`, { cut_id: 9999 }],
+      ] as const) {
+        const res = await send('POST', url, body);
+        expect(res.status, url).toBe(400);
+        expect((await json(res)).error).toMatch(/cut_id|Cut 9999/);
+      }
+      expect(t.db.prepare('SELECT hidden FROM clips WHERE id = ?').get(clipA)).toEqual({ hidden: 0 });
+    });
+
+    it('every mutating response carries history; GET history lists the labels', async () => {
+      const scene2 = await ok('POST', `/cuts/${cutId}/scenes`, { name: 'B' });
+      expect(scene2.history).toEqual({ can_undo: true, can_redo: false, undo_label: expect.any(String), redo_label: null });
+      const panel = await ok('POST', `/scenes/${sceneId}/panels`, { intent: 'wave' });
+      expect(panel.history.can_undo).toBe(true);
+      const placed = await ok('POST', `/panels/${panel.id}/place`, { moment_id: ma[0] });
+      expect(placed.history.undo_label).toMatch(/^Place moment in panel 1$/);
+      const trimmed = await ok('PATCH', `/panels/${panel.id}`, { start_sec: 3, end_sec: 5 });
+      expect(trimmed.history.undo_label).toMatch(/Trim/);
+      const rejected = await ok('POST', `/moments/${ma[1]}/reject`, { reason: 'shake', cut_id: cutId });
+      expect(rejected.history.undo_label).toBe('👎 shake');
+      const hidden = await ok('POST', `/clips/${clipB}/hide`, { cut_id: cutId });
+      expect(hidden.history.undo_label).toMatch(/^Hide clip /);
+      const brief = await ok('PUT', `/cuts/${cutId}/brief`, {
+        brief: { target_sec: 60, audience: 'a', mood: 'm', must_have: [], ending: 'e' }, state: 'confirmed',
+      });
+      expect(brief.history.undo_label).toMatch(/brief/i);
+      const del = await ok('DELETE', `/panels/${panel.id}`);
+      expect(del.history.can_undo).toBe(true);
+
+      const h = await ok('GET', `/cuts/${cutId}/history`);
+      expect(h.map((o: any) => o.label)).toEqual(expect.arrayContaining(['👎 shake']));
+      expect(h.length).toBe(8);
+      expect(h[0]).toMatchObject({ undone: false });
+    });
+
+    it('undo / redo restore state and report labels; empty history is a 400', async () => {
+      expect((await send('POST', `/cuts/${cutId}/undo`)).status).toBe(400);
+      const panel = await ok('POST', `/scenes/${sceneId}/panels`, { intent: 'wave' });
+      await ok('POST', `/panels/${panel.id}/place`, { moment_id: ma[0] });
+      const u = await ok('POST', `/cuts/${cutId}/undo`);
+      expect(u).toMatchObject({ label: 'Place moment in panel 1', can_redo: true });
+      expect(u.history).toMatchObject({ can_redo: true, redo_label: 'Place moment in panel 1' });
+      expect((await ok('GET', `/cuts/${cutId}`)).scenes[0].panels[0].state).toBe('gap');
+      const r = await ok('POST', `/cuts/${cutId}/redo`);
+      expect(r.history.can_redo).toBe(false);
+      expect((await ok('GET', `/cuts/${cutId}`)).scenes[0].panels[0].state).toBe('filled');
+      expect((await send('POST', `/cuts/${cutId}/redo`)).status).toBe(400);
+    });
+
+    it('a failed mutation logs nothing', async () => {
+      const res = await send('POST', `/scenes/${sceneId}/panels`, { moment_id: 9999 });
+      expect(res.status).toBe(400);
+      expect(await ok('GET', `/cuts/${cutId}/history`)).toEqual([]);
+    });
+
+    it('unknown cut: history 404', async () => {
+      expect((await send('GET', '/cuts/9999/history')).status).toBe(404);
+    });
   });
 });

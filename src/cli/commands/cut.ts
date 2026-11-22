@@ -7,6 +7,7 @@ import { runMigrations } from '../../db/migrations/runner.js';
 import { ProjectRepository } from '../../db/repositories/project.repository.js';
 import { resolveDbPath } from '../../utils/fs.js';
 import { StoryboardService, type CutTree } from '../../core/storyboard/service.js';
+import { labels } from '../../core/storyboard/labels.js';
 import { isTier, TIERS } from '../../core/tiers.js';
 import { resolveProject } from './resolve-project.js';
 
@@ -48,6 +49,14 @@ function cutIdOf({ db, svc }: Ctx, id: string | undefined, projectName?: string)
   const project = resolveProject(new ProjectRepository(db), projectName);
   if (!project) throw new Error('Could not resolve the project');
   return svc.getOrCreateMainCut(project.id).id;
+}
+
+/** Cut a moment/clip edit is logged on: --cut, else the "Main" cut of the item's project. */
+function logCutOf(svc: StoryboardService, cut: string | undefined, projectId: number): number {
+  if (cut === undefined) return svc.getOrCreateMainCut(projectId).id;
+  const n = toId(cut);
+  if (svc.projectIdOfCut(n) !== projectId) throw new Error(`Cut ${n} belongs to another project`);
+  return n;
 }
 
 function projectIdOf(db: Database.Database, projectName?: string): number {
@@ -107,7 +116,7 @@ export function registerCutCommands(parent: Command): void {
   cut.command('rename <id> <name>')
     .description('Rename a cut')
     .action((id: string, name: string) => withSvc(({ svc }) => {
-      svc.renameCut(toId(id), name);
+      svc.command(toId(id), labels.renameCut(name), () => svc.renameCut(toId(id), name));
       print(svc.getCut(toId(id))!.cut);
     }));
 
@@ -117,6 +126,29 @@ export function registerCutCommands(parent: Command): void {
       if (!svc.getCut(toId(id))) throw new Error(`Cut ${id} not found`);
       svc.deleteCut(toId(id));
       print({ ok: true, deleted: toId(id) });
+    }));
+
+  for (const [name, desc] of [['undo', 'Undo the last change to a cut'], ['redo', 'Redo the last undone change']] as const) {
+    cut.command(`${name} [id]`)
+      .description(`${desc} (default: the cut "Main")`)
+      .option(...projectOpt)
+      .option('--json', 'Emit JSON (output is always JSON)')
+      .action((id: string | undefined, o) => withSvc((c) => {
+        const cutId = cutIdOf(c, id, o.project);
+        const r = name === 'undo' ? c.svc.undo(cutId) : c.svc.redo(cutId);
+        print({ cut_id: cutId, ...r, ...c.svc.historyState(cutId) });
+      }));
+  }
+
+  cut.command('history [id]')
+    .description('List the last 50 changes to a cut, newest first (default: the cut "Main")')
+    .option(...projectOpt)
+    .option('--json', 'Emit JSON')
+    .action((id: string | undefined, o) => withSvc((c) => {
+      const h = c.svc.history(cutIdOf(c, id, o.project));
+      if (o.json) return print(h);
+      if (h.length === 0) return console.log('No changes yet.');
+      for (const op of h) console.log(`${String(op.id).padStart(4)}  ${op.undone ? chalk.dim('(undone) ') : ''}${op.label}  ${chalk.dim(op.created_at)}`);
     }));
 
   cut.command('brief [id]')
@@ -134,11 +166,12 @@ export function registerCutCommands(parent: Command): void {
         } catch (err) {
           throw new Error(`Cannot read brief file ${o.setFile}: ${(err as Error).message}`);
         }
-        c.svc.setBrief(cutId, raw, o.confirm ? 'confirmed' : 'proposed');
+        const state = o.confirm ? 'confirmed' : 'proposed';
+        c.svc.command(cutId, labels.brief(state), () => c.svc.setBrief(cutId, raw, state));
       } else if (o.confirm) {
         const cur = c.svc.getCut(cutId)!;
         if (cur.brief === null) throw new Error('No brief to confirm. Set one first with --set-file');
-        c.svc.setBrief(cutId, cur.brief, 'confirmed');
+        c.svc.command(cutId, labels.brief('confirmed'), () => c.svc.setBrief(cutId, cur.brief, 'confirmed'));
       }
       const t = c.svc.getCut(cutId)!;
       print({ cut_id: cutId, brief: t.brief, brief_state: t.brief_state });
@@ -157,7 +190,7 @@ export function registerCutCommands(parent: Command): void {
         throw new Error(`Cannot read draft file ${o.file}: ${(err as Error).message}`);
       }
       const cutId = cutIdOf(c, id, o.project);
-      const res = c.svc.applyDraft(cutId, raw, { mode: o.append ? 'append' : 'replace' });
+      const res = c.svc.command(cutId, labels.applyDraft(raw), () => c.svc.applyDraft(cutId, raw, { mode: o.append ? 'append' : 'replace' }));
       print({ cut_id: cutId, ...res });
     }));
 
@@ -171,27 +204,28 @@ export function registerCutCommands(parent: Command): void {
     .option(...projectOpt)
     .action((name: string, o) => withSvc((c) => {
       const cutId = cutIdOf(c, o.cut, o.project);
-      print(c.svc.addScene(cutId, name, { position: o.at === undefined ? undefined : toNum(o.at, 'position') }));
+      const position = o.at === undefined ? undefined : toNum(o.at, 'position');
+      print(c.svc.command(cutId, labels.addScene(name), () => c.svc.addScene(cutId, name, { position })));
     }));
 
   scene.command('rename <id> <name>')
     .description('Rename a scene')
     .action((id: string, name: string) => withSvc(({ svc }) => {
-      svc.renameScene(toId(id), name);
+      svc.command(svc.cutIdOfScene(toId(id)), labels.renameScene(name), () => svc.renameScene(toId(id), name));
       print({ ok: true, id: toId(id), name });
     }));
 
   scene.command('move <id> <position>')
     .description('Move a scene to a position (0 = first)')
     .action((id: string, position: string) => withSvc(({ svc }) => {
-      svc.moveScene(toId(id), toNum(position, 'position'));
+      svc.command(svc.cutIdOfScene(toId(id)), labels.moveScene(svc, toId(id)), () => svc.moveScene(toId(id), toNum(position, 'position')));
       print({ ok: true, id: toId(id) });
     }));
 
   scene.command('delete <id>')
     .description('Delete a scene with its panels')
     .action((id: string) => withSvc(({ svc }) => {
-      svc.deleteScene(toId(id));
+      svc.command(svc.cutIdOfScene(toId(id)), labels.deleteScene(svc, toId(id)), () => svc.deleteScene(toId(id)));
       print({ ok: true, deleted: toId(id) });
     }));
 
@@ -200,7 +234,7 @@ export function registerCutCommands(parent: Command): void {
     .action((id: string, eventId: string) => withSvc(({ db, svc }) => {
       const ev = eventId === 'none' ? null : toId(eventId);
       if (ev !== null && !db.prepare('SELECT 1 FROM events WHERE id = ?').get(ev)) throw new Error(`Event ${ev} not found`);
-      svc.setSceneEvent(toId(id), ev);
+      svc.command(svc.cutIdOfScene(toId(id)), labels.sceneEvent(svc, toId(id)), () => svc.setSceneEvent(toId(id), ev));
       print({ ok: true, id: toId(id), event_id: ev });
     }));
 
@@ -214,60 +248,62 @@ export function registerCutCommands(parent: Command): void {
     .option('--candidates <ids>', 'Comma-separated candidate moment ids')
     .option('--at <position>', 'Position (default: end)')
     .action((sceneId: string, o) => withSvc(({ svc }) => {
-      print(svc.addPanel(toId(sceneId), {
+      const input = {
         intent: o.intent,
         momentId: o.moment === undefined ? undefined : toId(o.moment),
         candidates: o.candidates === undefined ? undefined : String(o.candidates).split(',').map((s) => toId(s.trim())),
-        source: 'user',
-      }, o.at === undefined ? undefined : toNum(o.at, 'position')));
+        source: 'user' as const,
+      };
+      const at = o.at === undefined ? undefined : toNum(o.at, 'position');
+      print(svc.command(svc.cutIdOfScene(toId(sceneId)), labels.addPanel(svc, toId(sceneId)), () => svc.addPanel(toId(sceneId), input, at)));
     }));
 
   panel.command('move <id> <sceneId> <position>')
     .description('Move a panel to a scene and position')
     .action((id: string, sceneId: string, position: string) => withSvc(({ svc }) => {
-      svc.movePanel(toId(id), toId(sceneId), toNum(position, 'position'));
+      svc.command(svc.cutIdOfPanel(toId(id)), labels.movePanel(svc, toId(id)), () => svc.movePanel(toId(id), toId(sceneId), toNum(position, 'position')));
       print({ ok: true, id: toId(id), scene_id: toId(sceneId) });
     }));
 
   panel.command('delete <id>')
     .description('Delete a panel')
     .action((id: string) => withSvc(({ svc }) => {
-      svc.deletePanel(toId(id));
+      svc.command(svc.cutIdOfPanel(toId(id)), labels.deletePanel(svc, toId(id)), () => svc.deletePanel(toId(id)));
       print({ ok: true, deleted: toId(id) });
     }));
 
   panel.command('intent <id> <text>')
     .description("Set a panel's intent")
     .action((id: string, text: string) => withSvc(({ svc }) => {
-      svc.setIntent(toId(id), text);
+      svc.command(svc.cutIdOfPanel(toId(id)), labels.intent(svc, toId(id)), () => svc.setIntent(toId(id), text));
       print({ ok: true, id: toId(id), intent: text });
     }));
 
   panel.command('trim <id> <start> <end>')
     .description('Set in/out seconds of a filled panel (clamped to the clip)')
     .action((id: string, start: string, end: string) => withSvc(({ svc }) => {
-      svc.trimPanel(toId(id), toNum(start, 'start'), toNum(end, 'end'));
+      svc.command(svc.cutIdOfPanel(toId(id)), labels.trim(svc, toId(id)), () => svc.trimPanel(toId(id), toNum(start, 'start'), toNum(end, 'end')));
       print({ ok: true, id: toId(id) });
     }));
 
   panel.command('speed <id> <speed>')
     .description('Set playback speed: 1, 0.5 or 0.25 (needs enough source fps)')
     .action((id: string, speed: string) => withSvc(({ svc }) => {
-      svc.setSpeed(toId(id), toNum(speed, 'speed'));
+      svc.command(svc.cutIdOfPanel(toId(id)), labels.speed(svc, toId(id), toNum(speed, 'speed')), () => svc.setSpeed(toId(id), toNum(speed, 'speed')));
       print({ ok: true, id: toId(id), speed: toNum(speed) });
     }));
 
   panel.command('place <panelId> <momentId>')
     .description('Put a moment on a panel (confirms the moment)')
     .action((panelId: string, momentId: string) => withSvc(({ svc }) => {
-      svc.placeMoment(toId(panelId), toId(momentId));
+      svc.command(svc.cutIdOfPanel(toId(panelId)), labels.place(svc, toId(panelId)), () => svc.placeMoment(toId(panelId), toId(momentId)));
       print({ ok: true, panel_id: toId(panelId), moment_id: toId(momentId) });
     }));
 
   panel.command('pick <panelId> <momentId>')
     .description('Pick one candidate of a panel (same as place)')
     .action((panelId: string, momentId: string) => withSvc(({ svc }) => {
-      svc.pickCandidate(toId(panelId), toId(momentId));
+      svc.command(svc.cutIdOfPanel(toId(panelId)), labels.pick(svc, toId(panelId)), () => svc.pickCandidate(toId(panelId), toId(momentId)));
       print({ ok: true, panel_id: toId(panelId), moment_id: toId(momentId) });
     }));
 
@@ -276,8 +312,10 @@ export function registerCutCommands(parent: Command): void {
     .command('reject <id>')
     .description('Reject a moment (it leaves candidate lists; a panel using it becomes a gap)')
     .option('--reason <text>', 'Why')
+    .option('--cut <id>', 'Cut to log the undo step on (default: Main)')
     .action((id: string, o) => withSvc(({ svc }) => {
-      svc.rejectMoment(toId(id), o.reason);
+      const cutId = logCutOf(svc, o.cut, svc.projectIdOfMoment(toId(id)));
+      svc.command(cutId, labels.reject(toId(id), o.reason), () => svc.rejectMoment(toId(id), o.reason));
       print({ ok: true, id: toId(id), status: 'rejected' });
     }));
 
@@ -306,14 +344,18 @@ export function registerCutCommands(parent: Command): void {
   const clip = parent.command('clip').description('Clip visibility');
   clip.command('hide <id>')
     .description('Hide a clip: its moments leave panels and candidate lists')
-    .action((id: string) => withSvc(({ svc }) => {
-      svc.hideClip(toId(id));
+    .option('--cut <id>', 'Cut to log the undo step on (default: Main)')
+    .action((id: string, o) => withSvc(({ svc }) => {
+      const cutId = logCutOf(svc, o.cut, svc.projectIdOfClip(toId(id)));
+      svc.command(cutId, labels.hideClip(svc, toId(id)), () => svc.hideClip(toId(id)));
       print({ ok: true, id: toId(id), hidden: true });
     }));
   clip.command('unhide <id>')
     .description('Unhide a clip (panels it left stay gaps)')
-    .action((id: string) => withSvc(({ svc }) => {
-      svc.unhideClip(toId(id));
+    .option('--cut <id>', 'Cut to log the undo step on (default: Main)')
+    .action((id: string, o) => withSvc(({ svc }) => {
+      const cutId = logCutOf(svc, o.cut, svc.projectIdOfClip(toId(id)));
+      svc.command(cutId, labels.unhideClip(svc, toId(id)), () => svc.unhideClip(toId(id)));
       print({ ok: true, id: toId(id), hidden: false });
     }));
 }

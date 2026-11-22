@@ -158,6 +158,36 @@ export class StoryboardService {
     return ops.historyState(this.db, cutId);
   }
 
+  // ---------- lookups for logging (which cut an edit belongs to, human names for labels) ----------
+
+  cutIdOfScene(sceneId: number): number { return this.scene(sceneId).story_id; }
+
+  cutIdOfPanel(panelId: number): number { return this.panel(panelId).story_id; }
+
+  /** "panel N": 1-based position of the panel within its scene. */
+  panelNo(panelId: number): number { return this.panel(panelId).position + 1; }
+
+  sceneName(sceneId: number): string { return this.scene(sceneId).name; }
+
+  clipFileName(clipId: number): string {
+    const p = this.clip(clipId).file_path;
+    return p.slice(Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\')) + 1);
+  }
+
+  projectIdOfClip(clipId: number): number {
+    const pid = this.clip(clipId).project_id;
+    if (pid === null) throw new Error(`Clip ${clipId} has no project`);
+    return pid;
+  }
+
+  projectIdOfMoment(momentId: number): number { return this.projectIdOfClip(this.moment(momentId).clip_id); }
+
+  projectIdOfCut(cutId: number): number {
+    const c = this.findCut(cutId);
+    if (!c) throw new Error(`Cut ${cutId} not found`);
+    return c.project_id;
+  }
+
   // ---------- cuts ----------
 
   createCut(projectId: number, name: string): Cut {

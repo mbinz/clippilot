@@ -209,6 +209,52 @@ describe('clippilot scene / panel / moment / clip', () => {
   });
 });
 
+describe('clippilot cut undo / redo / history', () => {
+  it('CLI mutations are logged with labels; undo and redo restore state', async () => {
+    const s = await run('scene', 'add', 'A');
+    const p = await run('panel', 'add', String(s.id), '--intent', 'wave');
+    await run('panel', 'place', String(p.id), '1');
+    await run('panel', 'trim', String(p.id), '2', '3');
+    await run('moment', 'reject', '1', '--reason', 'shaky');
+    await run('clip', 'hide', '2');
+
+    const hist = await run('cut', 'history', '--json');
+    expect(hist.map((h: any) => h.label)).toEqual([
+      'Hide clip b.mp4', '👎 shaky', expect.stringMatching(/^Trim panel/), 'Place moment in panel 1',
+      expect.stringMatching(/panel/i), expect.stringMatching(/scene/i),
+    ]);
+    expect(hist[0]).toMatchObject({ undone: false });
+    expect((await run('moments', 'list', '--json')).map((x: any) => x.id)).toEqual([2]);
+
+    const u = await run('cut', 'undo', '--json');
+    expect(u).toMatchObject({ label: 'Hide clip b.mp4', can_undo: true, can_redo: true });
+    expect((await run('moments', 'list', '--json')).map((x: any) => x.id)).toEqual([2, 3]);
+    await run('cut', 'undo', '--json');
+    expect((await run('cut', 'show', '--json')).scenes[0].panels[0]).toMatchObject({ state: 'filled', moment_id: 1 });
+    const r = await run('cut', 'redo', '--json');
+    expect(r).toMatchObject({ label: '👎 shaky' });
+    expect((await run('cut', 'show', '--json')).scenes[0].panels[0].state).toBe('gap');
+  });
+
+  it('applying a draft is a single undo step', async () => {
+    const f = path.join(dir, 'd.json');
+    fs.writeFileSync(f, JSON.stringify({ scenes: [{ name: 'A', panels: [{ intent: 'x', moment_id: 1 }, { intent: 'y' }] }] }));
+    await run('cut', 'apply', '--file', f);
+    const hist = await run('cut', 'history', '--json');
+    expect(hist).toHaveLength(1);
+    expect(hist[0].label).toBe('Apply draft (2 panels)');
+    await run('cut', 'undo', '--json');
+    expect((await run('cut', 'show', '--json')).scenes).toEqual([]);
+  });
+
+  it('accepts an explicit cut id; nothing to undo is an error', async () => {
+    const c = await run('cut', 'create', 'Other');
+    await run('cut', 'undo', String(c.id), '--json');
+    expect(process.exitCode).toBe(1);
+    expect(errs.join('\n')).toMatch(/Nothing to undo/);
+  });
+});
+
 describe('clippilot export --cut', () => {
   async function build(): Promise<number> {
     const f = path.join(dir, 'draft.json');

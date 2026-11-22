@@ -4,6 +4,7 @@ import type Database from 'better-sqlite3';
 import { ProjectRepository } from '../../../db/repositories/project.repository.js';
 import { ThumbnailRepository } from '../../../db/repositories/thumbnail.repository.js';
 import { StoryboardService, type PanelNode } from '../../storyboard/service.js';
+import { labels } from '../../storyboard/labels.js';
 
 type Body = Record<string, unknown>;
 
@@ -53,6 +54,22 @@ export function createCutRoutes(db: Database.Database): Hono {
     }
   };
 
+  /**
+   * Run a mutation as one undoable operation on `cutId` and return its result plus the cut's history state.
+   * `cutId` and `label` are resolved before the mutation (the rows may be gone afterwards).
+   */
+  const logged = <T>(cutId: number, label: string, fn: () => T) => {
+    const result = svc.command(cutId, label, fn);
+    const base = result && typeof result === 'object' && !Array.isArray(result) ? result : { ok: true };
+    return { ...base, history: svc.historyState(cutId) };
+  };
+  /** cut_id of a moment/clip route body: required, must exist and belong to the same project. */
+  const cutOf = (body: Body, projectId: number): number => {
+    const cutId = int(body.cut_id, 'cut_id');
+    if (svc.projectIdOfCut(cutId) !== projectId) throw new Error(`Cut ${cutId} belongs to another project`);
+    return cutId;
+  };
+
   const panelRow = (panelId: number) => db.prepare('SELECT * FROM story_segments WHERE id = ?').get(panelId);
   const sceneRow = (sceneId: number) => db.prepare('SELECT * FROM scenes WHERE id = ?').get(sceneId);
   const briefOf = (cutId: number) => {
@@ -92,8 +109,11 @@ export function createCutRoutes(db: Database.Database): Hono {
     const cutId = id(c);
     const body = await bodyOf(c);
     return guard(() => {
-      svc.renameCut(cutId, str(body.name, 'name'));
-      return svc.getCut(cutId)!.cut;
+      const name = str(body.name, 'name');
+      return logged(cutId, labels.renameCut(name), () => {
+        svc.renameCut(cutId, name);
+        return svc.getCut(cutId)!.cut;
+      });
     })(c);
   });
 
@@ -106,8 +126,11 @@ export function createCutRoutes(db: Database.Database): Hono {
     const cutId = id(c);
     const body = await bodyOf(c);
     return guard(() => {
-      svc.setBrief(cutId, body.brief, (body.state ?? 'proposed') as 'proposed' | 'confirmed');
-      return briefOf(cutId);
+      const state = (body.state ?? 'proposed') as 'proposed' | 'confirmed';
+      return logged(cutId, labels.brief(state), () => {
+        svc.setBrief(cutId, body.brief, state);
+        return briefOf(cutId);
+      });
     })(c);
   });
 
@@ -115,75 +138,96 @@ export function createCutRoutes(db: Database.Database): Hono {
   app.post('/cuts/:id/scenes', async (c) => {
     const cutId = id(c);
     const body = await bodyOf(c);
-    return guard(() => svc.addScene(cutId, str(body.name, 'name'), {
-      position: body.position === undefined ? undefined : int(body.position, 'position'),
-    }))(c);
+    return guard(() => {
+      const name = str(body.name, 'name');
+      const position = body.position === undefined ? undefined : int(body.position, 'position');
+      return logged(cutId, labels.addScene(name), () => svc.addScene(cutId, name, { position }));
+    })(c);
   });
 
   app.patch('/scenes/:id', async (c) => {
     const sceneId = id(c);
     const body = await bodyOf(c);
-    return guard(() => db.transaction(() => {
-      if (body.name !== undefined) svc.renameScene(sceneId, str(body.name, 'name'));
-      if (body.event_id !== undefined) svc.setSceneEvent(sceneId, body.event_id === null ? null : int(body.event_id, 'event_id'));
+    return guard(() => {
       if (body.name === undefined && body.event_id === undefined) throw new Error('name or event_id is required');
-      return sceneRow(sceneId);
-    })())(c);
+      const cutId = svc.cutIdOfScene(sceneId);
+      const label = body.name !== undefined ? labels.renameScene(str(body.name, 'name')) : labels.sceneEvent(svc, sceneId);
+      return logged(cutId, label, () => {
+        if (body.name !== undefined) svc.renameScene(sceneId, str(body.name, 'name'));
+        if (body.event_id !== undefined) svc.setSceneEvent(sceneId, body.event_id === null ? null : int(body.event_id, 'event_id'));
+        return sceneRow(sceneId);
+      });
+    })(c);
   });
 
   app.post('/scenes/:id/move', async (c) => {
     const sceneId = id(c);
     const body = await bodyOf(c);
     return guard(() => {
-      svc.moveScene(sceneId, int(body.position, 'position'));
-      return sceneRow(sceneId);
+      const position = int(body.position, 'position');
+      return logged(svc.cutIdOfScene(sceneId), labels.moveScene(svc, sceneId), () => {
+        svc.moveScene(sceneId, position);
+        return sceneRow(sceneId);
+      });
     })(c);
   });
 
-  app.delete('/scenes/:id', (c) => guard(() => svc.deleteScene(id(c)))(c));
+  app.delete('/scenes/:id', (c) => guard(() => {
+    const sceneId = id(c);
+    return logged(svc.cutIdOfScene(sceneId), labels.deleteScene(svc, sceneId), () => svc.deleteScene(sceneId));
+  })(c));
 
   // ---------- panels ----------
   app.post('/scenes/:id/panels', async (c) => {
     const sceneId = id(c);
     const body = await bodyOf(c);
-    return guard(() => svc.addPanel(sceneId, {
-      intent: typeof body.intent === 'string' ? body.intent : '',
-      momentId: body.moment_id === undefined ? undefined : int(body.moment_id, 'moment_id'),
-      candidates: body.candidates === undefined ? undefined
-        : (Array.isArray(body.candidates) ? body.candidates : []).map((m) => int(m, 'candidates[]')),
-      source: 'user',
-    }, body.position === undefined ? undefined : int(body.position, 'position')))(c);
+    return guard(() => {
+      const input = {
+        intent: typeof body.intent === 'string' ? body.intent : '',
+        momentId: body.moment_id === undefined ? undefined : int(body.moment_id, 'moment_id'),
+        candidates: body.candidates === undefined ? undefined
+          : (Array.isArray(body.candidates) ? body.candidates : []).map((m) => int(m, 'candidates[]')),
+        source: 'user' as const,
+      };
+      const position = body.position === undefined ? undefined : int(body.position, 'position');
+      return logged(svc.cutIdOfScene(sceneId), labels.addPanel(svc, sceneId), () => svc.addPanel(sceneId, input, position));
+    })(c);
   });
 
   app.patch('/panels/:id', async (c) => {
     const panelId = id(c);
     const body = await bodyOf(c);
-    return guard(() => db.transaction(() => {
-      let touched = false;
-      if (body.intent !== undefined) {
-        if (typeof body.intent !== 'string') throw new Error('intent must be a string');
-        svc.setIntent(panelId, body.intent);
-        touched = true;
-      }
-      if (body.start_sec !== undefined || body.end_sec !== undefined) {
-        svc.trimPanel(panelId, num(body.start_sec, 'start_sec'), num(body.end_sec, 'end_sec'));
-        touched = true;
-      }
-      if (body.speed !== undefined) {
-        svc.setSpeed(panelId, num(body.speed, 'speed'));
-        touched = true;
-      }
-      if (!touched) throw new Error('Nothing to update (intent, start_sec + end_sec, speed)');
-      return panelRow(panelId);
-    })())(c);
+    return guard(() => {
+      const cutId = svc.cutIdOfPanel(panelId);
+      const parts: string[] = [];
+      if (body.intent !== undefined) parts.push(labels.intent(svc, panelId));
+      if (body.start_sec !== undefined || body.end_sec !== undefined) parts.push(labels.trim(svc, panelId));
+      if (body.speed !== undefined) parts.push(labels.speed(svc, panelId, Number(body.speed)));
+      if (!parts.length) throw new Error('Nothing to update (intent, start_sec + end_sec, speed)');
+      return logged(cutId, parts.join(', '), () => {
+        if (body.intent !== undefined) {
+          if (typeof body.intent !== 'string') throw new Error('intent must be a string');
+          svc.setIntent(panelId, body.intent);
+        }
+        if (body.start_sec !== undefined || body.end_sec !== undefined) {
+          svc.trimPanel(panelId, num(body.start_sec, 'start_sec'), num(body.end_sec, 'end_sec'));
+        }
+        if (body.speed !== undefined) svc.setSpeed(panelId, num(body.speed, 'speed'));
+        return panelRow(panelId);
+      });
+    })(c);
   });
 
   app.post('/panels/:id/move', async (c) => {
     const panelId = id(c);
     const body = await bodyOf(c);
     return guard(() => {
-      svc.movePanel(panelId, int(body.scene_id, 'scene_id'), int(body.position, 'position'));
-      return panelRow(panelId);
+      const sceneId = int(body.scene_id, 'scene_id');
+      const position = int(body.position, 'position');
+      return logged(svc.cutIdOfPanel(panelId), labels.movePanel(svc, panelId), () => {
+        svc.movePanel(panelId, sceneId, position);
+        return panelRow(panelId);
+      });
     })(c);
   });
 
@@ -191,8 +235,11 @@ export function createCutRoutes(db: Database.Database): Hono {
     const panelId = id(c);
     const body = await bodyOf(c);
     return guard(() => {
-      svc.placeMoment(panelId, int(body.moment_id, 'moment_id'));
-      return panelRow(panelId);
+      const momentId = int(body.moment_id, 'moment_id');
+      return logged(svc.cutIdOfPanel(panelId), labels.place(svc, panelId), () => {
+        svc.placeMoment(panelId, momentId);
+        return panelRow(panelId);
+      });
     })(c);
   });
 
@@ -200,24 +247,65 @@ export function createCutRoutes(db: Database.Database): Hono {
     const panelId = id(c);
     const body = await bodyOf(c);
     return guard(() => {
-      svc.pickCandidate(panelId, int(body.moment_id, 'moment_id'));
-      return panelRow(panelId);
+      const momentId = int(body.moment_id, 'moment_id');
+      return logged(svc.cutIdOfPanel(panelId), labels.pick(svc, panelId), () => {
+        svc.pickCandidate(panelId, momentId);
+        return panelRow(panelId);
+      });
     })(c);
   });
 
-  app.delete('/panels/:id', (c) => guard(() => svc.deletePanel(id(c)))(c));
+  app.delete('/panels/:id', (c) => guard(() => {
+    const panelId = id(c);
+    return logged(svc.cutIdOfPanel(panelId), labels.deletePanel(svc, panelId), () => svc.deletePanel(panelId));
+  })(c));
 
   // ---------- moments and clips ----------
   app.post('/moments/:id/reject', async (c) => {
     const body = await bodyOf(c);
     return guard(() => {
-      svc.rejectMoment(id(c), typeof body.reason === 'string' ? body.reason : undefined);
-      return { id: id(c), status: 'rejected' };
+      const momentId = id(c);
+      const reason = typeof body.reason === 'string' ? body.reason : undefined;
+      const cutId = cutOf(body, svc.projectIdOfMoment(momentId));
+      return logged(cutId, labels.reject(momentId, reason), () => {
+        svc.rejectMoment(momentId, reason);
+        return { id: momentId, status: 'rejected' };
+      });
     })(c);
   });
 
-  app.post('/clips/:id/hide', (c) => guard(() => { svc.hideClip(id(c)); return { id: id(c), hidden: true }; })(c));
-  app.post('/clips/:id/unhide', (c) => guard(() => { svc.unhideClip(id(c)); return { id: id(c), hidden: false }; })(c));
+  app.post('/clips/:id/hide', async (c) => {
+    const body = await bodyOf(c);
+    return guard(() => {
+      const clipId = id(c);
+      const cutId = cutOf(body, svc.projectIdOfClip(clipId));
+      return logged(cutId, labels.hideClip(svc, clipId), () => { svc.hideClip(clipId); return { id: clipId, hidden: true }; });
+    })(c);
+  });
+  app.post('/clips/:id/unhide', async (c) => {
+    const body = await bodyOf(c);
+    return guard(() => {
+      const clipId = id(c);
+      const cutId = cutOf(body, svc.projectIdOfClip(clipId));
+      return logged(cutId, labels.unhideClip(svc, clipId), () => { svc.unhideClip(clipId); return { id: clipId, hidden: false }; });
+    })(c);
+  });
+
+  // ---------- history ----------
+  app.post('/cuts/:id/undo', (c) => guard(() => {
+    const cutId = id(c);
+    const r = svc.undo(cutId);
+    return { ...r, history: svc.historyState(cutId) };
+  })(c));
+  app.post('/cuts/:id/redo', (c) => guard(() => {
+    const cutId = id(c);
+    const r = svc.redo(cutId);
+    return { ...r, history: svc.historyState(cutId) };
+  })(c));
+  app.get('/cuts/:id/history', (c) => {
+    if (!svc.getCut(id(c))) return c.json({ error: 'Cut not found' }, 404);
+    return c.json({ data: svc.history(id(c)) });
+  });
 
   return app;
 }
