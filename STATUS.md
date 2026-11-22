@@ -868,7 +868,13 @@ CLI and server routes are thin wrappers over it. Slices S1→S7, test-first, one
   `export --cut` without value) uses the project's cut "Main", creating it if the project has no cut yet. More cuts via
   explicit `cut create`. Service: `getOrCreateMainCut(projectId)`; tested in S2 and S4.
 
-### M4 — Scene board UI (mockup first)
+### M4 — Scene board UI (mockup first) — board ✅ 2026-11-22 (d2b5d77…753d18e, 721 tests); in use on the real Arrifana cut
+2026-11-22: server undo log (U1–U3), web board ported from mockup v2 (W1–W3), fixes F1/F2 after the planner's browser
+check. Verified on a DB copy: real cut loads (5 scenes / 42 panels), hover + drawer + preview play proxies, pick →
+logged, ⌘Z/⇧⌘Z via server, place of a 21 s moment → 4 s default window (gated slow-mo), 👎 / Undo 👎 logged, 6 undos
+restore the cut exactly, project auto-selects. Then pointed `clippilot ui` at `~/Video/ClipPilot Arrifana` (real DB).
+Deferred: CLI `scene add --event`; web `defaultRange` duplicates the server one (web can't import src/); no optimistic
+updates (every action waits for API + refetch); no pruning of `operations`; reject/hide undo is project-wide.
 - Moment pool per scene (by role, hero first, filler collapsed, duplicates stacked, hidden behind a link) + panel row.
 - Place (drag / pick candidate) = confirm; 👎 with reasons; hide clip; AI vs user picks visually distinct.
 - Edit scenes and panels, trim, speed 100/50/25 %; brief form; browser preview of scene / cut; export button (OTIO).
