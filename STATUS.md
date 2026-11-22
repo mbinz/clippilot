@@ -874,6 +874,66 @@ CLI and server routes are thin wrappers over it. Slices S1→S7, test-first, one
 - Edit scenes and panels, trim, speed 100/50/25 %; brief form; browser preview of scene / cut; export button (OTIO).
 - Replaces the standalone review page.
 
+#### M4 implementation specs (planner, 2026-11-22) — design = `mockups/scene-board-v2.html` (approved by "wire it")
+Two implementer runs: **A = U1–U3 (server)**, then **B = W1–W3 (web)**. Test-first where there is logic; one commit each.
+
+**U1 — operation log + undo/redo (migration 017, `src/core/storyboard/history.ts`)**
+- Table `operations (id PK, story_id FK CASCADE, label TEXT, before TEXT, after TEXT, undone INTEGER DEFAULT 0, created_at)`.
+- `snapshot(db, cutId)` → JSON of everything a board/CLI edit can change: the cut row (name, brief, brief_state), its
+  scenes, panels, panel_candidates (all with ids), plus for the cut's project: `highlights.status/reject_reason` of
+  non-proposed moments and the ids of hidden clips. `restore(db, cutId, snap)` rewrites exactly that (delete the cut's
+  scenes → cascade; re-insert scenes/panels/candidates **with their original ids**; reset statuses/hidden to the snapshot)
+  in one transaction.
+- `StoryboardService.command(cutId, label, fn)`: snapshot before → fn → snapshot after → insert operation; first deletes
+  the cut's `undone=1` operations (new action clears redo). `undo(cutId)` restores the newest not-undone op's `before` and
+  marks it undone; `redo(cutId)` restores the oldest undone op's `after` and clears the flag. Both return
+  `{label, can_undo, can_redo}`; nothing to undo/redo → error. `history(cutId)` → last 50 `{id, label, undone, created_at}`.
+- **Every** mutating service method used by routes/CLI goes through `command` with a human label ("Place moment in
+  panel 3", "Trim panel", "Apply draft (42 panels)", "👎 shake", "Hide clip C0519.MP4", "Confirm brief" …).
+  `applyDraft` = one operation. Clip hide/reject affect all cuts of the project but are logged on the cut they were
+  done from (fine for v1; note in ARCHITECTURE).
+- Tests: undo/redo round-trip for place, trim, reject (status + candidates), hide, delete scene (ids come back), draft
+  apply as one step; redo cleared by a new action; restore keeps panel ids; empty-history errors.
+
+**U2 — routes + CLI for history**
+- `POST /api/cuts/:id/undo`, `POST /api/cuts/:id/redo`, `GET /api/cuts/:id/history`. Every mutating cut/scene/panel/
+  moment/clip route response gains `history: {can_undo, can_redo, undo_label, redo_label}` for that cut (moment/clip
+  routes take `cut_id` in the body to know which cut to log on; required).
+- CLI: `cut undo|redo|history [id] --json`; CLI mutations log like the routes.
+
+**U3 — moments route + media**
+- `GET /api/projects/:id/moments?event_id&include_rejected=1&include_hidden=1` → `listMoments` rows plus
+  `thumbnail` (URL of the clip thumbnail nearest the moment midpoint), `clip: {id, file_name, duration_sec, fps,
+  proxy_url, hidden}`. Default excludes rejected + hidden (as the CLI).
+- `GET /api/cuts/:id` panels/candidates already carry thumbnail/proxy_url — make sure clip `fps` and `duration_sec`
+  are included (drawer timeline + speed gating). Test that `/media/proxies/*` answers a `Range` request with 206.
+
+**W1 — board data layer (web/src/board/)**
+- `api.ts` (typed calls for tree, moments, all mutations, undo/redo/history), `useBoard(cutId)` hook: loads tree +
+  moments, exposes actions that call the API then refetch the tree (simple; no optimistic updates), holds `history`.
+- Pure helpers in `web/src/board/logic.ts`: panel timeline length, first-candidate range, scene/cut totals, speed
+  gating, "to choose" list. Tests in `tests/unit/web/board-logic.test.ts` (root vitest imports the file).
+- Cut selection: project's "Main" cut (create on first open via POST if none).
+
+**W2 — board UI (web/src/components/board/)** — port the v2 mockup faithfully into React + Tailwind:
+- New header tab "Board". Scene nav (rename inline, add/move/delete), panel strip, image-only moment pool by role
+  (★ hero, ⚠ issue, dot = in cut; filler collapsed; rejected/hidden behind a link; This event / All), drawer for panel
+  (player looping range, clip timeline with moments + trim handles, speed 100/50/25 gated by fps, intent, move/delete,
+  candidates to pick) and for moment (player, whole-clip toggle, facts, Place / Add to scene, 👎 reason chips, Hide clip /
+  restore), hover playback from proxies (muted, 2×, loop range; one live video), drag a moment onto a panel or "+".
+- Colour tokens exactly as the mockup: neutral = selection/primary, violet = AI, green = mine, amber = needs decision,
+  red = rejected/destructive. Nothing else coloured.
+- Undo/redo: header buttons with labels in the tooltip, ⌘Z / ⇧⌘Z (not while typing), toast with "Undo" after actions.
+
+**W3 — brief, preview, export**
+- Brief modal (fields incl. audience, must-haves with thumbnails, Confirm → `PUT brief` state confirmed, logged).
+- Preview cut / scene: real proxy playback in order at panel speed, 1×/2×, click the track to jump, scene title overlay.
+- Export button → server route `POST /api/cuts/:id/export {format:'otio'}` writing to `<project>/exports/<project> – <cut>.otio`
+  (add the route in W3 with a test; reuse `cutToSegments` + OTIO writer) → toast with the path.
+
+Verification (planner): run `clippilot ui` in `~/Video/ClipPilot Arrifana` (dist built) against a **copy** first, then the real
+cut; check every interaction incl. undo/redo in the browser.
+
 ### M5 — Gap fillers (free) — v0.3
 - Per-gap search over own library (unused clips, other projects).
 - Locally rendered title/chapter cards, animated route map, photo pan/zoom → ingested as clips.

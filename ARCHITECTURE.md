@@ -90,6 +90,12 @@ ingest (resumable) → analyze proxy video → moments (tagged, no scores)
 6. **No build step.** Run via `tsx`. Type-checking is the compile gate.
 8. **Categorical tags, not absolute scores** (2026-11-19/21). Gemini's 1–5 clip scores and 1–10 moment scores were flat (2.8–3.8; 33 of 36 at 7–8) → dropped incl. DB columns. Moments carry tier/shot/role/issues/slow-mo/audio; measurable things (shake, fps, duration) are computed in code.
 9. **No learned taste profile** (2026-11-21). Profile rules learned from ~29 rated moments in one folder overfit; preference lives in the per-cut brief and in the user's choices on the board.
+10. **Undo/redo lives on the server** (2026-11-22). Every storyboard mutation — from the board, the CLI or Claude — runs
+   through `StoryboardService.command(cutId, label, fn)`, which stores a before/after snapshot of the cut (scenes, panels,
+   candidates, brief) and of the project's moment statuses / hidden clips in `operations`. Undo/redo restore snapshots
+   with original row ids, so the UI selection survives and a whole Claude draft is one undo step. Snapshots are small
+   (a cut is ≲ 100 panels); per-op inverses aren't worth the bug surface. Moment reject / clip hide are project-wide but
+   are logged on the cut they were done from.
 7. **Paid / vendor-specific sources are plugins.** Stock and AI-video gap fillers sit behind a plugin seam (M6); the core stays free and offline-capable except for Gemini analysis.
 
 ## Testing
