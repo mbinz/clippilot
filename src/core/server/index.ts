@@ -11,6 +11,7 @@ import { createProjectRoutes } from './routes/projects.js';
 import { createFacetRoutes } from './routes/facets.js';
 import { createSimilarityRoutes } from './routes/similarity.js';
 import { createEventRoutes } from './routes/events.js';
+import { createCutRoutes } from './routes/cuts.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -33,6 +34,7 @@ export function createApp(options: ServerOptions): Hono {
   app.route('/api/facets', createFacetRoutes(db));
   app.route('/api/similarity', createSimilarityRoutes(db));
   app.route('/api', createEventRoutes(db));
+  app.route('/api', createCutRoutes(db));
 
   // Serve thumbnails from .clippilot/thumbnails/
   const thumbnailDir = path.resolve(basePath, '.clippilot', 'thumbnails');
