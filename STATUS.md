@@ -747,7 +747,11 @@ Slices E1→E5, test-first, one commit each. Migration 015 (013/014 are taken by
 Done when: `events rebuild` on a copy of the pilot DB gives sensible events; then the user-facing step is ingesting
 `03 Arrifana` + the user running analyze.
 
-### M3 — Storyboard model + CLI — code ✅ 2026-11-22 (7d3b8cb…583ec69, 665 tests); Arrifana brief + draft in chat pending
+### M3 — Storyboard model + CLI — code ✅ 2026-11-22 (7d3b8cb…583ec69, 665 tests); brief ✅ draft ✅; Resolve import pending
+2026-11-22: brief proposed by Claude, confirmed by the user (2:45, family & grandparents, chronological, 5 must-haves,
+Odeceixe ending). Draft applied via `cut apply` in `~/Video/ClipPilot Arrifana`: 5 scenes, 42 panels (40 filled, 2
+candidates, 0 gaps), ~2:39, 3 slowed panels (50 fps only). Exported `exports/03 Arrifana – Main.otio` (25 fps, 42 clips,
+5 scene markers, all media paths exist). **Done when:** user imports it into free Resolve and judges the rough cut.
 - Migration: `scenes` (per cut, start event), cut brief, panel `intent` / `state` (filled | candidates | gap) / `speed` /
   `source` (ai | user), panel candidates; moment `status` (proposed | confirmed | rejected); `clips.hidden`.
 - CLI verbs for brief (Claude proposes, user adjusts) / cut / scene / panel; Claude drafts the Arrifana cut in chat.
