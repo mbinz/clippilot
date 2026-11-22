@@ -765,6 +765,23 @@ Done when: `events rebuild` on a copy of the pilot DB gives sensible events; the
   `mockups/scene-board.data.js` (regenerate: `scripts/mockups/extract-mockup-data.ts`). Serve the folder over HTTP to view.
   Waiting for user feedback before M4 build.
 
+#### M4 mockup — feedback round 1 → v2 (2026-11-22)
+User feedback on v1: too busy (drop text from the pool); thumbnails must show motion (play on hover); details only on
+click; colour must mean one thing each; the right panel was mostly empty; preview must show more than one frame.
+Plus: **undo/redo for every user action, built in from the start.**
+v2 (`mockups/scene-board-v2.html`, serve with `scripts/mockups/serve.ts` so proxies play):
+- Pool = image-only grid; ★ hero, ⚠ issue, small dot = in the cut. Hover plays the moment from the 720p proxy at 2×.
+- No permanent inspector: clicking a panel or moment opens a drawer (video player looping the range, clip timeline with
+  all moments + trim handles, speed, intent, actions; 👎 reasons inline).
+- Colours: neutral white = selection/primary · violet = AI proposed · green = mine/confirmed · amber = needs your
+  decision ("N to choose", over length) · red = rejected/problem/destructive. Hero is a ★, not a colour.
+- Preview plays the real proxies in order at panel speed (1×/2×), click the track to jump.
+- Undo/redo: every action is a labelled history step (⌘Z / ⇧⌘Z, header buttons, toast "Undo").
+- **Architecture decision (for M4 build): undo/redo is server-side.** Every board mutation goes through one command
+  endpoint that records an operation (label + inverse, or before/after snapshot of the touched rows) in an
+  `operations` table per cut; `POST /cuts/:id/undo|redo` replays. CLI/Claude edits go through the same log, so a
+  Claude draft can be undone from the UI as one step. Spec + ARCHITECTURE.md update before M4 S1.
+
 #### M3 implementation specs (planner, 2026-11-22) — Q1–Q3 answered by the user
 Facts: `stories` / `story_segments` are empty in every DB (pilot, Portugal) → reshape freely. Export already supports
 per-segment `speed` and `scene_name` markers (OTIO + FCPXML), but `export --story` passes neither. `analyze --force`
