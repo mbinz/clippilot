@@ -7,7 +7,8 @@ Update this file whenever the answer to any of those questions shifts.
 
 **2026-11-21:** re-planned around events + scene board (see "Re-plan 2026-11-21"). M2.7 ✅ and M2.8 ✅ (576 tests).
 2026-11-22: global config (K1); `03 Arrifana` ingested into `~/Video/ClipPilot Arrifana/` (104 clips, 0 errors,
-4 folder events: Arrifana 48, Delfine 33, Arrifana Haus 10, Praia do Odeceixe 13), analyze running. Next: M3.
+4 folder events: Arrifana 48, Delfine 33, Arrifana Haus 10, Praia do Odeceixe 13) and analyzed: 104/104 (1 retry
+after Gemini omitted `description`), 2 proxies > 18 MB went through the Files API ✅. Next: M3 (specs ready).
 
 `v0.1.0` — ingest (resumable) / analyze with timestamped highlights / search / summary; OTIO + FCPXML export verified in free Resolve (M1). No story/storyboard workflow yet (M3).
 Solo project, MIT. Run via `tsx`, no compiled binary.
@@ -659,6 +660,15 @@ Every slice: failing test first, `npm run typecheck && npm run test:all` green, 
   second "Undated" event; `createDb` doesn't await `ensureDir` (race on a fresh dir); `calibrate sample|status` commands
   remain but are undocumented; web UI doesn't show the audio tag or dup groups yet (M4).
 
+#### Arrifana analysis findings (2026-11-22, 104 clips, 177 moments)
+- Tiers: hero 46 / solid 123 / filler 5 (before retry) — hero ~26 %, fairly generous; filler barely used.
+- **audio_keep is far too generous:** 135 of 174 moments (78 %; ambient 75, speech 60). The prompt makes "worth hearing"
+  too easy → tighten in a later prompt pass (e.g. "nur wenn der Ton den Moment trägt; im Zweifel false"), check on a sample.
+- Duplicate groups: 0 — genuine. No overlapping recordings; nearest cross-clip thumbnail dHash distance is 9 (threshold 6).
+- One clip failed 3× because Gemini omitted `description` on moments; `--retry-errors` fixed it. Possible hardening:
+  default `description` to "" instead of failing the whole clip (deferred).
+- Event name "Praia do Odeceixe " keeps the folder's trailing space → trim names in `deriveEvents` (deferred).
+
 #### K1 — Global config (planner, 2026-11-22; replaces the launchctl fallback) — ✅ a10aa2c, d00bf81 (589 tests)
 Key now in `~/.clippilot/config.json` (0600); verified a fresh dir finds it. Deferred: project-level `config set`
 writes the whole merged config (incl. global values / env key) into the project file — should write only the changed key.
@@ -742,7 +752,7 @@ Done when: `events rebuild` on a copy of the pilot DB gives sensible events; the
 - CLI verbs for brief (Claude proposes, user adjusts) / cut / scene / panel; Claude drafts the Arrifana cut in chat.
 - Server routes for the same.
 
-#### M3 implementation specs (planner, 2026-11-22) — DRAFT, open questions below
+#### M3 implementation specs (planner, 2026-11-22) — Q1–Q3 answered by the user
 Facts: `stories` / `story_segments` are empty in every DB (pilot, Portugal) → reshape freely. Export already supports
 per-segment `speed` and `scene_name` markers (OTIO + FCPXML), but `export --story` passes neither. `analyze --force`
 calls `highlights.replaceForClip` (delete + insert) → would wipe moment status and break panel links.
@@ -776,7 +786,8 @@ CLI and server routes are thin wrappers over it. Slices S1→S7, test-first, one
 - Tests per op incl. position density, cross-scene move, speed gating, reject cascading.
 
 **S3 — brief + draft apply** (zod schemas in `src/core/storyboard/schema.ts`)
-- Brief: `{target_sec: number, mood: string, must_have: [{moment_id?: number, text: string}], ending: string, notes?: string}`.
+- Brief: `{target_sec: number, audience: string, mood: string, must_have: [{moment_id?: number, text: string}], ending: string,
+  notes?: string}` (audience e.g. "family", "friends / social" — steers tone and length).
   `setBrief(cutId, brief, state)` validates; `state` proposed (Claude) or confirmed (user said ok).
 - Draft: `{scenes:[{name, event_id?, notes?, panels:[{intent, moment_id?, candidates?: number[], start_sec?, end_sec?, speed?}]}]}`.
   Panel with `moment_id` → filled (in/out default to the moment's, overridable), with `candidates` (2–5) → candidates,
@@ -816,10 +827,12 @@ CLI and server routes are thin wrappers over it. Slices S1→S7, test-first, one
 **Then (planner + user, in chat):** Claude proposes the Arrifana brief → user adjusts/confirms → Claude drafts via
 `moments list` + `cut apply` → `export --cut` → user imports into free Resolve. That is the M3 "done when".
 
-**Open questions (need the user before S1):**
-- Q1: candidates panel on export — first candidate (AI pick usable as-is; default) or skip like a gap?
-- Q2: brief fields — target length, mood, must-haves, ending (from PRD); anything else (music track, aspect, audience)?
-- Q3: one cut per project in practice — create "Main" automatically on first use, or always explicit `cut create`?
+**Decisions (user, 2026-11-22):**
+- Q1: candidates panel exports its **first candidate** (AI pick usable as-is).
+- Q2: brief = PRD fields + **audience**.
+- Q3: **auto-create cut "Main"**: any cut-scoped command without a cut id (`cut show`, `cut brief`, `cut apply`,
+  `export --cut` without value) uses the project's cut "Main", creating it if the project has no cut yet. More cuts via
+  explicit `cut create`. Service: `getOrCreateMainCut(projectId)`; tested in S2 and S4.
 
 ### M4 — Scene board UI (mockup first)
 - Moment pool per scene (by role, hero first, filler collapsed, duplicates stacked, hidden behind a link) + panel row.
