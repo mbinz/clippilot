@@ -742,6 +742,85 @@ Done when: `events rebuild` on a copy of the pilot DB gives sensible events; the
 - CLI verbs for brief (Claude proposes, user adjusts) / cut / scene / panel; Claude drafts the Arrifana cut in chat.
 - Server routes for the same.
 
+#### M3 implementation specs (planner, 2026-11-22) — DRAFT, open questions below
+Facts: `stories` / `story_segments` are empty in every DB (pilot, Portugal) → reshape freely. Export already supports
+per-segment `speed` and `scene_name` markers (OTIO + FCPXML), but `export --story` passes neither. `analyze --force`
+calls `highlights.replaceForClip` (delete + insert) → would wipe moment status and break panel links.
+Design rules: a panel stores its own `clip_id` + in/out + speed (moment_id is provenance only, `ON DELETE SET NULL`),
+so the timeline survives re-analysis. All storyboard logic lives in `src/core/storyboard/` (service over repos);
+CLI and server routes are thin wrappers over it. Slices S1→S7, test-first, one commit each. Migration 016.
+
+**S1 — schema (migration 016)**
+- `stories` += `brief TEXT NULL` (JSON, see S3), `brief_state TEXT NOT NULL DEFAULT 'none'` (`none|proposed|confirmed`).
+- New `scenes (id, story_id FK CASCADE, position, name, event_id FK SET NULL, notes, created_at, UNIQUE(story_id, position))`.
+- `story_segments` recreated (empty table): `id, story_id FK CASCADE, scene_id FK CASCADE NOT NULL, position,
+  intent TEXT NOT NULL DEFAULT '', state TEXT CHECK (filled|candidates|gap), source TEXT CHECK (ai|user) DEFAULT 'ai',
+  clip_id FK NULL, moment_id FK highlights SET NULL, start_sec REAL NULL, end_sec REAL NULL, speed REAL NOT NULL DEFAULT 1,
+  notes, created_at, UNIQUE(scene_id, position)`. CHECK: filled ⇒ clip_id, start_sec, end_sec not null.
+- New `panel_candidates (panel_id FK CASCADE, moment_id FK highlights CASCADE, position, PRIMARY KEY(panel_id, moment_id))`.
+- `highlights` += `status TEXT NOT NULL DEFAULT 'proposed'` (`proposed|confirmed|rejected`), `reject_reason TEXT NULL`.
+- `clips` += `hidden INTEGER NOT NULL DEFAULT 0`.
+- Types in `src/types/story.ts` (Cut/Scene/Panel names in TS, table names unchanged). Tests: migration test like 012–015.
+
+**S2 — storyboard service, reads + edits** (`src/core/storyboard/service.ts`, in-memory DB tests)
+- `getCut(id)` → tree `{cut, brief, scenes:[{…, event, panels:[{…, clip, moment, candidates:[moment…]}]}], totals:{panels,
+  filled, candidates, gaps, duration_sec}}` (duration = Σ filled (end−start)/speed).
+- Cut: create, rename, delete, list. Scene: add (at position or end), rename, delete, move, set event.
+  Panel: add (state gap / with candidates / filled), delete, move (within or across scenes), set intent, trim (clamped to
+  clip duration, min 0.5 s), set speed (1 | 0.5 | 0.25, rejected if clip fps < 48 for 0.5 / < 90 for 0.25 — reuse
+  `suggestedSpeed` thresholds), positions stay dense 0..n−1 after every op.
+- **Place** moment on a panel → state filled, clip/in/out from the moment, speed = moment `suggested_speed`, source user,
+  moment status confirmed, candidates cleared. **Pick candidate** = place. **Reject** moment (reason optional) → status
+  rejected; removed from any candidate list; a filled panel using it becomes gap (source stays). **Hide clip** → `clips.hidden=1`,
+  same treatment for its moments' panels/candidates. Unhide reverses only the flag.
+- Tests per op incl. position density, cross-scene move, speed gating, reject cascading.
+
+**S3 — brief + draft apply** (zod schemas in `src/core/storyboard/schema.ts`)
+- Brief: `{target_sec: number, mood: string, must_have: [{moment_id?: number, text: string}], ending: string, notes?: string}`.
+  `setBrief(cutId, brief, state)` validates; `state` proposed (Claude) or confirmed (user said ok).
+- Draft: `{scenes:[{name, event_id?, notes?, panels:[{intent, moment_id?, candidates?: number[], start_sec?, end_sec?, speed?}]}]}`.
+  Panel with `moment_id` → filled (in/out default to the moment's, overridable), with `candidates` (2–5) → candidates,
+  neither → gap. `applyDraft(cutId, draft, {mode: 'replace'|'append'})` in one transaction: validates every id
+  (moment exists, belongs to the project, not rejected, clip not hidden) and reports all errors at once; `replace`
+  keeps panels with source user (they are re-appended to their scene by name; scene missing → kept in a "Kept" scene).
+  Draft-applied panels are source ai; their moments stay proposed.
+- Tests: valid draft tree, every validation error collected, replace keeps user panels, append.
+
+**S4 — CLI + skill** (`src/cli/commands/cut.ts`; all reads `--json`)
+- `cut list|create <name>|show <id>|rename|delete`, `cut brief <id> [--set-file f.json] [--confirm]` (no flags = print),
+  `cut apply <id> --file draft.json [--append]`, `scene add|rename|move|delete|set-event`, `panel add|move|delete|intent|
+  trim|speed|place <panelId> <momentId>|pick`, `moment reject <id> [--reason]`, `clip hide|unhide <id>`.
+- `moments list [--event <id>] [--min-tier] [--include-rejected] --json` → compact rows for drafting (id, clip, event,
+  start/end, tier/shot/role/issues, slowmo/suggested_speed, audio, dup_group, status, description), hidden clips excluded.
+- SKILL.md: "Storyboard" section — workflow brief → draft JSON → `cut apply` → `cut show`; rules: propose the brief and
+  wait for the user's ok before drafting; one dup_group member per cut; prefer hero/solid; respect audio_keep.
+- Tests: command-level like `events.test.ts` (show JSON shape, apply errors exit 1, place via CLI).
+
+**S5 — export a cut**
+- `export --cut <id>` (keep `--story` as alias): panels in scene/panel order; filled → its clip/in/out/speed;
+  candidates → **first candidate** (see Q1); gap → skipped. Every exported segment carries `speed` and `scene_name`
+  (first segment per scene gets the marker). JSON confirmation adds `{exported, skipped_gaps}`.
+- Tests: cut → ExportSegment list (order, speed, scene_name, gap skipped, candidate fallback); OTIO output of a 2-scene
+  cut has 2 markers and a LinearTimeWarp on the slowed panel. Resolve golden files untouched; manual Resolve import at
+  v0.2 acceptance.
+
+**S6 — re-analysis keeps decisions**
+- `analyze --force` on a clip: new moments replace old ones, but old moments that are confirmed/rejected or referenced by
+  a panel/candidate are **kept** (not deleted); other old moments are deleted. Panels keep working regardless (S1 rule).
+- Tests on `replaceForClip`-successor: kept vs dropped sets, candidates survive.
+
+**S7 — server routes** (Hono, like `events.ts`; thin over the service)
+- `GET /api/projects/:id/cuts`, `GET /api/cuts/:id` (tree + clip thumbnail/proxy URLs), `PUT /api/cuts/:id/brief`,
+  and POST/PATCH/DELETE for scene/panel ops, place, pick, reject, hide. Errors → 400 with message. Tests via `app.request`.
+
+**Then (planner + user, in chat):** Claude proposes the Arrifana brief → user adjusts/confirms → Claude drafts via
+`moments list` + `cut apply` → `export --cut` → user imports into free Resolve. That is the M3 "done when".
+
+**Open questions (need the user before S1):**
+- Q1: candidates panel on export — first candidate (AI pick usable as-is; default) or skip like a gap?
+- Q2: brief fields — target length, mood, must-haves, ending (from PRD); anything else (music track, aspect, audience)?
+- Q3: one cut per project in practice — create "Main" automatically on first use, or always explicit `cut create`?
+
 ### M4 — Scene board UI (mockup first)
 - Moment pool per scene (by role, hero first, filler collapsed, duplicates stacked, hidden behind a link) + panel row.
 - Place (drag / pick candidate) = confirm; 👎 with reasons; hide clip; AI vs user picks visually distinct.
