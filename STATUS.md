@@ -6,7 +6,8 @@ Update this file whenever the answer to any of those questions shifts.
 ## Version & state
 
 **2026-11-21:** re-planned around events + scene board (see "Re-plan 2026-11-21"). M2.7 ✅ and M2.8 ✅ (576 tests).
-Next: user ingests + analyzes `03 Arrifana` (and checks a > 20 MB proxy via Files API), then M3.
+2026-11-22: global config (K1); `03 Arrifana` ingested into `~/Video/ClipPilot Arrifana/` (104 clips, 0 errors,
+4 folder events: Arrifana 48, Delfine 33, Arrifana Haus 10, Praia do Odeceixe 13), analyze running. Next: M3.
 
 `v0.1.0` — ingest (resumable) / analyze with timestamped highlights / search / summary; OTIO + FCPXML export verified in free Resolve (M1). No story/storyboard workflow yet (M3).
 Solo project, MIT. Run via `tsx`, no compiled binary.
@@ -658,7 +659,9 @@ Every slice: failing test first, `npm run typecheck && npm run test:all` green, 
   second "Undated" event; `createDb` doesn't await `ensureDir` (race on a fresh dir); `calibrate sample|status` commands
   remain but are undocumented; web UI doesn't show the audio tag or dup groups yet (M4).
 
-#### K1 — Global config (planner, 2026-11-22; replaces the launchctl fallback)
+#### K1 — Global config (planner, 2026-11-22; replaces the launchctl fallback) — ✅ a10aa2c, d00bf81 (589 tests)
+Key now in `~/.clippilot/config.json` (0600); verified a fresh dir finds it. Deferred: project-level `config set`
+writes the whole merged config (incl. global values / env key) into the project file — should write only the changed key.
 The key was only in `~/Video/Portugal/.clippilot/config.json` (per working dir), so a new working dir had no key. A
 launchctl fallback (6543cc7) was built first but is useless — the key isn't in launchctl (`launchctl getenv` exits 0
 even when unset) — so it is **reverted** (`git revert 6543cc7`, keep its test file's env save/restore pattern).
