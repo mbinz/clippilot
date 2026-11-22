@@ -51,7 +51,13 @@ export class HighlightRepository {
   private stmtSetDup: Database.Statement;
 
   constructor(private db: Database.Database) {
-    this.stmtDelete = db.prepare('DELETE FROM highlights WHERE clip_id = ?');
+    // Decisions survive re-analysis: confirmed/rejected moments and those a panel or candidate list points at stay.
+    this.stmtDelete = db.prepare(`
+      DELETE FROM highlights
+      WHERE clip_id = ? AND status = 'proposed'
+        AND id NOT IN (SELECT moment_id FROM story_segments WHERE moment_id IS NOT NULL)
+        AND id NOT IN (SELECT moment_id FROM panel_candidates)
+    `);
     this.stmtInsert = db.prepare(
       'INSERT INTO highlights (clip_id, start_sec, end_sec, description, tier, shot, role, issues, slowmo, slowmo_reason, suggested_speed, audio_keep, audio_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     );
@@ -71,6 +77,10 @@ export class HighlightRepository {
     `);
   }
 
+  /**
+   * Store a fresh analysis: proposed, unreferenced moments are replaced by `items`; moments that are
+   * confirmed, rejected, or used by a panel/candidate list are kept (so decisions and the timeline survive).
+   */
   replaceForClip(clipId: number, items: InsertHighlight[]): void {
     this.db.transaction(() => {
       this.stmtDelete.run(clipId);

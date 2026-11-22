@@ -64,6 +64,25 @@ describe('analyzeClips with highlights', () => {
     const after = hlRepo.findByClip(clip.id);
     expect(after.map((h) => h.description)).toEqual(['Gull']);
   });
+  it('re-analysis (force) keeps a confirmed moment and drops proposed ones', async () => {
+    const clip = insertClip();
+    const first = { analyzeVideo: async () => response([
+      { start_sec: 0.5, end_sec: 2, description: 'Keep', tier: 'hero', shot: 'wide', role: 'action' },
+      { start_sec: 2.5, end_sec: 4, description: 'Drop', tier: 'filler', shot: 'close', role: 'detail' },
+    ]) };
+    await analyzeClips([clip], DEFAULT_CONFIG, clipRepo, () => {}, hlRepo, first);
+    const keep = hlRepo.findByClip(clip.id).find((h) => h.description === 'Keep')!;
+    db.prepare("UPDATE highlights SET status = 'confirmed' WHERE id = ?").run(keep.id);
+
+    clipRepo.resetAnalysis(undefined, [clip.id]);
+    const second = { analyzeVideo: async () => response([{ start_sec: 1, end_sec: 3, description: 'Fresh', tier: 'solid', shot: 'wide', role: 'action' }]) };
+    await analyzeClips([clipRepo.findById(clip.id)!], DEFAULT_CONFIG, clipRepo, () => {}, hlRepo, second);
+
+    expect(hlRepo.findByClip(clip.id).map((h) => [h.description, h.status]).sort()).toEqual([
+      ['Fresh', 'proposed'], ['Keep', 'confirmed'],
+    ]);
+    expect(hlRepo.findByClip(clip.id).find((h) => h.description === 'Keep')!.id).toBe(keep.id);
+  });
   it('leaves analysis_profile_version NULL (taste profiles are gone)', async () => {
     const a = insertClip();
     await analyzeClips([a], DEFAULT_CONFIG, clipRepo, () => {}, hlRepo, { analyzeVideo: async () => response([]) });

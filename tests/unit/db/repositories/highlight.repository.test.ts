@@ -139,3 +139,38 @@ describe('HighlightRepository', () => {
     expect(repo.findByClip(c2.id)[0].dup_group).toBe(1);
   });
 });
+
+describe('HighlightRepository.replaceForClip keeps decisions', () => {
+  it('keeps confirmed, rejected and panel/candidate-referenced moments; drops the rest; adds new ones', () => {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    runMigrations(db);
+    const pid = new ProjectRepository(db).findOrCreate('p').id;
+    const clip = new ClipRepository(db).insert(makeClip({ project_id: pid }));
+    const repo = new HighlightRepository(db);
+    repo.replaceForClip(clip.id, [
+      item(1, 2, 'confirmed'), item(3, 4, 'rejected'), item(5, 6, 'in panel'), item(7, 8, 'candidate'), item(9, 10, 'plain'),
+    ]);
+    const id = (d: string) => repo.findByClip(clip.id).find((h) => h.description === d)!.id;
+    db.prepare("UPDATE highlights SET status = 'confirmed' WHERE id = ?").run(id('confirmed'));
+    db.prepare("UPDATE highlights SET status = 'rejected' WHERE id = ?").run(id('rejected'));
+    const cut = db.prepare("INSERT INTO stories (project_id, name) VALUES (?, 'Main')").run(pid).lastInsertRowid;
+    const scene = db.prepare("INSERT INTO scenes (story_id, position, name) VALUES (?, 0, 's')").run(cut).lastInsertRowid;
+    const panel = db.prepare(`INSERT INTO story_segments (story_id, scene_id, position, state, clip_id, moment_id, start_sec, end_sec)
+      VALUES (?, ?, 0, 'filled', ?, ?, 5, 6)`).run(cut, scene, clip.id, id('in panel')).lastInsertRowid;
+    const cand = db.prepare("INSERT INTO story_segments (story_id, scene_id, position, state) VALUES (?, ?, 1, 'candidates')").run(cut, scene).lastInsertRowid;
+    db.prepare('INSERT INTO panel_candidates (panel_id, moment_id, position) VALUES (?, ?, 0)').run(cand, id('candidate'));
+    const keptIds = [id('confirmed'), id('rejected'), id('in panel'), id('candidate')];
+
+    repo.replaceForClip(clip.id, [item(20, 22, 'new one'), item(1, 2, 'confirmed again')]);
+
+    const after = repo.findByClip(clip.id);
+    expect(after.map((h) => h.description).sort()).toEqual(
+      ['candidate', 'confirmed', 'confirmed again', 'in panel', 'new one', 'rejected'],
+    );
+    expect(after.filter((h) => keptIds.includes(h.id))).toHaveLength(4);
+    expect(after.find((h) => h.description === 'new one')!.status).toBe('proposed');
+    expect(db.prepare('SELECT moment_id FROM story_segments WHERE id = ?').get(panel)).toEqual({ moment_id: id('in panel') });
+    expect(db.prepare('SELECT moment_id FROM panel_candidates WHERE panel_id = ?').all(cand)).toEqual([{ moment_id: id('candidate') }]);
+  });
+});

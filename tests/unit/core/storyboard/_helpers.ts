@@ -20,17 +20,15 @@ export function setup() {
       nb_frames: null, has_video: 1, has_audio: 1, codec: null, recorded_at: null, start_timecode: null,
       location: null, manual_tags: null, people: null,
     });
-  /** Adds moments to a clip (replacing none: appends via a combined replace) and returns their ids. */
+  /** Adds moments to a clip (keeping existing ones) and returns their ids. */
   const addMoments = (clipId: number, items: Partial<InsertHighlight>[]) => {
-    const existing = highlights.findByClip(clipId).map((h) => ({
-      start_sec: h.start_sec, end_sec: h.end_sec, description: h.description, tier: h.tier,
-      suggested_speed: h.suggested_speed,
-    }));
-    highlights.replaceForClip(clipId, [
-      ...existing,
-      ...items.map((i, k) => ({ start_sec: 1 + k * 5, end_sec: 5 + k * 5, description: 'm', tier: 'solid' as const, ...i })),
-    ]);
-    return highlights.findByClip(clipId).slice(existing.length).map((h) => h.id);
+    const existing = highlights.findByClip(clipId).length;
+    const ins = db.prepare(`INSERT INTO highlights (clip_id, start_sec, end_sec, description, tier, suggested_speed)
+      VALUES (?, ?, ?, ?, ?, ?)`);
+    return items.map((i, k) => {
+      const m = { start_sec: 1 + (existing + k) * 5, end_sec: 5 + (existing + k) * 5, description: 'm', tier: 'solid', suggested_speed: 1, ...i };
+      return Number(ins.run(clipId, m.start_sec, m.end_sec, m.description, m.tier, m.suggested_speed).lastInsertRowid);
+    });
   };
   return { db, svc: new StoryboardService(db), projectId, addClip, addMoments };
 }
