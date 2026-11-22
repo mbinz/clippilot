@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { setup } from '../../storyboard/_helpers.js';
 import { ThumbnailRepository } from '../../../../../src/db/repositories/thumbnail.repository.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { createCutRoutes } from '../../../../../src/core/server/routes/cuts.js';
 import { createApp } from '../../../../../src/core/server/index.js';
 
@@ -144,6 +147,69 @@ describe('Cut API routes', () => {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ cut_id: cut.id }),
     });
     expect(hide.status).toBe(200);
+  });
+
+  describe('moments and media', () => {
+    it('GET project moments: rows with nearest thumbnail and clip info; excludes rejected and hidden by default', async () => {
+      const thumbs = new ThumbnailRepository(t.db);
+      thumbs.insert({ clip_id: clipA, file_path: '/t/a_10.jpg', timestamp_sec: 10 });
+      thumbs.insert({ clip_id: clipA, file_path: '/t/a_20.jpg', timestamp_sec: 20 });
+      const rows = await ok('GET', `/projects/${t.projectId}/moments`);
+      expect(rows.map((m: any) => m.id)).toEqual([ma[0], ma[1], mb[0]]);
+      // ma[0] = 2-6 (mid 4) -> a_0 (t=0); ma[1] = 10-14 (mid 12) -> a_10
+      expect(rows[0]).toMatchObject({
+        id: ma[0], clip_id: clipA, start_sec: 2, end_sec: 6, status: 'proposed', thumbnail: '/media/thumbnails/a_0.jpg',
+        clip: { id: clipA, file_name: 'c1.mp4', duration_sec: 30, fps: 60, proxy_url: '/media/proxies/a_proxy.mp4', hidden: false },
+      });
+      expect(rows[1].thumbnail).toBe('/media/thumbnails/a_10.jpg');
+      expect(rows[2]).toMatchObject({ thumbnail: null, clip: { id: clipB, proxy_url: null, fps: 25 } });
+    });
+
+    it('filters: event_id, include_rejected, include_hidden', async () => {
+      const ev = Number(t.db.prepare("INSERT INTO events (project_id, name, source, sort_order) VALUES (?, 'E', 'folder', 0)").run(t.projectId).lastInsertRowid);
+      t.db.prepare('UPDATE clips SET event_id = ? WHERE id = ?').run(ev, clipB);
+      expect((await ok('GET', `/projects/${t.projectId}/moments?event_id=${ev}`)).map((m: any) => m.id)).toEqual([mb[0]]);
+
+      const cut = await ok('POST', `/projects/${t.projectId}/cuts`, { name: 'Main' });
+      await ok('POST', `/moments/${ma[0]}/reject`, { cut_id: cut.id });
+      await ok('POST', `/clips/${clipB}/hide`, { cut_id: cut.id });
+      expect((await ok('GET', `/projects/${t.projectId}/moments`)).map((m: any) => m.id)).toEqual([ma[1]]);
+      expect((await ok('GET', `/projects/${t.projectId}/moments?include_rejected=1`)).map((m: any) => m.id)).toEqual([ma[0], ma[1]]);
+      const all = await ok('GET', `/projects/${t.projectId}/moments?include_rejected=1&include_hidden=1`);
+      expect(all.map((m: any) => m.id)).toEqual([ma[0], ma[1], mb[0]]);
+      expect(all[2].clip.hidden).toBe(true);
+      expect(all[0].status).toBe('rejected');
+    });
+
+    it('unknown project 404, bad event_id 400', async () => {
+      expect((await send('GET', '/projects/999/moments')).status).toBe(404);
+      expect((await send('GET', `/projects/${t.projectId}/moments?event_id=x`)).status).toBe(400);
+    });
+
+    it('cut tree: panel clips carry fps and duration; candidates carry their clip info', async () => {
+      const cut = await ok('POST', `/projects/${t.projectId}/cuts`, { name: 'Main' });
+      const scene = await ok('POST', `/cuts/${cut.id}/scenes`, { name: 'A' });
+      await ok('POST', `/scenes/${scene.id}/panels`, { moment_id: ma[0] });
+      await ok('POST', `/scenes/${scene.id}/panels`, { candidates: [mb[0]] });
+      const [filled, cands] = (await ok('GET', `/cuts/${cut.id}`)).scenes[0].panels;
+      expect(filled.clip).toMatchObject({ fps: 60, duration_sec: 30 });
+      expect(cands.candidates[0].clip).toMatchObject({ id: clipB, fps: 25, duration_sec: 30, file_name: 'c2.mp4', hidden: false });
+    });
+
+    it('/media/proxies answers a Range request with 206', async () => {
+      const base = fs.mkdtempSync(path.join(os.tmpdir(), 'clippilot-media-'));
+      try {
+        fs.mkdirSync(path.join(base, '.clippilot', 'proxies'), { recursive: true });
+        fs.writeFileSync(path.join(base, '.clippilot', 'proxies', 'a_proxy.mp4'), Buffer.alloc(1000, 1));
+        const real = createApp({ db: t.db, basePath: base, port: 0 });
+        const res = await real.request('/media/proxies/a_proxy.mp4', { headers: { Range: 'bytes=0-99' } });
+        expect(res.status).toBe(206);
+        expect(res.headers.get('content-range')).toBe('bytes 0-99/1000');
+        expect((await res.arrayBuffer()).byteLength).toBe(100);
+      } finally {
+        fs.rmSync(base, { recursive: true, force: true });
+      }
+    });
   });
 
   describe('history', () => {

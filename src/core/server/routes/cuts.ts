@@ -22,6 +22,23 @@ export function createCutRoutes(db: Database.Database): Hono {
       proxy_url: proxyPath ? `/media/proxies/${path.basename(proxyPath)}` : null,
     };
   };
+  /** Clip info the board needs next to a moment: duration/fps for the timeline and speed gating, proxy for playback. */
+  const clipInfo = (clipId: number) => {
+    const row = db.prepare('SELECT id, file_path, duration_sec, fps, proxy_path, hidden FROM clips WHERE id = ?').get(clipId) as
+      { id: number; file_path: string; duration_sec: number; fps: number | null; proxy_path: string | null; hidden: number } | undefined;
+    if (!row) return null;
+    return {
+      id: row.id, file_name: path.basename(row.file_path), duration_sec: row.duration_sec, fps: row.fps,
+      proxy_url: media(row.id, row.proxy_path).proxy_url, hidden: Boolean(row.hidden),
+    };
+  };
+  /** URL of the clip thumbnail closest to `sec`. */
+  const thumbNear = (clipId: number, sec: number): string | null => {
+    const list = thumbs.findByClip(clipId);
+    if (!list.length) return null;
+    const best = list.reduce((a, b) => (Math.abs(b.timestamp_sec - sec) < Math.abs(a.timestamp_sec - sec) ? b : a));
+    return `/media/thumbnails/${path.basename(best.file_path)}`;
+  };
   const clipMedia = (clipId: number) => {
     const row = db.prepare('SELECT proxy_path FROM clips WHERE id = ?').get(clipId) as { proxy_path: string | null } | undefined;
     return media(clipId, row?.proxy_path ?? null);
@@ -99,7 +116,7 @@ export function createCutRoutes(db: Database.Database): Hono {
       panels: s.panels.map((p: PanelNode) => ({
         ...p,
         clip: p.clip ? { ...p.clip, ...media(p.clip.id, p.clip.proxy_path) } : null,
-        candidates: p.candidates.map((m) => ({ ...m, ...clipMedia(m.clip_id) })),
+        candidates: p.candidates.map((m) => ({ ...m, ...clipMedia(m.clip_id), clip: clipInfo(m.clip_id) })),
       })),
     }));
     return c.json({ data: { ...tree, scenes } });
@@ -261,6 +278,22 @@ export function createCutRoutes(db: Database.Database): Hono {
   })(c));
 
   // ---------- moments and clips ----------
+  app.get('/projects/:id/moments', (c) => {
+    const pid = id(c);
+    if (!projects.findById(pid)) return c.json({ error: 'Project not found' }, 404);
+    const ev = c.req.query('event_id');
+    const eventId = ev === undefined ? undefined : Number(ev);
+    if (eventId !== undefined && !Number.isInteger(eventId)) return c.json({ error: 'event_id must be an integer' }, 400);
+    const rows = svc.listMoments(pid, {
+      eventId,
+      includeRejected: c.req.query('include_rejected') === '1',
+      includeHidden: c.req.query('include_hidden') === '1',
+    });
+    return c.json({
+      data: rows.map((m) => ({ ...m, thumbnail: thumbNear(m.clip_id, (m.start_sec + m.end_sec) / 2), clip: clipInfo(m.clip_id) })),
+    });
+  });
+
   app.post('/moments/:id/reject', async (c) => {
     const body = await bodyOf(c);
     return guard(() => {

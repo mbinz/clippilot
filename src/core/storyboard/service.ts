@@ -406,10 +406,11 @@ export class StoryboardService {
 
   // ---------- moments ----------
 
-  /** Compact moment rows for drafting; hidden clips are excluded, rejected ones only on request. */
-  listMoments(projectId: number, opts: { eventId?: number; minTier?: Tier; includeRejected?: boolean } = {}): MomentRow[] {
+  /** Compact moment rows for drafting; hidden clips and rejected moments are excluded unless requested. */
+  listMoments(projectId: number, opts: { eventId?: number; minTier?: Tier; includeRejected?: boolean; includeHidden?: boolean } = {}): MomentRow[] {
     if (opts.minTier !== undefined && !isTier(opts.minTier)) throw new Error(`Invalid tier "${opts.minTier}"`);
-    const where = ['c.project_id = ?', 'c.hidden = 0'];
+    const where = ['c.project_id = ?'];
+    if (!opts.includeHidden) where.push('c.hidden = 0');
     const params: unknown[] = [projectId];
     if (opts.eventId !== undefined) { where.push('c.event_id = ?'); params.push(opts.eventId); }
     if (opts.minTier !== undefined) { where.push(`${tierRankSql('h.tier')} >= ${tierRankSql('?')}`); params.push(opts.minTier); }
