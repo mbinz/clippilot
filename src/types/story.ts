@@ -42,30 +42,3 @@ export interface Panel {
   notes: string | null;
   created_at: string;
 }
-
-export interface StorySegment {
-  id: number;
-  story_id: number;
-  clip_id: number;
-  position: number;
-  start_sec: number;
-  end_sec: number | null;
-  segment_role: string | null;
-  notes: string | null;
-  created_at: string;
-}
-
-export interface StoryWithSegments extends Story {
-  segments: (StorySegment & {
-    file_path: string;
-    proxy_path: string | null;
-    duration_sec: number;
-    resolution: string | null;
-    fps: number | null;
-    nb_frames: number | null;
-    has_video: number;
-    has_audio: number;
-    ai_summary: string | null;
-    start_timecode: string | null;
-  })[];
-}

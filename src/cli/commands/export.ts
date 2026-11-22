@@ -4,7 +4,10 @@ import chalk from 'chalk';
 import { createDb } from '../../db/connection.js';
 import { runMigrations } from '../../db/migrations/runner.js';
 import { ClipRepository } from '../../db/repositories/clip.repository.js';
-import { StoryRepository } from '../../db/repositories/story.repository.js';
+import { ProjectRepository } from '../../db/repositories/project.repository.js';
+import { StoryboardService } from '../../core/storyboard/service.js';
+import { cutToSegments } from '../../core/storyboard/export.js';
+import { resolveProject } from './resolve-project.js';
 import { resolveDbPath } from '../../utils/fs.js';
 import { exportSegments } from '../../core/export/index.js';
 import type { ExportFormat, ExportSegment } from '../../types/export.js';
@@ -71,8 +74,10 @@ function detectFps(
 export function registerExportCommand(parent: Command): void {
   parent
     .command('export')
-    .description('Export a story or clip list for DaVinci Resolve')
-    .option('--story <id>', 'Story ID to export')
+    .description('Export a cut or clip list for DaVinci Resolve')
+    .option('--cut [id]', 'Cut to export (no id: the cut "Main")')
+    .option('--story [id]', 'Alias of --cut')
+    .option('--project <name>', 'Project name for --cut without an id (default: the only project)')
     .option('--clips <ids>', 'Comma-separated clip IDs (e.g., 1,5,12)')
     .option('--format <format>', 'Export format: csv, json, edl, fcpxml, otio', 'edl')
     .option('--output <path>', 'Output file path')
@@ -80,8 +85,9 @@ export function registerExportCommand(parent: Command): void {
     .option('--fps <fps>', 'Frame rate for timecode (auto-detected from clips if omitted)')
     .option('--json', 'Emit JSON confirmation (requires --output)')
     .action(async (options) => {
-      if (!options.story && !options.clips) {
-        console.error(chalk.red('Error: Specify --story <id> or --clips <id1,id2,...>'));
+      const cutOpt: string | boolean | undefined = options.cut ?? options.story;
+      if (cutOpt === undefined && !options.clips) {
+        console.error(chalk.red('Error: Specify --cut [id] or --clips <id1,id2,...>'));
         process.exit(1);
       }
 
@@ -94,32 +100,27 @@ export function registerExportCommand(parent: Command): void {
         const format = options.format as ExportFormat;
         const explicitFps = options.fps != null ? parseFloat(options.fps) : null;
 
-        if (options.story) {
-          const storyRepo = new StoryRepository(db);
-          const story = storyRepo.getStoryWithSegments(parseInt(options.story, 10));
-          if (!story) {
-            console.error(chalk.red(`Error: Story ${options.story} not found`));
+        let skippedGaps: number | null = null;
+        if (cutOpt !== undefined) {
+          let cutId: number;
+          if (typeof cutOpt === 'string') {
+            cutId = parseInt(cutOpt, 10);
+            if (!new StoryboardService(db).getCut(cutId)) {
+              console.error(chalk.red(`Error: Cut ${cutOpt} not found`));
+              process.exit(1);
+            }
+          } else {
+            const project = resolveProject(new ProjectRepository(db), options.project);
+            if (!project) process.exit(1);
+            cutId = new StoryboardService(db).getOrCreateMainCut(project.id).id;
+          }
+          const built = cutToSegments(db, cutId, { fallbackFps: explicitFps });
+          segments = built.segments;
+          skippedGaps = built.skipped_gaps;
+          if (segments.length === 0) {
+            console.error(chalk.red(`Error: Cut ${cutId} has no filled panels to export (${skippedGaps} gap(s))`));
             process.exit(1);
           }
-
-          segments = story.segments.map((seg) => ({
-            position: seg.position,
-            clip_id: seg.clip_id,
-            file_path: seg.file_path,
-            file_name: path.basename(seg.file_path),
-            duration_sec: seg.duration_sec,
-            start_sec: seg.start_sec,
-            end_sec: seg.end_sec ?? seg.duration_sec,
-            start_timecode: seg.start_timecode ?? null,
-            nb_frames: seg.nb_frames ?? null,
-            fps: seg.fps ?? explicitFps ?? 0,
-            has_video: seg.has_video !== 0,
-            has_audio: seg.has_audio !== 0,
-            resolution: seg.resolution,
-            ai_summary: seg.ai_summary,
-            segment_role: seg.segment_role,
-            notes: seg.notes,
-          }));
         } else {
           const clipIds = options.clips.split(',').map((s: string) => parseInt(s.trim(), 10));
           const clipRepo = new ClipRepository(db);
@@ -200,6 +201,7 @@ export function registerExportCommand(parent: Command): void {
                   format,
                   fps,
                   count: segments.length,
+                  ...(skippedGaps !== null ? { exported: segments.length, skipped_gaps: skippedGaps } : {}),
                 },
                 null,
                 2,

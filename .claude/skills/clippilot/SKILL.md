@@ -59,6 +59,7 @@ on success. Always pass `--json` so output is parseable.
 | `clippilot mark-best <id> [--group <gid>]` | User picks the best take among similar clips. Defaults to all groups containing the clip. |
 | `clippilot tag <id> [-l <location>] [-t a,b,c] [--people n,m] --json` | User adds metadata. |
 | `clippilot contact-sheet [--query <q>] [--project <name>] [--ids 1,2,3] [--cols 4 --rows 6] [-o /tmp/sheet.png]` | User wants to *see* a batch of clips. Render the PNG, then `Read` it. |
+| `clippilot export --cut [id] --format otio --output <abs path> --json` | Export the storyboard (no id: cut "Main"; `--story` is an alias). Filled panels keep clip/in/out/speed, candidate panels use their first candidate, gaps are skipped; JSON reports `exported` and `skipped_gaps`. |
 | `clippilot export --clips 1,5,12 --format otio --output ./final.otio --json` | User is ready to take a selection to DaVinci. **`otio` is primary** (keeps markers, linked audio); `fcpxml` secondary; also csv, json, edl. |
 | `clippilot review-highlights [--clips 1,2,3] [-o <path>]` | Writes a local HTML review page (video + highlights with tier/shot/role/issues + verdict toggles + Export). Open it with `open <path>`. |
 | `clippilot review import <review-verdicts.json> [--project <name>]` | Stores the user's exported verdicts as a calibration round; prints metrics. |

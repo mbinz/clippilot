@@ -73,40 +73,10 @@ describe('StoryRepository', () => {
     expect(story.target_duration_sec).toBe(180);
   });
 
-  it('adds segments', () => {
-    const story = storyRepo.createStory(projectId, 'Test Story');
-    storyRepo.addSegment(story.id, clipId1, 1, 0, 10, 'intro');
-    storyRepo.addSegment(story.id, clipId2, 2, 5, 15, 'highlight');
-
-    const full = storyRepo.getStoryWithSegments(story.id);
-    expect(full).not.toBeNull();
-    expect(full!.segments).toHaveLength(2);
-    expect(full!.segments[0].position).toBe(1);
-    expect(full!.segments[1].position).toBe(2);
-    expect(full!.segments[0].file_path).toBe('/videos/clip1.mp4');
-  });
-
-  it('returns null for nonexistent story', () => {
-    expect(storyRepo.getStoryWithSegments(999)).toBeNull();
-  });
-
   it('lists stories by project', () => {
     storyRepo.createStory(projectId, 'Story A');
     storyRepo.createStory(projectId, 'Story B');
     const list = storyRepo.listByProject(projectId);
     expect(list).toHaveLength(2);
-  });
-
-  it('replaces segments', () => {
-    const story = storyRepo.createStory(projectId, 'Test');
-    storyRepo.addSegment(story.id, clipId1, 1, 0, 10);
-
-    storyRepo.replaceSegments(story.id, [
-      { clipId: clipId2, position: 1, startSec: 0, endSec: 20, role: 'intro' },
-    ]);
-
-    const full = storyRepo.getStoryWithSegments(story.id)!;
-    expect(full.segments).toHaveLength(1);
-    expect(full.segments[0].clip_id).toBe(clipId2);
   });
 });

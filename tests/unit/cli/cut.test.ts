@@ -208,3 +208,30 @@ describe('clippilot scene / panel / moment / clip', () => {
     expect((await run('moments', 'list', '--include-rejected', '--json')).map((r: any) => r.id)).toEqual([1, 2, 3]);
   });
 });
+
+describe('clippilot export --cut', () => {
+  async function build(): Promise<number> {
+    const f = path.join(dir, 'draft.json');
+    fs.writeFileSync(f, JSON.stringify({ scenes: [{ name: 'Arrival', panels: [
+      { intent: 'wave', moment_id: 1 }, { intent: 'pick', candidates: [3, 2] }, { intent: 'gap' },
+    ] }] }));
+    return (await run('cut', 'apply', '--file', f)).cut_id;
+  }
+
+  it('without a value exports "Main"; reports exported and skipped gaps; candidate falls back to first', async () => {
+    const id = await build();
+    const outFile = path.join(dir, 'cut.otio');
+    const res = await run('export', '--cut', '--format', 'otio', '--output', outFile, '--json');
+    expect(res).toMatchObject({ ok: true, format: 'otio', exported: 2, skipped_gaps: 1 });
+    const otio = JSON.parse(fs.readFileSync(outFile, 'utf-8'));
+    expect(JSON.stringify(otio)).toContain('/v/b.mp4'); // first candidate is moment 3 (clip b)
+    const res2 = await run('export', '--cut', String(id), '--format', 'otio', '--output', outFile, '--json');
+    expect(res2).toMatchObject({ exported: 2, skipped_gaps: 1 });
+  });
+
+  it('--story is an alias', async () => {
+    const id = await build();
+    const res = await run('export', '--story', String(id), '--format', 'otio', '--output', path.join(dir, 's.otio'), '--json');
+    expect(res).toMatchObject({ ok: true, exported: 2 });
+  });
+});
