@@ -173,6 +173,31 @@ export class StoryboardService {
     return ops.historyState(this.db, cutId);
   }
 
+  /** Cheap change marker for live refresh: latest operation id (undone ones included) + undo/redo state. */
+  head(cutId: number): ops.HistoryState & { op_id: number | null } {
+    const r = this.db.prepare('SELECT MAX(id) AS id FROM operations WHERE story_id = ?').get(cutId) as { id: number | null };
+    return { op_id: r.id, ...ops.historyState(this.db, cutId) };
+  }
+
+  /**
+   * Similar moments: same event + role + shot (null matches null), not rejected, clip not hidden; star (effective
+   * tier) first, then recording time. Same rule as `alternatives` in web/src/board/pool.ts.
+   */
+  alternatives(momentId: number): number[] {
+    const subject = this.db.prepare(`SELECT c.event_id, h.role, h.shot, c.project_id FROM highlights h JOIN clips c ON c.id = h.clip_id
+      WHERE h.id = ?`).get(momentId) as { event_id: number | null; role: string | null; shot: string | null; project_id: number } | undefined;
+    if (!subject) return [];
+    const rows = this.db.prepare(`SELECT h.id, h.start_sec, h.tier, h.user_tier, c.recorded_at
+      FROM highlights h JOIN clips c ON c.id = h.clip_id
+      WHERE c.project_id = ? AND h.id <> ? AND h.status <> 'rejected' AND c.hidden = 0
+        AND c.event_id IS ? AND h.role IS ? AND h.shot IS ?`)
+      .all(subject.project_id, momentId, subject.event_id, subject.role, subject.shot) as
+      { id: number; start_sec: number; tier: string; user_tier: string | null; recorded_at: string | null }[];
+    const time = (r: { start_sec: number; recorded_at: string | null }) => (Date.parse(r.recorded_at ?? '') || 0) / 1000 + r.start_sec;
+    const star = (r: { tier: string; user_tier: string | null }) => ((r.user_tier ?? r.tier) === 'hero' ? 1 : 0);
+    return rows.sort((a, b) => star(b) - star(a) || time(a) - time(b)).map((r) => r.id);
+  }
+
   // ---------- lookups for logging (which cut an edit belongs to, human names for labels) ----------
 
   cutIdOfScene(sceneId: number): number { return this.scene(sceneId).story_id; }

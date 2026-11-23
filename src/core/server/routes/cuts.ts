@@ -7,6 +7,7 @@ import { ProjectRepository } from '../../../db/repositories/project.repository.j
 import { ThumbnailRepository } from '../../../db/repositories/thumbnail.repository.js';
 import { StoryboardService, type PanelNode } from '../../storyboard/service.js';
 import { labels } from '../../storyboard/labels.js';
+import { parseSelection, checkSelection, writeBoardSelection, SelectionError } from '../../storyboard/selection.js';
 import { cutToSegments } from '../../storyboard/export.js';
 import { exportSegments } from '../../export/index.js';
 import type { Tier } from '../../tiers.js';
@@ -468,6 +469,24 @@ export function createCutRoutes(db: Database.Database, options: CutRoutesOptions
     const r = svc.redo(cutId);
     return { ...r, history: svc.historyState(cutId) };
   })(c));
+  app.get('/cuts/:id/head', (c) => {
+    if (!svc.getCut(id(c))) return c.json({ error: 'Cut not found' }, 404);
+    return c.json({ data: svc.head(id(c)) });
+  });
+
+  // ---------- board selection (M8): what the open board has selected, for `clippilot board context` ----------
+  app.put('/board/selection', async (c) => {
+    try {
+      const sel = parseSelection(await c.req.json<unknown>().catch(() => null));
+      const problem = checkSelection(db, sel);
+      if (problem) return c.json({ error: problem.message }, problem.status);
+      return c.json({ data: writeBoardSelection(options.basePath ?? process.cwd(), sel) });
+    } catch (err) {
+      if (err instanceof SelectionError) return c.json({ error: err.message }, err.status);
+      return c.json({ error: (err as Error).message }, 500);
+    }
+  });
+
   app.get('/cuts/:id/history', (c) => {
     if (!svc.getCut(id(c))) return c.json({ error: 'Cut not found' }, 404);
     return c.json({ data: svc.history(id(c)) });
