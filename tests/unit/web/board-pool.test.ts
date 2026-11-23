@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  effectiveTier, isHero, similarKey, recTime, poolOrder, alternatives, slotFor, usage, fades, loopStep, seekState,
+  effectiveTier, isHero, similarKey, recTime, poolOrder, alternatives, slotFor, usage, fades, loopStep, seekState, loopSeekTarget,
   type PoolMoment, type PoolTree,
 } from '../../../web/src/board/pool.js';
 
@@ -139,4 +139,11 @@ describe('loop / play-on', () => {
   it.each([
     [3, false], [1, false], [0.96, false], [0.9, true], [5.04, false], [5.1, true], [20, true],
   ])('seekState t=%s -> free=%s', (t, free) => expect(seekState(t, 1, 5)).toBe(free));
+
+  // Safari bug 2026-11-23: currentTime advances between two reads, so "seek unless unchanged" seeked on every
+  // timeupdate. The player must only seek when a jump is due: null = leave the video alone.
+  it.each([
+    [2, false, null], [4.99, false, null], [5, false, 1], [6, false, 1], [0.6, false, 1], [0.8, false, null],
+    [7, true, null], [0, true, null],
+  ])('loopSeekTarget t=%s free=%s -> %s', (t, free, want) => expect(loopSeekTarget(t, 1, 5, free)).toBe(want));
 });

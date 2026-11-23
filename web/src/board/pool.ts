@@ -122,6 +122,15 @@ export function loopStep(t: number, a: number, b: number, free: boolean): { t: n
   return { t, free };
 }
 
+/**
+ * Where the player must jump to now, or null to leave the video alone. Read `currentTime` ONCE and pass it in:
+ * Safari advances currentTime between reads, so comparing against a second read seeks on every timeupdate.
+ */
+export function loopSeekTarget(t: number, a: number, b: number, free: boolean): number | null {
+  const s = loopStep(t, a, b, free);
+  return s.t === t ? null : s.t;
+}
+
 /** After a seek: free (play on) when outside [a-0.05, b+0.05]; inside, loop again. */
 export function seekState(t: number, a: number, b: number): boolean {
   return t < a - 0.05 || t > b + 0.05;

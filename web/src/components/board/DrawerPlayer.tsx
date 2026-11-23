@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type MutableRefObject, type RefObject } from 'react';
-import { loopStep, seekState } from '../../board/pool';
+import { loopSeekTarget, seekState } from '../../board/pool';
 import { playLabel } from '../../board/drawer';
 import { btnIcon, kbd } from './ui';
 
@@ -59,10 +59,12 @@ export function DrawerPlayer({ src, a, b, rate, duration, hint, videoRef, seekRe
           }}
           onTimeUpdate={(e) => {
             const v = e.currentTarget;
-            const s = loopStep(v.currentTime, cur.current.a, cur.current.b, free.current);
-            if (s.t !== v.currentTime) v.currentTime = s.t;
-            if (duration) onTime(v.currentTime / duration);
-            setLabel({ t: v.currentTime, free: free.current });
+            const t = v.currentTime; // read once (Safari advances it between reads)
+            const jump = loopSeekTarget(t, cur.current.a, cur.current.b, free.current);
+            if (jump !== null) v.currentTime = jump;
+            const now = jump ?? t;
+            if (duration) onTime(now / duration);
+            setLabel({ t: now, free: free.current });
           }}
           onEnded={(e) => {
             if (free.current) return;
