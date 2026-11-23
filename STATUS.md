@@ -1225,6 +1225,31 @@ you" (fix b2d6560: an AI draft's range is the AI range). ★ at 16 % is above th
 - `~/Video/ClipPilot Portugal/`: ingest `~/Video/Portugal` (508 clips, 123 GB; resumable, overnight), analyze with
   prompt v3, events, then Claude proposes a brief per user wish.
 
+### Resolve capability test for post-production (2026-11-23, free Resolve, user import)
+
+Direction (user, 2026-11-23): ClipPilot stays sorting + storyboard + rough-cut export; post-production automation
+(titles, sound/music, stabilization, color) lives in separate Claude skills/tools that work on the export + originals.
+Resolve stays the finishing tool (fine cut, timing, mix, grade = manual). Package: `~/Video/ClipPilot Arrifana/exports/
+resolve-test/` (generators `build_resolve_tests.py`, `render-title.mjs`).
+
+| Feature | OTIO | FCPXML |
+|---|---|---|
+| Transparent title clip (ProRes 4444, yuva444p, 4K/25) on V2 / lane 1; movable, speed-changeable | yes | yes |
+| Music file on its own audio track / lane -1 | yes | yes |
+| Cross dissolve (OTIO `Transition` SMPTE_Dissolve / FCPXML `transition`) | yes | yes |
+| Markers with color + note (`Resolve_OTIO.Note`) | yes | no (M1) |
+| Clip color (`Resolve_OTIO."Clip Color"`) | yes | – |
+| Clip volume `adjust-volume amount="-12dB"` | – | yes |
+| Volume keyframes (2 s fade-in) | – | yes |
+| `adjust-stabilization` | – | **ignored** |
+| CDL from EDL | **no** — free Resolve has no apply-CDL menu; importing the EDL creates a timeline | – |
+| Stabilize several selected clips at once (Inspector) | yes (in Resolve) | |
+
+- FCPXML must use rational times ("400/25s"): decimals ("16.00s") make Resolve import an **empty** timeline.
+- Consequences: stabilization = tool measures jitter (full frame rate) → orange clip color + marker note → user selects
+  all and clicks Stabilize once. Color = clip color per camera + reference-clip marker → Resolve "Shot Match"/Auto Color
+  per group; the look is one LUT/grade. Audio levels/fades need FCPXML; markers/clip colors need OTIO.
+
 ### M5 — Gap fillers (free) — roadmap item 5
 - Per-gap search over own library (unused clips, other projects).
 - Locally rendered title/chapter cards, animated route map, photo pan/zoom → ingested as clips.
