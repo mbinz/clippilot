@@ -1020,12 +1020,12 @@ exports the real cut). Decisions from the grilling + mockup rounds (2026-11-22/2
   *rejected* moment edits it but keeps it rejected; (5) `touch` sets `source='user'` on panels using the moment in *all*
   cuts, while undo snapshots only restore the logged cut's panels; (6) `unstar` = back to the AI tier, or `solid` when the AI
   tier is hero (`starMoment`); star = `hero`; route labels: hero -> "★", null/solid -> "Remove ★"; (7) a lone `start_sec`
-  or `end_sec` in `PATCH /moments/:id` keeps the other bound; (8) a draft's explicit in/out/speed overwrites the moment even
-  if the user already edited it; (9) the filled CHECK is now `clip_id` + `moment_id` NOT NULL, so deleting a moment that a
+  or `end_sec` in `PATCH /moments/:id` keeps the other bound; (8) a draft writes in/out/speed only to proposed moments;
+  confirmed moments keep the user's edit; (9) the filled CHECK is now `clip_id` + `moment_id` NOT NULL, so deleting a moment that a
   filled panel uses fails (CHECK) instead of nulling the link; (10) `migration-016.test.ts` now builds the schema as of 016
   (migrations 1-16) because later migrations reshape `story_segments`.
 - Deferred: `GET /projects/:id/moments` rows do not yet carry `speed`/`ai_*`/`user_tier` (B2); web drawers still show
-  panel-centric trim/speed copy (B4); a draft cannot yet report that it overwrote an edited moment.
+  panel-centric trim/speed copy (B4).
 
 **B2 — server: seen, Show in Finder, moment data for the drawers**
 - `POST /moments/:id/seen {seen: boolean}` sets/clears `seen_at` (not logged). `POST /clips/:id/reveal` runs

@@ -348,10 +348,13 @@ export class StoryboardService {
         this.assertUsable(m);
         state = 'filled';
         clipId = m.clip_id;
-        if (input.startSec !== undefined || input.endSec !== undefined) {
-          this.writeMomentRange(m, input.startSec ?? m.start_sec, input.endSec ?? m.end_sec);
+        // Explicit in/out/speed only shape a moment nobody has touched; a confirmed moment keeps the user's edit.
+        if (m.status === 'proposed') {
+          if (input.startSec !== undefined || input.endSec !== undefined) {
+            this.writeMomentRange(m, input.startSec ?? m.start_sec, input.endSec ?? m.end_sec);
+          }
+          if (input.speed !== undefined) this.writeMomentSpeed(m, input.speed);
         }
-        if (input.speed !== undefined) this.writeMomentSpeed(m, input.speed);
         if (input.source === 'user') this.confirmMoment(m.id);
       } else if (input.candidates?.length) {
         for (const id of input.candidates) this.assertUsable(this.moment(id));

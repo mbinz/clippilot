@@ -458,6 +458,16 @@ describe('StoryboardService', () => {
         .toEqual({ start_sec: 1, end_sec: 9, speed: 1, status: 'proposed' });
     });
 
+    it('a draft never overwrites the in/out/speed of a moment the user has confirmed', () => {
+      const clip = t.addClip({ fps: 50 });
+      const [m] = t.addMoments(clip.id, [{ start_sec: 0, end_sec: 10 }]);
+      t.svc.trimMoment(m, 2, 6);
+      t.svc.setMomentSpeed(m, 0.5);
+      t.svc.addPanel(scene, { momentId: m, startSec: 1, endSec: 9, speed: 1 });
+      expect(t.db.prepare('SELECT start_sec, end_sec, speed, status FROM highlights WHERE id = ?').get(m))
+        .toEqual({ start_sec: 2, end_sec: 6, speed: 0.5, status: 'confirmed' });
+    });
+
     it('trimPanel and setSpeed are gone', () => {
       const svc = t.svc as unknown as Record<string, unknown>;
       expect([svc.trimPanel, svc.setSpeed]).toEqual([undefined, undefined]);
