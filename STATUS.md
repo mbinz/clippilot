@@ -1015,7 +1015,7 @@ exports the real cut). Decisions from the grilling + mockup rounds (2026-11-22/2
 **B3 — web logic (pure, tested in `tests/unit/web/board-logic.test.ts`)**
 - `similarKey(m)`, `poolOrder(moments)` → `{ heroes: Moment[][], rest: Moment[][] }` (groups; ★ by effective tier),
   `alternatives(m, moments)`, `slotFor(m, tree)` (own panel → panel with a similar moment in this scene → any scene →
-  null), `fades(m, used, seen)`, loop/play-on rule `nextTime(t, a, b, free)`. Port from the mockup.
+  null), `fades(m, used, seen)`, loop/play-on rules `loopStep(t, a, b, free)` + `seekState(t, a, b)`. Port from the mockup.
 - **B3 result (2026-11-23):** done in `web/src/board/pool.ts` + `tests/unit/web/board-pool.test.ts` (new files, so B1 can
   edit `logic.ts`/`types.ts` freely). API: `effectiveTier`, `isHero`, `similarKey`, `recTime`, `poolOrder` (+`out`),
   `alternatives(m, moments)`, `slotFor(m, tree, moments, currentSceneId?)`, `usage(tree)`, `fades(m, {inStory, seen,
