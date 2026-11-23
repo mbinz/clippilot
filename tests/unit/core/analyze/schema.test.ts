@@ -131,3 +131,10 @@ describe('HighlightSchema audio tag', () => {
     expect(() => HighlightSchema.parse({ ...MOMENT, audio_type: 'silence' })).toThrow();
   });
 });
+
+describe('HighlightSchema missing description', () => {
+  it('defaults a missing description to an empty string', () => {
+    const { description: _d, ...rest } = MOMENT;
+    expect(HighlightSchema.parse(rest).description).toBe('');
+  });
+});

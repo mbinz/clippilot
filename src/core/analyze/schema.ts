@@ -14,7 +14,7 @@ export const SceneSchema = z.object({
 export const HighlightSchema = z.object({
   start_sec: z.number(),
   end_sec: z.number(),
-  description: z.string(),
+  description: z.string().default(''),
   tier: z.enum(['hero', 'solid', 'filler']),
   shot: z.enum(['wide', 'medium', 'close', 'detail']),
   role: z.enum(['establishing', 'action', 'reaction', 'detail', 'transition']),

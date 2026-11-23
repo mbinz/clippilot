@@ -110,3 +110,63 @@ describe('normalizeHighlights audio', () => {
     expect(out[1]).toMatchObject({ audio_keep: false, audio_type: 'noise' });
   });
 });
+
+describe('normalizeHighlights maximum length (MAX_MOMENT_SEC = 8)', () => {
+  it('shortens a longer moment to 8 s centred', () => {
+    const out = normalizeHighlights([h(2, 14)], 30);
+    expect([out[0].start_sec, out[0].end_sec]).toEqual([4, 12]);
+  });
+
+  it('keeps exactly 8 s untouched', () => {
+    const out = normalizeHighlights([h(2, 10)], 30);
+    expect([out[0].start_sec, out[0].end_sec]).toEqual([2, 10]);
+  });
+
+  it('clamps to the clip first, then centres (end past duration)', () => {
+    const out = normalizeHighlights([h(0, 40)], 20);
+    expect([out[0].start_sec, out[0].end_sec]).toEqual([6, 14]);
+    const tail = normalizeHighlights([h(10, 40)], 20);
+    expect([tail[0].start_sec, tail[0].end_sec]).toEqual([11, 19]);
+  });
+
+  it('clamps negative start before centring', () => {
+    const out = normalizeHighlights([h(-5, 12)], 30);
+    expect([out[0].start_sec, out[0].end_sec]).toEqual([2, 10]);
+  });
+});
+
+describe('normalizeHighlights overlap rule (shift later start to earlier end)', () => {
+  it('shifts the later moment to start where the earlier one ends', () => {
+    const out = normalizeHighlights([h(1, 6), h(4, 11)], 30);
+    expect(out.map((x) => [x.start_sec, x.end_sec])).toEqual([[1, 6], [6, 11]]);
+  });
+
+  it('drops the later moment when less than 3 s remain', () => {
+    const out = normalizeHighlights([h(1, 8), h(3, 10)], 30);
+    expect(out.map((x) => [x.start_sec, x.end_sec])).toEqual([[1, 8]]);
+  });
+
+  it('drops a moment fully inside an earlier one', () => {
+    const out = normalizeHighlights([h(0, 8), h(2, 5)], 30);
+    expect(out.map((x) => [x.start_sec, x.end_sec])).toEqual([[0, 8]]);
+  });
+
+  it('keeps touching moments as they are', () => {
+    const out = normalizeHighlights([h(0, 4), h(4, 8)], 30);
+    expect(out.map((x) => [x.start_sec, x.end_sec])).toEqual([[0, 4], [4, 8]]);
+  });
+
+  it('applies the rule after widening and sorting, against the previous kept moment', () => {
+    // 4-5 widens to 3-6; 5.9-6.2 widens to 4.55-7.55 -> shifted to 6-7.55 (1.55 s) -> dropped
+    const out = normalizeHighlights([h(5.9, 6.2), h(0, 3), h(4, 5)], 30);
+    expect(out.map((x) => [x.start_sec, x.end_sec])).toEqual([[0, 3], [3, 6]]);
+  });
+});
+
+describe('normalizeHighlights missing description', () => {
+  it('outputs "" when the description is missing', () => {
+    const { description: _d, ...noDesc } = h(1, 5);
+    const out = normalizeHighlights([noDesc as unknown as ReturnType<typeof h>], 30);
+    expect(out[0].description).toBe('');
+  });
+});

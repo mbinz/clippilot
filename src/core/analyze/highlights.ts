@@ -2,6 +2,7 @@ import type { HighlightResponse, SlowmoLevel } from './schema.js';
 
 const MIN_LENGTH_SEC = 0.5;
 const MIN_MOMENT_SEC = 3;
+export const MAX_MOMENT_SEC = 8;
 
 /** Minimum source fps for 50 % / 25 % playback (assumes a 25 fps timeline). */
 export const MIN_FPS_HALF_SPEED = 48;
@@ -54,16 +55,27 @@ function widen(start: number, end: number, durationSec: number): [number, number
   return [s, e];
 }
 
+/** Shorten a range longer than MAX_MOMENT_SEC to MAX_MOMENT_SEC around its midpoint (stays inside the clamped range). */
+function shorten(start: number, end: number): [number, number] {
+  if (end - start <= MAX_MOMENT_SEC) return [start, end];
+  const mid = (start + end) / 2;
+  return [mid - MAX_MOMENT_SEC / 2, mid + MAX_MOMENT_SEC / 2];
+}
+
 /**
- * Clamp to [0, duration], drop junk (< 0.5 s), widen to a 3 s minimum, sort by start, round to 0.01 s,
- * add suggested_speed.
+ * Clamp to [0, duration], drop junk (< 0.5 s), widen to a 3 s minimum, shorten to an 8 s maximum (centred),
+ * sort by start, resolve overlaps, round to 0.01 s, add suggested_speed.
+ *
+ * Overlap rule: walking the moments in start order, a moment that starts before the previous kept moment ends
+ * is shifted to start at that end (its end stays); if less than MIN_MOMENT_SEC remains it is dropped.
+ * Fully contained moments are therefore dropped. Moments are never merged, so the model's cut points survive.
  */
 export function normalizeHighlights(
   raw: HighlightResponse[],
   durationSec: number,
   fps?: number | null,
 ): NormalizedHighlight[] {
-  return raw
+  const sized = raw
     .map((h) => ({
       ...h,
       start_sec: Math.max(0, h.start_sec),
@@ -71,16 +83,27 @@ export function normalizeHighlights(
     }))
     .filter((h) => h.end_sec - h.start_sec >= MIN_LENGTH_SEC)
     .map((h) => {
-      const [start_sec, end_sec] = widen(h.start_sec, h.end_sec, durationSec);
+      const [ws, we] = widen(h.start_sec, h.end_sec, durationSec);
+      const [start_sec, end_sec] = shorten(ws, we);
       return { ...h, start_sec, end_sec };
     })
-    .sort((a, b) => a.start_sec - b.start_sec)
+    .sort((a, b) => a.start_sec - b.start_sec);
+
+  const kept: typeof sized = [];
+  for (const h of sized) {
+    const prevEnd = kept.length ? kept[kept.length - 1].end_sec : 0;
+    const start_sec = Math.max(h.start_sec, prevEnd);
+    if (start_sec !== h.start_sec && h.end_sec - start_sec < MIN_MOMENT_SEC) continue;
+    kept.push({ ...h, start_sec });
+  }
+
+  return kept
     .map((h) => {
       const slowmo = h.slowmo ?? 'none';
       return {
         start_sec: round2(h.start_sec),
         end_sec: round2(h.end_sec),
-        description: h.description,
+        description: h.description ?? '',
         tier: h.tier,
         shot: h.shot,
         role: h.role,
