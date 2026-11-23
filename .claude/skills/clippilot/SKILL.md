@@ -55,6 +55,7 @@ on success. Always pass `--json` so output is parseable.
 | `clippilot summary [--project <name>] [--top N] --json` | Overview of a project: scene hints, places, moments, best highlights. Run after analyze, before storyboarding. |
 | `clippilot events list [--project <name>] --json` | Events: clips grouped by folder (deepest folder) or by recording time (gap > 45 min). See "Events" below. |
 | `clippilot cut show --json` / `cut brief` / `cut apply --file f.json` / `moments list --json` | The storyboard: brief, draft, read back. See "Storyboard" below. |
+| `clippilot board context --json` | The user has the board open and says **this / that panel, this moment, here, the selected one**: run this first. It resolves their selection (scene, panel + intent, focused moment with clip, in/out, speed, tier, shot/role, `alternatives` ids). Exit 1 + `{error}` when no board has been opened yet; `stale: true` means some selected item was deleted since. |
 | `clippilot proxies rebuild [--project <name>] [--only-bad] [--json]` | Playback is skippy/freezes: re-encode proxies to yuv420p with 1 s keyframes (sequential; `--only-bad` skips proxies already yuv420p; reports clips whose original is missing). |
 | `clippilot similar <id>` | User asks "what other takes of this exist" or "any duplicates of clip N". |
 | `clippilot mark-best <id> [--group <gid>]` | User picks the best take among similar clips. Defaults to all groups containing the clip. |
@@ -106,6 +107,11 @@ Edit verbs: `scene add|rename|move|delete|set-event`, `panel add|move|delete|int
 `panel place` and `panel pick` confirm the moment; so do `moment trim` and `moment speed` (and every panel using the
 moment becomes the user's). There is no `panel trim` / `panel speed` any more: edit the moment. In a draft,
 `start_sec` / `end_sec` / `speed` on a panel are written to its moment (without confirming it).
+
+**The board is live (M8).** When the user has the board open, "this panel", "that moment", "here" mean their current
+selection: run `clippilot board context --json` before acting (do not ask "which panel?" unless it fails). Your CLI
+edits show up in the open board within about 2 s, with a toast "Updated: <label>", and each is one undo step in the
+board's history (Cmd+Z) like any of the user's own edits.
 
 Rules when drafting:
 - At most one member of a `dup_group` per cut.

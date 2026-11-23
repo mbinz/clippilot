@@ -1,3 +1,4 @@
+import type { Head, SelectionBody } from './refresh';
 import type { BoardMoment, Brief, CutTree, HistoryState, Tier } from './types';
 
 const BASE = '/api';
@@ -26,6 +27,10 @@ export interface CutSummary {
 export const fetchCuts = (projectId: number) => call<CutSummary[]>('GET', `/projects/${projectId}/cuts`);
 export const createCut = (projectId: number, name: string) => call<CutSummary>('POST', `/projects/${projectId}/cuts`, { name });
 export const fetchTree = (cutId: number) => call<CutTree>('GET', `/cuts/${cutId}`);
+/** Cheap change marker of the cut's undo history (live refresh polls this). */
+export const fetchHead = (cutId: number) => call<Head>('GET', `/cuts/${cutId}/head`);
+/** What the board has selected, for `clippilot board context`. Board state: not logged, not undoable. */
+export const putSelection = (s: SelectionBody) => call<unknown>('PUT', '/board/selection', s);
 export const fetchHistory = (cutId: number) =>
   call<{ id: number; label: string; undone: boolean; created_at: string }[]>('GET', `/cuts/${cutId}/history`);
 

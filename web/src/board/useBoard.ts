@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as api from './api';
 import type { BoardMoment, CutTree, HistoryState } from './types';
+import { shouldRefetch, updateLabel, type Head } from './refresh';
+
+const POLL_MS = 2000;
 
 const NO_HISTORY: HistoryState = { can_undo: false, can_redo: false, undo_label: null, redo_label: null };
 
@@ -27,21 +30,66 @@ export function useBoard(projectId: number | undefined) {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
   const toastN = useRef(0);
+  /** Last head seen from the server (baseline for live refresh), the head after this tab's last own action, and busy flags. */
+  const headRef = useRef<Head | null>(null);
+  const ownRef = useRef<Head | null>(null);
+  const busy = useRef(0);
 
   const say = useCallback((text: string, undo = false, sticky = false) => {
     setToast({ text, undo, sticky, n: ++toastN.current });
   }, []);
 
   const reload = useCallback(async (id: number, pid: number) => {
-    const [t, ms, h] = await Promise.all([api.fetchTree(id), api.fetchMoments(pid), api.fetchHistory(id)]);
+    const [t, ms, h] = await Promise.all([api.fetchTree(id), api.fetchMoments(pid), api.fetchHead(id)]);
     setTree(t);
     setMoments(ms);
-    setHistory({
-      can_undo: h.some((o) => !o.undone),
-      can_redo: h.some((o) => o.undone),
-      undo_label: h.find((o) => !o.undone)?.label ?? null,
-      redo_label: [...h].reverse().find((o) => o.undone)?.label ?? null,
-    });
+    headRef.current = h;
+    setHistory({ can_undo: h.can_undo, can_redo: h.can_redo, undo_label: h.undo_label, redo_label: h.redo_label });
+  }, []);
+
+  // Live refresh: poll the cut's head every 2 s while the tab is visible; an outside change (CLI / Claude) refetches.
+  useEffect(() => {
+    if (cutId === null || projectId === undefined) return;
+    let stopped = false;
+    let polling = false;
+    const poll = async () => {
+      if (stopped || polling || document.hidden || busy.current > 0) return;
+      polling = true;
+      try {
+        const next = await api.fetchHead(cutId);
+        if (stopped || busy.current > 0) return;
+        const prev = headRef.current;
+        if (shouldRefetch(prev, next, ownRef.current)) {
+          await reload(cutId, projectId);
+          say(`Updated: ${updateLabel(prev, next)}`);
+        } else {
+          headRef.current = next;
+        }
+      } catch {
+        // transient (server restarting, cut deleted): try again on the next tick
+      } finally {
+        polling = false;
+      }
+    };
+    const timer = setInterval(() => void poll(), POLL_MS);
+    const onVisible = () => { if (!document.hidden) void poll(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [cutId, projectId, reload, say]);
+
+  /** Run one of this tab's own actions: polls pause meanwhile, and the head it ends on is remembered as "ours". */
+  const own = useCallback(async <T,>(fn: () => Promise<T>): Promise<T> => {
+    busy.current++;
+    try {
+      return await fn();
+    } finally {
+      ownRef.current = headRef.current;
+      busy.current--;
+    }
   }, []);
 
   // Resolve (or create) the project's "Main" cut, then load everything.
@@ -74,8 +122,11 @@ export function useBoard(projectId: number | undefined) {
   const act = useCallback(async <T extends { history?: HistoryState }>(label: string | null, fn: () => Promise<T>): Promise<T | null> => {
     if (cutId === null || projectId === undefined) return null;
     try {
-      const res = await fn();
-      await reload(cutId, projectId);
+      const res = await own(async () => {
+        const r = await fn();
+        await reload(cutId, projectId);
+        return r;
+      });
       if (res.history) setHistory(res.history);
       setError(null);
       if (label) say(label, true);
@@ -86,7 +137,7 @@ export function useBoard(projectId: number | undefined) {
       say(msg);
       return null;
     }
-  }, [cutId, projectId, reload, say]);
+  }, [cutId, projectId, reload, say, own]);
 
   /** Seen is board state, not an edit: optimistic local update, no refetch, not undoable. */
   const momentsRef = useRef(moments);
@@ -101,26 +152,32 @@ export function useBoard(projectId: number | undefined) {
   const undo = useCallback(async () => {
     if (cutId === null || projectId === undefined) return;
     try {
-      const r = await api.undoCut(cutId);
-      await reload(cutId, projectId);
+      const r = await own(async () => {
+        const res = await api.undoCut(cutId);
+        await reload(cutId, projectId);
+        return res;
+      });
       setHistory(r.history);
       say(`Undone: ${r.label}`);
     } catch (err) {
       say(err instanceof Error ? err.message : String(err));
     }
-  }, [cutId, projectId, reload, say]);
+  }, [cutId, projectId, reload, say, own]);
 
   const redo = useCallback(async () => {
     if (cutId === null || projectId === undefined) return;
     try {
-      const r = await api.redoCut(cutId);
-      await reload(cutId, projectId);
+      const r = await own(async () => {
+        const res = await api.redoCut(cutId);
+        await reload(cutId, projectId);
+        return res;
+      });
       setHistory(r.history);
       say(`Redone: ${r.label}`);
     } catch (err) {
       say(err instanceof Error ? err.message : String(err));
     }
-  }, [cutId, projectId, reload, say]);
+  }, [cutId, projectId, reload, say, own]);
 
   return {
     cutId, tree, moments, history, loading, error, toast, say,

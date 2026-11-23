@@ -1098,6 +1098,23 @@ Finder; route tested with a fake). Deferred to after A1: reset-moment button, re
   changes (CLI/Claude edits). Toast "Updated by Claude: <label>" when the change didn't come from this tab.
 - SKILL.md: "when the user says this / that panel, run `clippilot board context --json` first".
 
+**A1 result (implementer, 2026-11-23)** - done; `test:all` 836 -> 865 (+29) (typecheck + `web:build` green). Components are not unit-tested (UI only).
+- Server: `src/core/storyboard/selection.ts` (parse/check/atomic write/read, `resolveBoardContext`), `StoryboardService.alternatives()` + `head()`,
+  routes `PUT /board/selection` (400/404, not logged) and `GET /cuts/:id/head` (`{op_id, can_undo, can_redo, undo_label, redo_label}`;
+  `/history` did not expose the latest id cheaply since it lists 50 rows). CLI `clippilot board context [--json]` (`src/cli/commands/board.ts`).
+- Web: `web/src/board/refresh.ts` (`shouldRefetch(prev, next, own)`, `updateLabel`, `selectionKey`; tested), `useBoard` polls `/head` every
+  2 s (paused on `document.hidden`, immediate poll on `visibilitychange`, no overlap, paused during own actions) and refetches tree + moments
+  on an outside change with toast "Updated: <label>"; `BoardView` PUTs the selection debounced 300 ms, deduped by key.
+- Interpretations: (1) the project dir for the file is the server's `basePath` and the CLI's `process.cwd()` (same as the DB); (2) toast
+  says "Updated: <label>" (not "by Claude": the board cannot tell CLI from Claude), undo/redo from outside read "Updated: Undo <label>";
+  (3) `moment_id` in the selection = the moment drawer's moment only; the panel drawer's moment comes from the panel and `preview_moment_id`;
+  (4) focus order preview, then panel's moment (candidates: first candidate, as in the web), then drawer moment; output field `moment.focus`;
+  (5) scene must belong to the cut and panel to the scene (400), unknown ids 404; (6) stale ids resolve to null and set `stale: true`;
+  (7) the baseline head is refreshed on every reload, so own actions never toast; `own` head is also passed to `shouldRefetch`;
+  (8) selection and drawer are kept across a refetch because the board already resolves them by id each render (gone ids just close the drawer).
+- Not done / deferred: not checked in a real browser (planner); selection is a single global file (two boards/projects share it); `board context`
+  has no `--project` flag (uses the folder it runs in).
+
 Deferred (v0.3): new moment from a clip range (two pieces of one clip); splitting large similarity groups (by place
 or time gap); event-level "unseen ★" count; seen per device; touch press-and-hold preview.
 

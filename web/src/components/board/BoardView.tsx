@@ -14,7 +14,8 @@ import { MomentDrawer } from './MomentDrawer';
 import { BriefModal } from './BriefModal';
 import { PreviewModal, type PreviewItem } from './PreviewModal';
 import { panelMedia } from './media';
-import { exportCut, revealClip } from '../../board/api';
+import { exportCut, revealClip, putSelection } from '../../board/api';
+import { selectionKey, type SelectionBody } from '../../board/refresh';
 import { Toast } from './Toast';
 import { btnGhost, intentFrom } from './ui';
 
@@ -111,6 +112,28 @@ export function BoardView({ projectId }: Props) {
   useEffect(() => {
     drawerRef.current?.scrollTo?.({ top: 0 });
   }, [drawerKey]);
+
+  // Tell the server what is selected (debounced; deduped by key) so `clippilot board context` can answer "this panel".
+  const selBody: SelectionBody | null = board.cutId !== null && scene
+    ? {
+      cut_id: board.cutId,
+      scene_id: selPanel?.scene.id ?? scene.id,
+      panel_id: selPanel?.panel.id ?? null,
+      moment_id: selMoment?.id ?? null,
+      drawer: drawerKind,
+      preview_moment_id: selPanel && open?.kind === 'panel' ? open.preview : null,
+    }
+    : null;
+  const selKey = selBody ? selectionKey(selBody) : null;
+  const selRef = useRef(selBody);
+  selRef.current = selBody;
+  useEffect(() => {
+    if (selKey === null) return;
+    const t = setTimeout(() => {
+      if (selRef.current) putSelection(selRef.current).catch(() => {});
+    }, 300);
+    return () => clearTimeout(t);
+  }, [selKey]);
 
   const closeDrawer = () => setOpen(null);
   const openPanel = (id: number, preview?: number) => {

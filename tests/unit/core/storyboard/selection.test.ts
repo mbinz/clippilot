@@ -95,6 +95,7 @@ describe('board selection file + context', () => {
       t.db.prepare('UPDATE clips SET event_id = 1, hidden = 1 WHERE id = ?').run(c2);
       const h = t.addMoments(c2, [{}])[0]; set(h, 'action', 'wide');
       const c3 = t.addClip().id;
+      t.db.prepare("INSERT INTO events (project_id, name, source, sort_order) VALUES (?, 'Town', 'folder', 1)").run(t.projectId);
       t.db.prepare('UPDATE clips SET event_id = 2 WHERE id = ?').run(c3);
       const e = t.addMoments(c3, [{}])[0]; set(e, 'action', 'wide');
       expect(t.svc.alternatives(ms[0])).toEqual([ms[2], ms[1]]);
@@ -118,7 +119,7 @@ describe('board selection file + context', () => {
       expect(ctx.updated_at).toBe('T');
       expect(ctx.cut).toEqual({ id: cutId, name: 'Main' });
       expect(ctx.scene).toEqual({ id: sceneId, name: 'Arrival', position: 0, event: { id: 1, name: 'Beach' } });
-      expect(ctx.panel).toMatchObject({ id: p, number: 1, intent: 'Arrival shot', state: 'filled', source: 'user', moment_id: ms[0] });
+      expect(ctx.panel).toMatchObject({ id: p, number: 1, intent: 'Arrival shot', state: 'filled', source: 'ai', moment_id: ms[0] });
       expect(ctx.drawer).toBe('panel');
       expect(ctx.preview_moment_id).toBe(ms[1]);
       expect(ctx.moment).toMatchObject({
