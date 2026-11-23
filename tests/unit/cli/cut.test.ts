@@ -145,7 +145,7 @@ describe('clippilot scene / panel / moment / clip', () => {
     expect(tree.scenes[0].event).toBeNull();
   });
 
-  it('panel place via CLI fills it, confirms the moment; trim and speed work; bad speed exits 1', async () => {
+  it('panel place via CLI fills it, confirms the moment; moment trim and speed work; bad speed exits 1', async () => {
     const s = await run('scene', 'add', 'A');
     const p = await run('panel', 'add', String(s.id), '--intent', 'wave');
     expect(p.state).toBe('gap');
@@ -154,17 +154,50 @@ describe('clippilot scene / panel / moment / clip', () => {
     const panel = tree.scenes[0].panels[0];
     expect(panel).toMatchObject({ state: 'filled', source: 'user', clip_id: 2, start_sec: 2, end_sec: 6 });
     expect(panel.moment.status).toBe('confirmed');
-    await run('panel', 'trim', String(p.id), '2', '4');
-    await run('panel', 'speed', String(p.id), '0.5');
+    await run('moment', 'trim', '3', '2', '4');
+    await run('moment', 'speed', '3', '0.5');
     await run('panel', 'intent', String(p.id), 'big wave');
     tree = await run('cut', 'show', '--json');
     expect(tree.scenes[0].panels[0]).toMatchObject({ start_sec: 2, end_sec: 4, speed: 0.5, intent: 'big wave' });
     expect(tree.totals.duration_sec).toBe(4);
 
-    const slow = await run('panel', 'add', String(s.id), '--moment', '1'); // clip at 25 fps
-    await run('panel', 'speed', String(slow.id), '0.5');
+    await run('panel', 'add', String(s.id), '--moment', '1'); // clip at 25 fps
+    await run('moment', 'speed', '1', '0.5');
     expect(process.exitCode).toBe(1);
     expect(errs.join(' ')).toMatch(/frame rate/);
+  });
+
+  it('panel trim and panel speed no longer exist', async () => {
+    const cmds = createProgram().commands.find((c) => c.name() === 'panel')!.commands.map((c) => c.name());
+    expect(cmds).not.toContain('trim');
+    expect(cmds).not.toContain('speed');
+    const momentCmds = createProgram().commands.find((c) => c.name() === 'moment')!.commands.map((c) => c.name());
+    expect(momentCmds).toEqual(expect.arrayContaining(['trim', 'speed', 'star', 'unstar', 'reset', 'reject', 'unreject']));
+  });
+
+  it('moment star / unstar / reset: logged on the Main cut and undoable', async () => {
+    const s = await run('scene', 'add', 'A');
+    await run('panel', 'add', String(s.id), '--moment', '3');
+    await run('moment', 'star', '2'); // solid-less filler moment 2 -> user tier hero
+    await run('moment', 'trim', '3', '3', '5');
+    await run('moment', 'speed', '3', '0.5');
+    let tree = await run('cut', 'show', '--json');
+    expect(tree.scenes[0].panels[0]).toMatchObject({ start_sec: 3, end_sec: 5, speed: 0.5, source: 'user' });
+    const hist = await run('cut', 'history', '--json');
+    expect(hist.map((h: any) => h.label).slice(0, 3)).toEqual(['Speed 50 %', 'Trim moment', '\u2605']);
+    await run('moment', 'reset', '3');
+    tree = await run('cut', 'show', '--json');
+    expect(tree.scenes[0].panels[0]).toMatchObject({ start_sec: 2, end_sec: 6, speed: 1 });
+    await run('cut', 'undo');
+    tree = await run('cut', 'show', '--json');
+    expect(tree.scenes[0].panels[0]).toMatchObject({ start_sec: 3, end_sec: 5, speed: 0.5 });
+    await run('moment', 'unstar', '2');
+    await run('moment', 'unstar', '1'); // AI hero -> demoted to solid by the user
+    const db = createDb(path.join(dir, '.clippilot', 'clippilot.db'));
+    expect(db.prepare('SELECT id, user_tier FROM highlights ORDER BY id').all()).toEqual([
+      { id: 1, user_tier: 'solid' }, { id: 2, user_tier: null }, { id: 3, user_tier: null },
+    ]);
+    db.close();
   });
 
   it('panel add with candidates, pick, move, delete', async () => {
@@ -214,13 +247,13 @@ describe('clippilot cut undo / redo / history', () => {
     const s = await run('scene', 'add', 'A');
     const p = await run('panel', 'add', String(s.id), '--intent', 'wave');
     await run('panel', 'place', String(p.id), '1');
-    await run('panel', 'trim', String(p.id), '2', '3');
+    await run('moment', 'trim', '1', '2', '3');
     await run('moment', 'reject', '1', '--reason', 'shaky');
     await run('clip', 'hide', '2');
 
     const hist = await run('cut', 'history', '--json');
     expect(hist.map((h: any) => h.label)).toEqual([
-      'Hide clip b.mp4', '👎 shaky', expect.stringMatching(/^Trim panel/), 'Place moment in panel 1',
+      'Hide clip b.mp4', '👎 shaky', 'Trim moment', 'Place moment in panel 1',
       expect.stringMatching(/panel/i), expect.stringMatching(/scene/i),
     ]);
     expect(hist[0]).toMatchObject({ undone: false });

@@ -265,9 +265,9 @@ export function BoardView({ projectId }: Props) {
               momentsById={momentsById}
               allMoments={moments}
               onClose={closeDrawer}
-              onSpeed={(v) => void actions.patchPanel(selPanel.panel.id, { speed: v }, `Speed ${v * 100} %`)}
+              onSpeed={(v) => selPanel.panel.moment_id !== null && void actions.patchMoment(selPanel.panel.moment_id, { speed: v }, `Speed ${v * 100} %`)}
               onPick={(mid) => void actions.pickCandidate(selPanel.panel.id, mid)}
-              onTrim={(a, b) => void actions.patchPanel(selPanel.panel.id, { start_sec: a, end_sec: b }, 'Trim panel')}
+              onTrim={(a, b) => selPanel.panel.moment_id !== null && void actions.patchMoment(selPanel.panel.moment_id, { start_sec: a, end_sec: b }, 'Trim moment')}
               onIntent={(t) => void actions.patchPanel(selPanel.panel.id, { intent: t }, 'Edit intent')}
               onMove={(dir) => void actions.movePanel(selPanel.panel.id, selPanel.scene.id, selPanel.scene.panels.indexOf(selPanel.panel) + dir)}
               onDelete={async () => {

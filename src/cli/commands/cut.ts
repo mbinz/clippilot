@@ -279,20 +279,6 @@ export function registerCutCommands(parent: Command): void {
       print({ ok: true, id: toId(id), intent: text });
     }));
 
-  panel.command('trim <id> <start> <end>')
-    .description('Set in/out seconds of a filled panel (clamped to the clip)')
-    .action((id: string, start: string, end: string) => withSvc(({ svc }) => {
-      svc.command(svc.cutIdOfPanel(toId(id)), labels.trim(svc, toId(id)), () => svc.trimPanel(toId(id), toNum(start, 'start'), toNum(end, 'end')));
-      print({ ok: true, id: toId(id) });
-    }));
-
-  panel.command('speed <id> <speed>')
-    .description('Set playback speed: 1, 0.5 or 0.25 (needs enough source fps)')
-    .action((id: string, speed: string) => withSvc(({ svc }) => {
-      svc.command(svc.cutIdOfPanel(toId(id)), labels.speed(svc, toId(id), toNum(speed, 'speed')), () => svc.setSpeed(toId(id), toNum(speed, 'speed')));
-      print({ ok: true, id: toId(id), speed: toNum(speed) });
-    }));
-
   panel.command('place <panelId> <momentId>')
     .description('Put a moment on a panel (confirms the moment)')
     .action((panelId: string, momentId: string) => withSvc(({ svc }) => {
@@ -326,6 +312,49 @@ export function registerCutCommands(parent: Command): void {
       const cutId = logCutOf(svc, o.cut, svc.projectIdOfMoment(toId(id)));
       svc.command(cutId, labels.unreject(), () => svc.unrejectMoment(toId(id)));
       print({ ok: true, id: toId(id), status: 'proposed' });
+    }));
+
+  const momentLog = (svc: StoryboardService, id: string, cut: string | undefined) => logCutOf(svc, cut, svc.projectIdOfMoment(toId(id)));
+  const cutOpt = ['--cut <id>', 'Cut to log the undo step on (default: Main)'] as const;
+
+  momentCmd.command('trim <id> <start> <end>')
+    .description('Set in/out seconds of a moment (clamped to the clip). Every panel using it plays the new range')
+    .option(...cutOpt)
+    .action((id: string, start: string, end: string, o) => withSvc(({ svc }) => {
+      svc.command(momentLog(svc, id, o.cut), labels.trimMoment(), () => svc.trimMoment(toId(id), toNum(start, 'start'), toNum(end, 'end')));
+      print({ ok: true, id: toId(id) });
+    }));
+
+  momentCmd.command('speed <id> <speed>')
+    .description('Set playback speed of a moment: 1, 0.5 or 0.25 (needs enough source fps)')
+    .option(...cutOpt)
+    .action((id: string, speed: string, o) => withSvc(({ svc }) => {
+      svc.command(momentLog(svc, id, o.cut), labels.momentSpeed(toNum(speed, 'speed')), () => svc.setMomentSpeed(toId(id), toNum(speed, 'speed')));
+      print({ ok: true, id: toId(id), speed: toNum(speed) });
+    }));
+
+  momentCmd.command('star <id>')
+    .description('Star a moment (your override: hero)')
+    .option(...cutOpt)
+    .action((id: string, o) => withSvc(({ svc }) => {
+      svc.command(momentLog(svc, id, o.cut), labels.momentTier('hero'), () => svc.starMoment(toId(id), true));
+      print({ ok: true, id: toId(id), starred: true });
+    }));
+
+  momentCmd.command('unstar <id>')
+    .description('Remove the star (back to the AI tier; an AI hero becomes solid)')
+    .option(...cutOpt)
+    .action((id: string, o) => withSvc(({ svc }) => {
+      svc.command(momentLog(svc, id, o.cut), labels.momentTier(null), () => svc.starMoment(toId(id), false));
+      print({ ok: true, id: toId(id), starred: false });
+    }));
+
+  momentCmd.command('reset <id>')
+    .description('Back to the analysis range and the default speed')
+    .option(...cutOpt)
+    .action((id: string, o) => withSvc(({ svc }) => {
+      svc.command(momentLog(svc, id, o.cut), labels.resetMoment(), () => svc.resetMoment(toId(id)));
+      print({ ok: true, id: toId(id) });
     }));
 
   parent.command('moments').description('Moments for drafting')

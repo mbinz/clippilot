@@ -8,30 +8,14 @@ export interface PanelRange {
   speed: number;
 }
 
-export const PANEL_DEFAULT_SEC = 4;
-const round2 = (n: number) => Math.round(n * 100) / 100;
-
-/** Mirrors `defaultRange` on the server: gated suggested speed, a window of at most 4 s x speed centred on the moment. */
-export function defaultRange(
-  m: { start_sec: number; end_sec: number; suggested_speed: number },
-  fps: number | null | undefined,
-): { a: number; b: number; speed: number } {
-  const speed = speedOk(fps, m.suggested_speed || 1) ? (m.suggested_speed || 1) : 1;
-  const want = PANEL_DEFAULT_SEC * speed;
-  if (m.end_sec - m.start_sec <= want) return { a: m.start_sec, b: m.end_sec, speed };
-  const mid = (m.start_sec + m.end_sec) / 2;
-  return { a: round2(mid - want / 2), b: round2(mid + want / 2), speed };
-}
-
-/** What a panel plays: its own range when filled, the first candidate's default range otherwise. */
+/** What a panel plays: the range and speed of its moment (the moment is the edit); for candidates the first one's. */
 export function panelRange(p: BoardPanel): PanelRange | null {
   if (p.state === 'filled' && p.clip_id !== null && p.start_sec !== null && p.end_sec !== null) {
     return { clipId: p.clip_id, a: p.start_sec, b: p.end_sec, speed: p.speed };
   }
   if (p.state === 'candidates' && p.candidates.length > 0) {
     const m = p.candidates[0];
-    const d = defaultRange(m, m.clip?.fps);
-    return { clipId: m.clip_id, ...d };
+    return { clipId: m.clip_id, a: m.start_sec, b: m.end_sec, speed: m.speed };
   }
   return null;
 }

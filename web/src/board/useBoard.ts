@@ -124,8 +124,10 @@ export function useBoard(projectId: number | undefined) {
       deleteScene: (id: number, name: string) => act(`Delete scene "${name}"`, () => api.deleteScene(id)),
       addPanel: (sceneId: number, input: { intent?: string; moment_id?: number; position?: number }, label = 'Add panel') =>
         act(label, () => api.addPanel(sceneId, input)),
-      patchPanel: (id: number, patch: { intent?: string; start_sec?: number; end_sec?: number; speed?: number }, label: string) =>
+      patchPanel: (id: number, patch: { intent?: string }, label: string) =>
         act(label, () => api.patchPanel(id, patch)),
+      patchMoment: (id: number, patch: { start_sec?: number; end_sec?: number; speed?: number }, label: string) =>
+        act(label, () => api.patchMoment(id, cutId!, patch)),
       movePanel: (id: number, sceneId: number, position: number) => act('Move panel', () => api.movePanel(id, sceneId, position)),
       placeMoment: (panelId: number, momentId: number, label: string) => act(label, () => api.placeMoment(panelId, momentId)),
       pickCandidate: (panelId: number, momentId: number) => act('Choose candidate', () => api.pickCandidate(panelId, momentId)),

@@ -22,7 +22,7 @@ const cut = story && {
   brief: story.brief ? { ...JSON.parse(story.brief), state: story.brief_state } : null,
   scenes: (db.prepare('select id, name, event_id from scenes where story_id=? order by position').all(story.id) as any[]).map(s => ({
     ...s,
-    panels: (db.prepare('select id, intent, state, source, clip_id, moment_id, start_sec, end_sec, speed from story_segments where scene_id=? order by position').all(s.id) as any[])
+    panels: (db.prepare('select p.id, p.intent, p.state, p.source, p.clip_id, p.moment_id, h.start_sec, h.end_sec, coalesce(h.speed, 1) as speed from story_segments p left join highlights h on h.id = p.moment_id where p.scene_id=? order by p.position').all(s.id) as any[])
       .map(p => ({ ...p, cands: (db.prepare('select moment_id from panel_candidates where panel_id=? order by position').all(p.id) as any[]).map(c => c.moment_id) })),
   })),
 };

@@ -49,6 +49,8 @@ export interface TreeMoment {
   description: string;
   tier: string;
   suggested_speed: number;
+  /** The moment's playback speed (the edit). */
+  speed: number;
   thumbnail: string | null;
   proxy_url: string | null;
   clip: ClipInfo | null;

@@ -5,8 +5,8 @@ import {
 } from '../../../web/src/board/logic.js';
 import type { BoardMoment, BoardPanel, BoardScene } from '../../../web/src/board/types.js';
 
-const cand = (id: number, clip_id: number, start_sec: number, end_sec: number, suggested_speed = 1) =>
-  ({ id, clip_id, start_sec, end_sec, description: 'd', tier: 'solid', suggested_speed, thumbnail: null, proxy_url: null, clip: null });
+const cand = (id: number, clip_id: number, start_sec: number, end_sec: number, suggested_speed = 1, speed = 1) =>
+  ({ id, clip_id, start_sec, end_sec, description: 'd', tier: 'solid', suggested_speed, speed, thumbnail: null, proxy_url: null, clip: null });
 
 const panel = (p: Partial<BoardPanel>): BoardPanel => ({
   id: 1, scene_id: 1, position: 0, intent: '', state: 'gap', source: 'ai', clip_id: null, moment_id: null,
@@ -30,16 +30,12 @@ describe('panel timeline length', () => {
     expect(panelLength(filled(1, 2, 6, 1))).toBe(4);
   });
 
-  it('candidates panel: first candidate at its default range (centred 4 s window, gated speed)', () => {
-    const c = (id: number, clip_id: number, a: number, b: number, sp: number, fps: number) =>
-      ({ ...cand(id, clip_id, a, b, sp), clip: { id: clip_id, file_name: 'x', duration_sec: 60, fps, proxy_url: null, hidden: false } });
-    const slow = panel({ state: 'candidates', candidates: [c(5, 9, 10, 20, 0.5, 50), c(6, 9, 20, 30, 1, 25)] });
-    expect(panelRange(slow)).toEqual({ clipId: 9, a: 14, b: 16, speed: 0.5 });
-    expect(panelLength(slow)).toBe(4);
-    const gated = panel({ state: 'candidates', candidates: [c(5, 9, 10, 20, 0.5, 25)] });
-    expect(panelRange(gated)).toEqual({ clipId: 9, a: 13, b: 17, speed: 1 });
-    const short = panel({ state: 'candidates', candidates: [c(5, 9, 10, 12.5, 1, 25)] });
-    expect(panelRange(short)).toEqual({ clipId: 9, a: 10, b: 12.5, speed: 1 });
+  it('candidates panel: the first candidate with its whole moment range and the moment speed', () => {
+    const slow = panel({ state: 'candidates', candidates: [cand(5, 9, 10, 20, 0.5, 0.5), cand(6, 9, 20, 30)] });
+    expect(panelRange(slow)).toEqual({ clipId: 9, a: 10, b: 20, speed: 0.5 });
+    expect(panelLength(slow)).toBe(20);
+    const normal = panel({ state: 'candidates', candidates: [cand(5, 9, 10, 12.5)] });
+    expect(panelRange(normal)).toEqual({ clipId: 9, a: 10, b: 12.5, speed: 1 });
   });
 
   it('gap and empty candidates have no range and zero length', () => {

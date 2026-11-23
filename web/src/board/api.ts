@@ -44,8 +44,11 @@ export const deleteScene = (sceneId: number) => call<Mutation>('DELETE', `/scene
 
 export const addPanel = (sceneId: number, input: { intent?: string; moment_id?: number; position?: number }) =>
   call<Mutation<{ id: number }>>('POST', `/scenes/${sceneId}/panels`, input);
-export const patchPanel = (panelId: number, patch: { intent?: string; start_sec?: number; end_sec?: number; speed?: number }) =>
+export const patchPanel = (panelId: number, patch: { intent?: string }) =>
   call<Mutation>('PATCH', `/panels/${panelId}`, patch);
+/** The moment is the edit: in/out and speed are set on the moment (every panel using it follows). */
+export const patchMoment = (momentId: number, cutId: number, patch: { start_sec?: number; end_sec?: number; speed?: number }) =>
+  call<Mutation>('PATCH', `/moments/${momentId}`, { cut_id: cutId, ...patch });
 export const movePanel = (panelId: number, sceneId: number, position: number) =>
   call<Mutation>('POST', `/panels/${panelId}/move`, { scene_id: sceneId, position });
 export const placeMoment = (panelId: number, momentId: number) =>
