@@ -17,6 +17,8 @@ export interface ClipInfo {
   fps: number | null;
   proxy_url: string | null;
   hidden: boolean;
+  recorded_at: string | null;
+  event_id: number | null;
 }
 
 /** A moment as listed for the pool (GET /projects/:id/moments). */
@@ -26,7 +28,16 @@ export interface BoardMoment {
   event_id: number | null;
   start_sec: number;
   end_sec: number;
+  /** The moment's playback speed (the edit). */
+  speed: number;
+  /** The analysis' original in/out. */
+  ai_start_sec: number;
+  ai_end_sec: number;
+  /** Effective tier (`user_tier ?? ai_tier`). */
   tier: Tier | string;
+  ai_tier: Tier | string;
+  user_tier: Tier | null;
+  seen: boolean;
   shot: string | null;
   role: string | null;
   issues: string[];

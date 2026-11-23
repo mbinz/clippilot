@@ -57,7 +57,16 @@ export interface MomentRow {
   event_id: number | null;
   start_sec: number;
   end_sec: number;
+  /** The moment's playback speed (the edit). */
+  speed: number;
+  /** The analysis' original in/out (what "reset" returns to). */
+  ai_start_sec: number;
+  ai_end_sec: number;
+  /** Effective tier: `user_tier ?? ai_tier`. */
   tier: string;
+  ai_tier: string;
+  user_tier: string | null;
+  seen: boolean;
   shot: string | null;
   role: string | null;
   issues: string[];
@@ -480,10 +489,17 @@ export class StoryboardService {
     `).all(...params) as (HighlightRecord & { event_id: number | null })[];
     return rows.map((h) => ({
       id: h.id, clip_id: h.clip_id, event_id: h.event_id, start_sec: h.start_sec, end_sec: h.end_sec,
-      tier: h.tier, shot: h.shot, role: h.role, issues: JSON.parse(h.issues || '[]') as string[],
+      speed: h.speed, ai_start_sec: h.ai_start_sec, ai_end_sec: h.ai_end_sec,
+      tier: h.user_tier ?? h.tier, ai_tier: h.tier, user_tier: h.user_tier, seen: h.seen_at !== null, shot: h.shot, role: h.role, issues: JSON.parse(h.issues || '[]') as string[],
       slowmo: h.slowmo, suggested_speed: h.suggested_speed, audio_keep: Boolean(h.audio_keep),
       audio_type: h.audio_type, dup_group: h.dup_group, status: h.status, description: h.description,
     }));
+  }
+
+  /** Board state, not an edit: stored on the moment, never logged in `operations` or part of an undo snapshot. */
+  setMomentSeen(momentId: number, seen: boolean): void {
+    this.moment(momentId);
+    this.db.prepare('UPDATE highlights SET seen_at = ? WHERE id = ?').run(seen ? new Date().toISOString() : null, momentId);
   }
 
   placeMoment(panelId: number, momentId: number): void {

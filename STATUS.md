@@ -1032,6 +1032,15 @@ exports the real cut). Decisions from the grilling + mockup rounds (2026-11-22/2
   `open -R <file_path>` via an injectable opener (test with a fake; 404 for unknown clip, 409 if the file is missing).
 - `/projects/:id/moments` rows gain `speed`, `ai_start_sec`, `ai_end_sec`, `user_tier`, effective `tier`, `seen`, and
   `clip.recorded_at`, `clip.event_id`. The board loads with `include_rejected=1&include_hidden=1` and filters itself.
+- **B2 result (implementer, 2026-11-23):** done; `test:all` 786 -> 792 (+6, new `tests/unit/core/server/routes/moments-board.test.ts`;
+  typecheck, `web:build` green). Built: `StoryboardService.setMomentSeen`, `MomentRow` extended (also the CLI
+  `moments list --json` shape; its row-shape test updated), `POST /moments/:id/seen`, `POST /clips/:id/reveal` with
+  `opener` option on `createCutRoutes` / `createApp` (default spawns `open` with an args array, no shell), web `types.ts`
+  + `api.ts` (`markSeen`, `revealClip`).
+- Interpretations: `tier` is the effective tier and `ai_tier` the AI one; `listMoments --min-tier` still filters on the AI
+  tier (unchanged; revisit if the board/CLI should filter by effective tier); a failing opener returns 500.
+- For B4: `fetchMoments` already loads `include_rejected=1&include_hidden=1` (unchanged); the board's hidden/rejected
+  filtering is as before. Web `ClipInfo` gained `recorded_at`/`event_id`.
 
 **B3 — web logic (pure, tested in `tests/unit/web/board-logic.test.ts`)**
 - `similarKey(m)`, `poolOrder(moments)` → `{ heroes: Moment[][], rest: Moment[][] }` (groups; ★ by effective tier),

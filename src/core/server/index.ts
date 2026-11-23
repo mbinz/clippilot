@@ -19,6 +19,8 @@ export interface ServerOptions {
   db: Database.Database;
   basePath: string;
   port: number;
+  /** Overrides how `open` is run for "Show in Finder" (tests). */
+  opener?: (args: string[]) => void | Promise<void>;
 }
 
 export function createApp(options: ServerOptions): Hono {
@@ -34,7 +36,7 @@ export function createApp(options: ServerOptions): Hono {
   app.route('/api/facets', createFacetRoutes(db));
   app.route('/api/similarity', createSimilarityRoutes(db));
   app.route('/api', createEventRoutes(db));
-  app.route('/api', createCutRoutes(db, { basePath }));
+  app.route('/api', createCutRoutes(db, { basePath, opener: options.opener }));
 
   // Serve thumbnails from .clippilot/thumbnails/
   const thumbnailDir = path.resolve(basePath, '.clippilot', 'thumbnails');

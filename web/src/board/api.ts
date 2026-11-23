@@ -33,6 +33,12 @@ export const fetchHistory = (cutId: number) =>
 export const fetchMoments = (projectId: number) =>
   call<BoardMoment[]>('GET', `/projects/${projectId}/moments?include_rejected=1&include_hidden=1`);
 
+/** Board state, not an edit: not logged, not undoable. */
+export const markSeen = (momentId: number, seen: boolean) =>
+  call<{ id: number; seen: boolean }>('POST', `/moments/${momentId}/seen`, { seen });
+/** "Show in Finder" (macOS `open -R`). */
+export const revealClip = (clipId: number) => call<{ ok: true; path: string }>('POST', `/clips/${clipId}/reveal`);
+
 export const undoCut = (cutId: number) => call<Mutation<{ label: string }>>('POST', `/cuts/${cutId}/undo`);
 export const redoCut = (cutId: number) => call<Mutation<{ label: string }>>('POST', `/cuts/${cutId}/redo`);
 

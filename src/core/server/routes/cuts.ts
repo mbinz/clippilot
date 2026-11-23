@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { Hono, type Context } from 'hono';
 import type Database from 'better-sqlite3';
@@ -15,7 +16,15 @@ type Body = Record<string, unknown>;
 export interface CutRoutesOptions {
   /** Folder that holds `.clippilot` (the project folder); exports are written to `<basePath>/exports/`. */
   basePath?: string;
+  /** Runs macOS `open` with these args (injectable for tests). Default: spawn `open` without a shell. */
+  opener?: (args: string[]) => void | Promise<void>;
 }
+
+const defaultOpener = (args: string[]): Promise<void> => new Promise((resolve, reject) => {
+  const child = spawn('open', args, { stdio: 'ignore' });
+  child.once('error', reject);
+  child.once('exit', (code) => (code === 0 ? resolve() : reject(new Error(`open exited with code ${code}`))));
+});
 
 /** Mounted at /api: storyboard (cut / scene / panel) routes, thin wrappers over StoryboardService. */
 export function createCutRoutes(db: Database.Database, options: CutRoutesOptions = {}): Hono {
@@ -23,6 +32,7 @@ export function createCutRoutes(db: Database.Database, options: CutRoutesOptions
   const svc = new StoryboardService(db);
   const projects = new ProjectRepository(db);
   const thumbs = new ThumbnailRepository(db);
+  const opener = options.opener ?? defaultOpener;
 
   const media = (clipId: number, proxyPath: string | null) => {
     const [first] = thumbs.findByClip(clipId);
@@ -33,12 +43,14 @@ export function createCutRoutes(db: Database.Database, options: CutRoutesOptions
   };
   /** Clip info the board needs next to a moment: duration/fps for the timeline and speed gating, proxy for playback. */
   const clipInfo = (clipId: number) => {
-    const row = db.prepare('SELECT id, file_path, duration_sec, fps, proxy_path, hidden FROM clips WHERE id = ?').get(clipId) as
-      { id: number; file_path: string; duration_sec: number; fps: number | null; proxy_path: string | null; hidden: number } | undefined;
+    const row = db.prepare('SELECT id, file_path, duration_sec, fps, proxy_path, hidden, recorded_at, event_id FROM clips WHERE id = ?').get(clipId) as
+      { id: number; file_path: string; duration_sec: number; fps: number | null; proxy_path: string | null; hidden: number;
+        recorded_at: string | null; event_id: number | null } | undefined;
     if (!row) return null;
     return {
       id: row.id, file_name: path.basename(row.file_path), duration_sec: row.duration_sec, fps: row.fps,
       proxy_url: media(row.id, row.proxy_path).proxy_url, hidden: Boolean(row.hidden),
+      recorded_at: row.recorded_at, event_id: row.event_id,
     };
   };
   /** URL of the clip thumbnail closest to `sec`. */
@@ -340,6 +352,29 @@ export function createCutRoutes(db: Database.Database, options: CutRoutesOptions
         return momentRow(momentId);
       });
     })(c);
+  });
+
+  /** Board state, not an edit: not logged, not undoable. */
+  app.post('/moments/:id/seen', async (c) => {
+    const body = await bodyOf(c);
+    const momentId = id(c);
+    if (!db.prepare('SELECT 1 FROM highlights WHERE id = ?').get(momentId)) return c.json({ error: 'Moment not found' }, 404);
+    if (typeof body.seen !== 'boolean') return c.json({ error: 'seen must be a boolean' }, 400);
+    svc.setMomentSeen(momentId, body.seen);
+    return c.json({ data: { id: momentId, seen: body.seen } });
+  });
+
+  /** "Show in Finder": `open -R <file>`. */
+  app.post('/clips/:id/reveal', async (c) => {
+    const row = db.prepare('SELECT file_path FROM clips WHERE id = ?').get(id(c)) as { file_path: string } | undefined;
+    if (!row) return c.json({ error: 'Clip not found' }, 404);
+    if (!fs.existsSync(row.file_path)) return c.json({ error: `File not found on disk: ${row.file_path}` }, 409);
+    try {
+      await opener(['-R', row.file_path]);
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 500);
+    }
+    return c.json({ data: { ok: true, path: row.file_path } });
   });
 
   app.post('/moments/:id/reject', async (c) => {

@@ -230,8 +230,9 @@ describe('clippilot scene / panel / moment / clip', () => {
     const rows = await run('moments', 'list', '--json');
     expect(rows.map((r: any) => r.id)).toEqual([1, 2, 3]);
     expect(Object.keys(rows[0]).sort()).toEqual([
-      'audio_keep', 'audio_type', 'clip_id', 'description', 'dup_group', 'end_sec', 'event_id', 'id', 'issues', 'role',
-      'shot', 'slowmo', 'start_sec', 'status', 'suggested_speed', 'tier',
+      'ai_end_sec', 'ai_start_sec', 'ai_tier', 'audio_keep', 'audio_type', 'clip_id', 'description', 'dup_group', 'end_sec',
+      'event_id', 'id', 'issues', 'role', 'seen', 'shot', 'slowmo', 'speed', 'start_sec', 'status', 'suggested_speed', 'tier',
+      'user_tier',
     ]);
     expect(rows[0]).toMatchObject({ clip_id: 1, event_id: 1, tier: 'hero', status: 'proposed', issues: [], audio_keep: false });
     expect((await run('moments', 'list', '--event', '1', '--json')).map((r: any) => r.id)).toEqual([1, 2]);
