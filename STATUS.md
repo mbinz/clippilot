@@ -1206,6 +1206,16 @@ v3 added a near-duplicate 1.5-8.5 s; 3 of 10 user trims were < 3 s).
   trimmed, 👎 or placed) with prompt v3 without touching the real DB; report per clip the new moments vs the user's
   trims (overlap), length distribution, ★ share, audio_keep share. Planner + user judge; iterate the prompt if needed.
 
+**Q2 result (planner, 2026-11-23)** — eval on a copy (22 clips: 17 the user had touched + 5 untouched, < $1): v3 median
+moment 5.0 s (always 3–8; old up to 21 s), ★ 30 % → 9 %, audio_keep 72 % → 19 %, user trims matched 5/10 → 6/10 (3 of
+the user's trims were < 3 s → min lowered to 2 s in Q1b), "shake" rejects re-proposed 0/5, "boring" 4/7 (two clips the user
+found boring overall). Re-analysis kept user moments and added near-duplicates → Q1b dedupe rule.
+**Arrifana reset + v3 run (2026-11-23, user decision: "my changes were playful")** — backup `clippilot.pre-reset.db`; all
+moments, scenes, panels and history deleted (clips, events, brief kept); `analyze --force` on 104 clips (0 errors): 167
+moments, avg 5.2 s, ★ 16 %, audio_keep 19 %. Brief must-haves remapped to the new moments (same text; kiss → the
+"Schön hier!" moment 241). Claude draft applied: 5 scenes, 37 panels, 2:48 for a 2:45 target, 0 moments "changed by
+you" (fix b2d6560: an AI draft's range is the AI range). ★ at 16 % is above the ~10 % target — watch on Portugal.
+
 **Q3 — small analysis fixes**
 - Event names trimmed (folder "Praia do Odeceixe "); event times/names in the footage's time zone: project config
   `timezone` (IANA, default = system) used by `deriveEvents` and time-group names; set `Europe/Lisbon` for Portugal.
