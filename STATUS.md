@@ -1149,6 +1149,39 @@ poll ("Updated: Trim moment", drawer stayed on panel 3, Undo offers it); the boa
 item 2. Small deferred items: reset-moment button, 👎 reason in the clip's moment list, `--min-tier` on the effective tier,
 `--only-bad` keyframe check, one selection file per project folder (two open boards overwrite each other).
 
+### Roadmap item 2 — Analysis polish + full Portugal (planned 2026-11-23)
+
+Why: on the board the moment *is* the edit, so the AI's moments must be good cuts. Example C0542: the analysis marked
+0–3 s (still adjusting sunglasses) and missed the best stable stretch 4–9 s; the user trimmed it by hand. Decisions
+(user, 2026-11-23): moments **3–8 s**, **several per clip**, **★ for ~1 in 10** moments (today ~26 %).
+
+**Q1 — moment prompt v3 + normalisation** (test-first where code; prompt text checked by tests on its rules)
+- Prompt (`src/core/analyze/prompts.ts`): moments = the best *stable* stretches a cutter would use, 3–8 s each; cover the
+  clip — several moments for a long clip, don't skip good parts between moments; start after reframing/adjusting settles
+  and end before the camera moves away; avoid parts where the camera pans/tilts/zooms in search of the subject unless the
+  move itself is the shot. tier: "hero" only for the ~10 % best moments of a trip (opens or carries a scene), most moments
+  "solid". audio_keep strict: only when the original sound carries the moment (laughter, a spoken line, a wave event);
+  ambient sea/wind alone = false; "im Zweifel false". Keep the 0–5 limit → raise to 0–8 per clip.
+- `highlights.ts`: `MAX_MOMENT_SEC = 8` — longer moments are shortened to 8 s centred (like the existing widening to 3 s);
+  overlapping moments of one clip are merged or the later one is shifted to start at the earlier one's end (pick one,
+  test it). A moment missing `description` defaults to "" instead of failing the clip (Arrifana: one clip failed 3×).
+- Tests: normaliser (≤ 8 s, ≥ 3 s, overlap rule, clamping), schema accepts a missing description, prompt contains the
+  3–8 s / ★ ~10 % / audio rules (cheap guard against regressions).
+
+**Q2 — evaluation on Arrifana (planner, cost shown first)**
+- Script `scripts/eval/moment-eval.ts`: on a **copy** of the Arrifana DB, re-analyse a sample (~15 clips the user touched:
+  trimmed, 👎 or placed) with prompt v3 without touching the real DB; report per clip the new moments vs the user's
+  trims (overlap), length distribution, ★ share, audio_keep share. Planner + user judge; iterate the prompt if needed.
+
+**Q3 — small analysis fixes**
+- Event names trimmed (folder "Praia do Odeceixe "); event times/names in the footage's time zone: project config
+  `timezone` (IANA, default = system) used by `deriveEvents` and time-group names; set `Europe/Lisbon` for Portugal.
+- `proxies rebuild --only-bad` also rebuilds proxies whose keyframes are > 2 s apart.
+
+**Q4 — full Portugal** (after Q1–Q3; user OK on the Gemini cost estimate first)
+- `~/Video/ClipPilot Portugal/`: ingest `~/Video/Portugal` (508 clips, 123 GB; resumable, overnight), analyze with
+  prompt v3, events, then Claude proposes a brief per user wish.
+
 ### M5 — Gap fillers (free) — roadmap item 5
 - Per-gap search over own library (unused clips, other projects).
 - Locally rendered title/chapter cards, animated route map, photo pan/zoom → ingested as clips.
