@@ -8,6 +8,7 @@ import { StoryboardService, type PanelNode } from '../../storyboard/service.js';
 import { labels } from '../../storyboard/labels.js';
 import { cutToSegments } from '../../storyboard/export.js';
 import { exportSegments } from '../../export/index.js';
+import type { Tier } from '../../tiers.js';
 
 type Body = Record<string, unknown>;
 
@@ -224,21 +225,14 @@ export function createCutRoutes(db: Database.Database, options: CutRoutesOptions
     const panelId = id(c);
     const body = await bodyOf(c);
     return guard(() => {
+      if (body.start_sec !== undefined || body.end_sec !== undefined || body.speed !== undefined) {
+        throw new Error('In/out and speed live on the moment: use PATCH /moments/:id');
+      }
+      if (body.intent === undefined) throw new Error('Nothing to update (intent)');
       const cutId = svc.cutIdOfPanel(panelId);
-      const parts: string[] = [];
-      if (body.intent !== undefined) parts.push(labels.intent(svc, panelId));
-      if (body.start_sec !== undefined || body.end_sec !== undefined) parts.push(labels.trim(svc, panelId));
-      if (body.speed !== undefined) parts.push(labels.speed(svc, panelId, Number(body.speed)));
-      if (!parts.length) throw new Error('Nothing to update (intent, start_sec + end_sec, speed)');
-      return logged(cutId, parts.join(', '), () => {
-        if (body.intent !== undefined) {
-          if (typeof body.intent !== 'string') throw new Error('intent must be a string');
-          svc.setIntent(panelId, body.intent);
-        }
-        if (body.start_sec !== undefined || body.end_sec !== undefined) {
-          svc.trimPanel(panelId, num(body.start_sec, 'start_sec'), num(body.end_sec, 'end_sec'));
-        }
-        if (body.speed !== undefined) svc.setSpeed(panelId, num(body.speed, 'speed'));
+      return logged(cutId, labels.intent(svc, panelId), () => {
+        if (typeof body.intent !== 'string') throw new Error('intent must be a string');
+        svc.setIntent(panelId, body.intent);
         return panelRow(panelId);
       });
     })(c);
@@ -301,6 +295,51 @@ export function createCutRoutes(db: Database.Database, options: CutRoutesOptions
     return c.json({
       data: rows.map((m) => ({ ...m, thumbnail: thumbNear(m.clip_id, (m.start_sec + m.end_sec) / 2), clip: clipInfo(m.clip_id) })),
     });
+  });
+
+  const momentRow = (momentId: number) => db.prepare(
+    'SELECT id, clip_id, start_sec, end_sec, speed, user_tier, status FROM highlights WHERE id = ?').get(momentId) as
+    { id: number; start_sec: number; end_sec: number } & Record<string, unknown>;
+
+  /** The moment is the edit: in/out, speed and ★ (tier) of a moment, as one undoable step. */
+  app.patch('/moments/:id', async (c) => {
+    const body = await bodyOf(c);
+    return guard(() => {
+      const momentId = id(c);
+      const cutId = cutOf(body, svc.projectIdOfMoment(momentId));
+      const trim = body.start_sec !== undefined || body.end_sec !== undefined;
+      const speed = body.speed === undefined ? undefined : num(body.speed, 'speed');
+      const tier = body.tier;
+      if (tier !== undefined && tier !== null && typeof tier !== 'string') throw new Error('tier must be hero, solid, filler or null');
+      const parts: string[] = [];
+      if (trim) parts.push(labels.trimMoment());
+      if (speed !== undefined) parts.push(labels.momentSpeed(speed));
+      if (tier !== undefined) parts.push(labels.momentTier(tier));
+      if (!parts.length) throw new Error('Nothing to update (start_sec / end_sec, speed, tier)');
+      return logged(cutId, parts.join(', '), () => {
+        if (trim) {
+          const cur = momentRow(momentId);
+          svc.trimMoment(momentId,
+            body.start_sec === undefined ? cur.start_sec : num(body.start_sec, 'start_sec'),
+            body.end_sec === undefined ? cur.end_sec : num(body.end_sec, 'end_sec'));
+        }
+        if (speed !== undefined) svc.setMomentSpeed(momentId, speed);
+        if (tier !== undefined) svc.setMomentTier(momentId, tier as Tier | null);
+        return momentRow(momentId);
+      });
+    })(c);
+  });
+
+  app.post('/moments/:id/reset', async (c) => {
+    const body = await bodyOf(c);
+    return guard(() => {
+      const momentId = id(c);
+      const cutId = cutOf(body, svc.projectIdOfMoment(momentId));
+      return logged(cutId, labels.resetMoment(), () => {
+        svc.resetMoment(momentId);
+        return momentRow(momentId);
+      });
+    })(c);
   });
 
   app.post('/moments/:id/reject', async (c) => {

@@ -7,7 +7,7 @@ import { speedAllowed } from '../analyze/highlights.js';
 import { BriefSchema, BriefStateSchema, formatIssues, type Draft } from './schema.js';
 import { applyDraft as applyDraftImpl } from './draft.js';
 import * as ops from './history.js';
-import { defaultRange } from './range.js';
+import { defaultSpeed } from './range.js';
 import { isTier, tierRankSql, type Tier } from '../tiers.js';
 
 export const MAIN_CUT_NAME = 'Main';
@@ -17,6 +17,10 @@ const SPEEDS = [1, 0.5, 0.25];
 export type PanelClip = Pick<Clip, 'id' | 'file_path' | 'proxy_path' | 'duration_sec' | 'fps' | 'resolution' | 'hidden'>;
 
 export interface PanelNode extends Panel {
+  /** Range and speed of the panel's moment (a panel stores none of its own); null / 1 unless the panel is filled. */
+  start_sec: number | null;
+  end_sec: number | null;
+  speed: number;
   clip: PanelClip | null;
   moment: HighlightRecord | null;
   candidates: HighlightRecord[];
@@ -37,9 +41,10 @@ export interface CutTree {
 
 export interface AddPanelInput {
   intent?: string;
-  /** Fill from this moment (in/out/speed default to `defaultRange`). A user-sourced panel confirms the moment. */
+  /** Point at this moment. A user-sourced panel confirms it. */
   momentId?: number;
   candidates?: number[];
+  /** Explicit in/out/speed (from a draft) are written to the moment, without confirming it. */
   startSec?: number;
   endSec?: number;
   speed?: number;
@@ -245,15 +250,20 @@ export class StoryboardService {
         : ((this.db.prepare('SELECT id, name FROM events WHERE id = ?').get(s.event_id) as SceneNode['event']) ?? null);
       const sp = panels.filter((p) => p.scene_id === s.id).map<PanelNode>((p) => {
         totals.panels++;
+        const moment = momentOf(p.moment_id);
+        const filled = p.state === 'filled' && moment !== null;
         if (p.state === 'filled') {
           totals.filled++;
-          totals.duration_sec += (p.end_sec! - p.start_sec!) / p.speed;
+          if (moment) totals.duration_sec += (moment.end_sec - moment.start_sec) / moment.speed;
         } else if (p.state === 'candidates') totals.candidates++;
         else totals.gaps++;
         return {
           ...p,
+          start_sec: filled ? moment.start_sec : null,
+          end_sec: filled ? moment.end_sec : null,
+          speed: filled ? moment.speed : 1,
           clip: clipOf(p.clip_id),
-          moment: momentOf(p.moment_id),
+          moment,
           candidates: this.candidateIds(p.id).map((mid) => momentOf(mid)!),
         };
       });
@@ -333,28 +343,25 @@ export class StoryboardService {
     return this.tx(() => {
       let state: Panel['state'] = 'gap';
       let clipId: number | null = null;
-      let start: number | null = null;
-      let end: number | null = null;
-      let speed = input.speed ?? 1;
       if (input.momentId !== undefined) {
         const m = this.moment(input.momentId);
         this.assertUsable(m);
         state = 'filled';
         clipId = m.clip_id;
-        const d = defaultRange(m, this.clip(m.clip_id));
-        start = input.startSec ?? d.start_sec;
-        end = input.endSec ?? d.end_sec;
-        speed = input.speed ?? d.speed;
+        if (input.startSec !== undefined || input.endSec !== undefined) {
+          this.writeMomentRange(m, input.startSec ?? m.start_sec, input.endSec ?? m.end_sec);
+        }
+        if (input.speed !== undefined) this.writeMomentSpeed(m, input.speed);
         if (input.source === 'user') this.confirmMoment(m.id);
       } else if (input.candidates?.length) {
         for (const id of input.candidates) this.assertUsable(this.moment(id));
         state = 'candidates';
       }
       const r = this.db.prepare(`
-        INSERT INTO story_segments (story_id, scene_id, position, intent, state, source, clip_id, moment_id, start_sec, end_sec, speed)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO story_segments (story_id, scene_id, position, intent, state, source, clip_id, moment_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `).run(scene.story_id, sceneId, -1_000_000, input.intent ?? '', state, input.source ?? 'ai',
-        clipId, input.momentId ?? null, start, end, speed);
+        clipId, input.momentId ?? null);
       const id = Number(r.lastInsertRowid);
       if (state === 'candidates') this.setCandidates(id, input.candidates!);
       this.writeOrder('story_segments', this.insertAt(this.panelIds(sceneId).filter((x) => x !== id), id, position));
@@ -387,36 +394,70 @@ export class StoryboardService {
     this.db.prepare('UPDATE story_segments SET intent = ? WHERE id = ?').run(intent, id);
   }
 
-  trimPanel(id: number, startSec: number, endSec: number): void {
-    const p = this.panel(id);
-    if (p.state !== 'filled') throw new Error(`Panel ${id} is not filled`);
-    const dur = this.clip(p.clip_id!).duration_sec;
-    const s = round2(Math.max(0, Math.min(startSec, dur)));
-    const e = round2(Math.max(0, Math.min(endSec, dur)));
-    if (e - s < MIN_PANEL_SEC) throw new Error(`Trim must leave at least ${MIN_PANEL_SEC} s`);
-    this.db.prepare("UPDATE story_segments SET start_sec = ?, end_sec = ?, source = 'user' WHERE id = ?").run(s, e, id);
-    this.confirmPanelMoment(p);
-  }
-
-  setSpeed(id: number, speed: number): void {
-    const p = this.panel(id);
-    if (!SPEEDS.includes(speed)) throw new Error(`Invalid speed ${speed} (use 1, 0.5 or 0.25)`);
-    if (speed !== 1) {
-      if (p.clip_id === null) throw new Error(`Panel ${id} is not filled`);
-      const fps = this.clip(p.clip_id).fps;
-      if (!speedAllowed(speed, fps)) throw new Error(`Speed ${speed} needs a higher frame rate (clip is ${fps ?? 'unknown'} fps)`);
-    }
-    this.db.prepare("UPDATE story_segments SET speed = ?, source = 'user' WHERE id = ?").run(speed, id);
-    this.confirmPanelMoment(p);
-  }
-
   private confirmMoment(momentId: number): void {
     this.db.prepare("UPDATE highlights SET status = 'confirmed', reject_reason = NULL WHERE id = ?").run(momentId);
   }
 
-  /** The user touched a filled panel: its moment counts as confirmed. */
-  private confirmPanelMoment(p: Panel): void {
-    if (p.moment_id !== null) this.confirmMoment(p.moment_id);
+  // ---------- the moment is the edit: range, speed, tier ----------
+
+  /** Range of a moment, clamped to its clip. Throws when less than MIN_PANEL_SEC would remain. No touch. */
+  private writeMomentRange(m: HighlightRecord, startSec: number, endSec: number): void {
+    const dur = this.clip(m.clip_id).duration_sec;
+    const s = round2(Math.max(0, Math.min(startSec, dur)));
+    const e = round2(Math.max(0, Math.min(endSec, dur)));
+    if (e - s < MIN_PANEL_SEC) throw new Error(`Trim must leave at least ${MIN_PANEL_SEC} s`);
+    this.db.prepare('UPDATE highlights SET start_sec = ?, end_sec = ? WHERE id = ?').run(s, e, m.id);
+  }
+
+  /** Speed of a moment (1, 0.5, 0.25), gated by the clip's frame rate. No touch. */
+  private writeMomentSpeed(m: HighlightRecord, speed: number): void {
+    if (!SPEEDS.includes(speed)) throw new Error(`Invalid speed ${speed} (use 1, 0.5 or 0.25)`);
+    const fps = this.clip(m.clip_id).fps;
+    if (!speedAllowed(speed, fps)) throw new Error(`Speed ${speed} needs a higher frame rate (clip is ${fps ?? 'unknown'} fps)`);
+    this.db.prepare('UPDATE highlights SET speed = ? WHERE id = ?').run(speed, m.id);
+  }
+
+  /** The user edited a moment: it counts as confirmed (a rejected one stays rejected) and every panel using it is theirs. */
+  private touchMoment(m: HighlightRecord): void {
+    if (m.status !== 'rejected') this.confirmMoment(m.id);
+    this.db.prepare("UPDATE story_segments SET source = 'user' WHERE moment_id = ?").run(m.id);
+  }
+
+  trimMoment(id: number, startSec: number, endSec: number): void {
+    const m = this.moment(id);
+    this.tx(() => {
+      this.writeMomentRange(m, startSec, endSec);
+      this.touchMoment(m);
+    });
+  }
+
+  setMomentSpeed(id: number, speed: number): void {
+    const m = this.moment(id);
+    this.tx(() => {
+      this.writeMomentSpeed(m, speed);
+      this.touchMoment(m);
+    });
+  }
+
+  /** ★: the user's tier for the moment (null = back to the AI's tier). Not a confirmation. */
+  setMomentTier(id: number, tier: Tier | null): void {
+    this.moment(id);
+    if (tier !== null && !isTier(tier)) throw new Error(`Invalid tier "${String(tier)}" (use hero, solid, filler or null)`);
+    this.db.prepare('UPDATE highlights SET user_tier = ? WHERE id = ?').run(tier, id);
+  }
+
+  /** Star / unstar: star = hero; unstar = back to the AI's tier, or solid when the AI itself said hero. */
+  starMoment(id: number, starred: boolean): void {
+    const m = this.moment(id);
+    this.setMomentTier(id, starred ? 'hero' : (m.tier === 'hero' ? 'solid' : null));
+  }
+
+  /** Back to the analysis' range and the default speed (status and ★ stay). */
+  resetMoment(id: number): void {
+    const m = this.moment(id);
+    const speed = defaultSpeed(m.suggested_speed, this.clip(m.clip_id).fps);
+    this.db.prepare('UPDATE highlights SET start_sec = ?, end_sec = ?, speed = ? WHERE id = ?')
+      .run(m.ai_start_sec ?? m.start_sec, m.ai_end_sec ?? m.end_sec, speed, id);
   }
 
   // ---------- moments ----------
@@ -446,12 +487,9 @@ export class StoryboardService {
     this.panel(panelId);
     const m = this.moment(momentId);
     this.assertUsable(m);
-    const d = defaultRange(m, this.clip(m.clip_id));
     this.tx(() => {
-      this.db.prepare(`
-        UPDATE story_segments SET state = 'filled', source = 'user', clip_id = ?, moment_id = ?,
-               start_sec = ?, end_sec = ?, speed = ? WHERE id = ?
-      `).run(m.clip_id, m.id, d.start_sec, d.end_sec, d.speed, panelId);
+      this.db.prepare("UPDATE story_segments SET state = 'filled', source = 'user', clip_id = ?, moment_id = ? WHERE id = ?")
+        .run(m.clip_id, m.id, panelId);
       this.db.prepare('DELETE FROM panel_candidates WHERE panel_id = ?').run(panelId);
       this.db.prepare("UPDATE highlights SET status = 'confirmed', reject_reason = NULL WHERE id = ?").run(momentId);
     });
@@ -508,4 +546,4 @@ export class StoryboardService {
   }
 }
 
-const GAP_SET = "state = 'gap', clip_id = NULL, moment_id = NULL, start_sec = NULL, end_sec = NULL, speed = 1";
+const GAP_SET = "state = 'gap', clip_id = NULL, moment_id = NULL";

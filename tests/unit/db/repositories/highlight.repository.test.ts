@@ -156,8 +156,8 @@ describe('HighlightRepository.replaceForClip keeps decisions', () => {
     db.prepare("UPDATE highlights SET status = 'rejected' WHERE id = ?").run(id('rejected'));
     const cut = db.prepare("INSERT INTO stories (project_id, name) VALUES (?, 'Main')").run(pid).lastInsertRowid;
     const scene = db.prepare("INSERT INTO scenes (story_id, position, name) VALUES (?, 0, 's')").run(cut).lastInsertRowid;
-    const panel = db.prepare(`INSERT INTO story_segments (story_id, scene_id, position, state, clip_id, moment_id, start_sec, end_sec)
-      VALUES (?, ?, 0, 'filled', ?, ?, 5, 6)`).run(cut, scene, clip.id, id('in panel')).lastInsertRowid;
+    const panel = db.prepare(`INSERT INTO story_segments (story_id, scene_id, position, state, clip_id, moment_id)
+      VALUES (?, ?, 0, 'filled', ?, ?)`).run(cut, scene, clip.id, id('in panel')).lastInsertRowid;
     const cand = db.prepare("INSERT INTO story_segments (story_id, scene_id, position, state) VALUES (?, ?, 1, 'candidates')").run(cut, scene).lastInsertRowid;
     db.prepare('INSERT INTO panel_candidates (panel_id, moment_id, position) VALUES (?, ?, 0)').run(cand, id('candidate'));
     const keptIds = [id('confirmed'), id('rejected'), id('in panel'), id('candidate')];
@@ -172,5 +172,43 @@ describe('HighlightRepository.replaceForClip keeps decisions', () => {
     expect(after.find((h) => h.description === 'new one')!.status).toBe('proposed');
     expect(db.prepare('SELECT moment_id FROM story_segments WHERE id = ?').get(panel)).toEqual({ moment_id: id('in panel') });
     expect(db.prepare('SELECT moment_id FROM panel_candidates WHERE panel_id = ?').all(cand)).toEqual([{ moment_id: id('candidate') }]);
+  });
+});
+
+describe('HighlightRepository: the moment is the edit', () => {
+  let db: Database.Database;
+  let repo: HighlightRepository;
+  let clipId: number;
+  const rows = () => db.prepare('SELECT description, start_sec, end_sec, ai_start_sec, ai_end_sec, speed, user_tier FROM highlights ORDER BY id').all();
+
+  beforeEach(() => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    runMigrations(db);
+    const pid = new ProjectRepository(db).findOrCreate('p').id;
+    clipId = new ClipRepository(db).insert(makeClip({ project_id: pid, fps: 25 })).id;
+    repo = new HighlightRepository(db);
+  });
+
+  it('a new moment keeps its ai range and starts at speed 1 on a 25 fps clip even when 0.5 is suggested', () => {
+    repo.replaceForClip(clipId, [{ ...item(1, 4, 'slow?'), suggested_speed: 0.5 }]);
+    expect(rows()).toEqual([{ description: 'slow?', start_sec: 1, end_sec: 4, ai_start_sec: 1, ai_end_sec: 4, speed: 1, user_tier: null }]);
+  });
+
+  it('a new moment on a fast clip starts at its suggested speed', () => {
+    const pid = new ProjectRepository(db).findOrCreate('p').id;
+    const fast = new ClipRepository(db).insert(makeClip({ project_id: pid, file_path: '/b.mp4', file_hash: 'b', fps: 50 })).id;
+    repo.replaceForClip(fast, [{ ...item(1, 4, 'slow'), suggested_speed: 0.5 }]);
+    expect(rows()[0]).toMatchObject({ speed: 0.5 });
+  });
+
+  it('re-analysis keeps moments whose range, speed or tier the user changed; drops untouched ones', () => {
+    repo.replaceForClip(clipId, [item(1, 4, 'trimmed'), item(5, 8, 'tiered'), item(9, 12, 'plain'), item(13, 16, 'speedy')]);
+    const id = (d: string) => repo.findByClip(clipId).find((h) => h.description === d)!.id;
+    db.prepare('UPDATE highlights SET start_sec = 2 WHERE id = ?').run(id('trimmed'));
+    db.prepare("UPDATE highlights SET user_tier = 'hero' WHERE id = ?").run(id('tiered'));
+    db.prepare('UPDATE highlights SET speed = 0.5 WHERE id = ?').run(id('speedy'));
+    repo.replaceForClip(clipId, [item(20, 22, 'new')]);
+    expect(repo.findByClip(clipId).map((h) => h.description).sort()).toEqual(['new', 'speedy', 'tiered', 'trimmed']);
   });
 });

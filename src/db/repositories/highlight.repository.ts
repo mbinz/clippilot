@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3';
 import type { Tier } from '../../core/tiers.js';
+import { defaultSpeed } from '../../core/storyboard/range.js';
 
 export type Shot = 'wide' | 'medium' | 'close' | 'detail';
 export type AudioType = 'ambient' | 'speech' | 'music' | 'noise';
@@ -23,6 +24,14 @@ export interface HighlightRecord {
   dup_group: number | null;
   status: 'proposed' | 'confirmed' | 'rejected';
   reject_reason: string | null;
+  /** The moment is the edit: playback speed (1, 0.5, 0.25). `start_sec`/`end_sec` are the edited range. */
+  speed: number;
+  /** The analysis' original range (`resetMoment` goes back to it). */
+  ai_start_sec: number;
+  ai_end_sec: number;
+  /** The user's override of `tier` (the ★), or null. */
+  user_tier: Tier | null;
+  seen_at: string | null;
   created_at: string;
 }
 
@@ -42,6 +51,7 @@ export interface InsertHighlight {
 }
 
 export class HighlightRepository {
+  private stmtReplaceable: Database.Statement;
   private stmtDelete: Database.Statement;
   private stmtInsert: Database.Statement;
   private stmtFindByClip: Database.Statement;
@@ -51,15 +61,17 @@ export class HighlightRepository {
   private stmtSetDup: Database.Statement;
 
   constructor(private db: Database.Database) {
-    // Decisions survive re-analysis: confirmed/rejected moments and those a panel or candidate list points at stay.
-    this.stmtDelete = db.prepare(`
-      DELETE FROM highlights
+    // Decisions survive re-analysis: confirmed/rejected moments, edited ones (range, speed, ★) and those a panel
+    // or candidate list points at stay. This selects the proposed, unreferenced ones; edited ones are filtered in code.
+    this.stmtReplaceable = db.prepare(`
+      SELECT id, start_sec, end_sec, ai_start_sec, ai_end_sec, speed, suggested_speed, user_tier FROM highlights
       WHERE clip_id = ? AND status = 'proposed'
         AND id NOT IN (SELECT moment_id FROM story_segments WHERE moment_id IS NOT NULL)
         AND id NOT IN (SELECT moment_id FROM panel_candidates)
     `);
+    this.stmtDelete = db.prepare('DELETE FROM highlights WHERE id = ?');
     this.stmtInsert = db.prepare(
-      'INSERT INTO highlights (clip_id, start_sec, end_sec, description, tier, shot, role, issues, slowmo, slowmo_reason, suggested_speed, audio_keep, audio_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO highlights (clip_id, start_sec, end_sec, description, tier, shot, role, issues, slowmo, slowmo_reason, suggested_speed, audio_keep, audio_type, speed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     );
     this.stmtFindByClip = db.prepare(
       'SELECT * FROM highlights WHERE clip_id = ? ORDER BY start_sec ASC, id ASC',
@@ -79,16 +91,27 @@ export class HighlightRepository {
 
   /**
    * Store a fresh analysis: proposed, unreferenced moments are replaced by `items`; moments that are
-   * confirmed, rejected, or used by a panel/candidate list are kept (so decisions and the timeline survive).
+   * confirmed, rejected, edited (range / speed / ★), or used by a panel/candidate list are kept (so decisions
+   * and the timeline survive). New moments start at the fps-gated default speed.
    */
   replaceForClip(clipId: number, items: InsertHighlight[]): void {
+    const fps = (this.db.prepare('SELECT fps FROM clips WHERE id = ?').get(clipId) as { fps: number | null } | undefined)?.fps;
     this.db.transaction(() => {
-      this.stmtDelete.run(clipId);
+      const rows = this.stmtReplaceable.all(clipId) as {
+        id: number; start_sec: number; end_sec: number; ai_start_sec: number | null; ai_end_sec: number | null;
+        speed: number; suggested_speed: number; user_tier: string | null;
+      }[];
+      for (const r of rows) {
+        const edited = r.start_sec !== (r.ai_start_sec ?? r.start_sec) || r.end_sec !== (r.ai_end_sec ?? r.end_sec)
+          || r.speed !== defaultSpeed(r.suggested_speed, fps) || r.user_tier !== null;
+        if (!edited) this.stmtDelete.run(r.id);
+      }
       for (const h of items) {
+        const suggested = h.suggested_speed ?? 1;
         this.stmtInsert.run(clipId, h.start_sec, h.end_sec, h.description, h.tier,
           h.shot ?? null, h.role ?? null, JSON.stringify(h.issues ?? []),
-          h.slowmo ?? 'none', h.slowmo_reason ?? '', h.suggested_speed ?? 1,
-          h.audio_keep ? 1 : 0, h.audio_type ?? 'noise');
+          h.slowmo ?? 'none', h.slowmo_reason ?? '', suggested,
+          h.audio_keep ? 1 : 0, h.audio_type ?? 'noise', defaultSpeed(suggested, fps));
       }
     })();
   }

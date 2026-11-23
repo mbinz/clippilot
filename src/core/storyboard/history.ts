@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3';
+import { defaultSpeed } from './range.js';
 
 type Row = Record<string, unknown>;
 
@@ -8,9 +9,19 @@ export interface Snapshot {
   scenes: Row[];
   panels: Row[];
   candidates: Row[];
-  /** Non-proposed moments of the cut's project. */
-  moments: { id: number; status: string; reject_reason: string | null }[];
+  /** Moments of the cut's project that differ from their default (status, range, speed or ★). */
+  moments: MomentState[];
   hidden_clips: number[];
+}
+
+export interface MomentState {
+  id: number;
+  status: string;
+  reject_reason: string | null;
+  start_sec: number;
+  end_sec: number;
+  speed: number;
+  user_tier: string | null;
 }
 
 export interface OperationInfo {
@@ -27,6 +38,21 @@ export interface HistoryState {
   redo_label: string | null;
 }
 
+type MomentDefaults = MomentState & { default_start: number; default_end: number; default_speed: number };
+
+/** Every moment of the project that differs from its default: status, range (vs the ai range), speed or user tier. */
+function editedMoments(db: Database.Database, projectId: number): MomentDefaults[] {
+  const rows = db.prepare(`SELECT h.id, h.status, h.reject_reason, h.start_sec, h.end_sec, h.speed, h.user_tier,
+      COALESCE(h.ai_start_sec, h.start_sec) AS default_start, COALESCE(h.ai_end_sec, h.end_sec) AS default_end,
+      h.suggested_speed, c.fps
+    FROM highlights h JOIN clips c ON c.id = h.clip_id WHERE c.project_id = ? ORDER BY h.id`).all(projectId) as
+    (Omit<MomentDefaults, 'default_speed'> & { suggested_speed: number; fps: number | null })[];
+  return rows
+    .map((r) => ({ ...r, default_speed: defaultSpeed(r.suggested_speed, r.fps) }))
+    .filter((r) => r.status !== 'proposed' || r.start_sec !== r.default_start || r.end_sec !== r.default_end
+      || r.speed !== r.default_speed || r.user_tier !== null);
+}
+
 export function snapshot(db: Database.Database, cutId: number): Snapshot {
   const cut = db.prepare('SELECT name, brief, brief_state, project_id FROM stories WHERE id = ?').get(cutId) as
     (Snapshot['cut'] & { project_id: number }) | undefined;
@@ -38,8 +64,8 @@ export function snapshot(db: Database.Database, cutId: number): Snapshot {
     panels: all('SELECT * FROM story_segments WHERE story_id = ? ORDER BY scene_id, position', cutId),
     candidates: all(`SELECT pc.* FROM panel_candidates pc JOIN story_segments p ON p.id = pc.panel_id
       WHERE p.story_id = ? ORDER BY pc.panel_id, pc.position`, cutId),
-    moments: all(`SELECT h.id, h.status, h.reject_reason FROM highlights h JOIN clips c ON c.id = h.clip_id
-      WHERE c.project_id = ? AND h.status <> 'proposed' ORDER BY h.id`, cut.project_id) as Snapshot['moments'],
+    moments: editedMoments(db, cut.project_id).map(({ id, status, reject_reason, start_sec, end_sec, speed, user_tier }) =>
+      ({ id, status, reject_reason, start_sec, end_sec, speed, user_tier })),
     hidden_clips: (all('SELECT id FROM clips WHERE project_id = ? AND hidden = 1 ORDER BY id', cut.project_id) as { id: number }[])
       .map((r) => r.id),
   };
@@ -66,10 +92,13 @@ export function restore(db: Database.Database, cutId: number, snap: Snapshot): v
     insertRows(db, 'story_segments', snap.panels);
     insertRows(db, 'panel_candidates', snap.candidates);
 
-    db.prepare(`UPDATE highlights SET status = 'proposed', reject_reason = NULL
-      WHERE status <> 'proposed' AND clip_id IN (SELECT id FROM clips WHERE project_id = ?)`).run(cut.project_id);
-    const setMoment = db.prepare('UPDATE highlights SET status = ?, reject_reason = ? WHERE id = ?');
-    for (const m of snap.moments) setMoment.run(m.status, m.reject_reason, m.id);
+    // Every moment that is edited now goes back to its default; then the snapshot's edits are applied.
+    const reset = db.prepare(`UPDATE highlights SET status = 'proposed', reject_reason = NULL, start_sec = ?, end_sec = ?,
+      speed = ?, user_tier = NULL WHERE id = ?`);
+    for (const m of editedMoments(db, cut.project_id)) reset.run(m.default_start, m.default_end, m.default_speed, m.id);
+    const setMoment = db.prepare(`UPDATE highlights SET status = ?, reject_reason = ?, start_sec = ?, end_sec = ?,
+      speed = ?, user_tier = ? WHERE id = ?`);
+    for (const m of snap.moments) setMoment.run(m.status, m.reject_reason, m.start_sec, m.end_sec, m.speed, m.user_tier, m.id);
 
     db.prepare('UPDATE clips SET hidden = 0 WHERE project_id = ? AND hidden = 1').run(cut.project_id);
     const hide = db.prepare('UPDATE clips SET hidden = 1 WHERE id = ?');

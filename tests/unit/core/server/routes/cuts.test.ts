@@ -102,13 +102,14 @@ describe('Cut API routes', () => {
     const s2 = await ok('POST', `/cuts/${cut.id}/scenes`, { name: 'B' });
     const p = await ok('POST', `/scenes/${s1.id}/panels`, { intent: 'x' });
     await ok('POST', `/panels/${p.id}/place`, { moment_id: ma[0] });
-    await ok('PATCH', `/panels/${p.id}`, { intent: 'wave', start_sec: 3, end_sec: 5, speed: 0.5 });
+    await ok('PATCH', `/panels/${p.id}`, { intent: 'wave' });
+    await ok('PATCH', `/moments/${ma[0]}`, { cut_id: cut.id, start_sec: 3, end_sec: 5, speed: 0.5 });
     await ok('POST', `/panels/${p.id}/move`, { scene_id: s2.id, position: 0 });
     const tree = await ok('GET', `/cuts/${cut.id}`);
     expect(tree.scenes[1].panels[0]).toMatchObject({ intent: 'wave', state: 'filled', source: 'user', start_sec: 3, end_sec: 5, speed: 0.5 });
     expect(tree.scenes[1].panels[0].moment.status).toBe('confirmed');
 
-    const slow = await send('PATCH', `/panels/${p.id}`, { speed: 0.3 });
+    const slow = await send('PATCH', `/moments/${ma[0]}`, { cut_id: cut.id, speed: 0.3 });
     expect(slow.status).toBe(400);
     expect((await json(slow)).error).toMatch(/Invalid speed/);
     expect((await send('POST', `/panels/${p.id}/place`, { moment_id: 9999 })).status).toBe(400);
@@ -239,8 +240,8 @@ describe('Cut API routes', () => {
       expect(panel.history.can_undo).toBe(true);
       const placed = await ok('POST', `/panels/${panel.id}/place`, { moment_id: ma[0] });
       expect(placed.history.undo_label).toMatch(/^Place moment in panel 1$/);
-      const trimmed = await ok('PATCH', `/panels/${panel.id}`, { start_sec: 3, end_sec: 5 });
-      expect(trimmed.history.undo_label).toMatch(/Trim/);
+      const trimmed = await ok('PATCH', `/moments/${ma[0]}`, { cut_id: cutId, start_sec: 3, end_sec: 5 });
+      expect(trimmed.history.undo_label).toBe('Trim moment');
       const rejected = await ok('POST', `/moments/${ma[1]}/reject`, { reason: 'shake', cut_id: cutId });
       expect(rejected.history.undo_label).toBe('👎 shake');
       const hidden = await ok('POST', `/clips/${clipB}/hide`, { cut_id: cutId });
@@ -266,6 +267,78 @@ describe('Cut API routes', () => {
       expect(t.db.prepare('SELECT status, reject_reason FROM highlights WHERE id = ?').get(ma[1])).toEqual({ status: 'proposed', reject_reason: null });
       await ok('POST', `/cuts/${cutId}/undo`);
       expect(t.db.prepare('SELECT status FROM highlights WHERE id = ?').get(ma[1])).toEqual({ status: 'rejected' });
+    });
+
+    describe('moment edits', () => {
+      let panelId: number;
+      const rangeOf = async () => {
+        const p = (await ok('GET', `/cuts/${cutId}`)).scenes[0].panels[0];
+        return [p.start_sec, p.end_sec, p.speed, p.source];
+      };
+      beforeEach(async () => {
+        panelId = t.svc.addPanel(sceneId, { momentId: ma[0] }).id; // direct service call: not logged, source ai
+      });
+
+      it('PATCH /moments/:id trims, sets speed and star; labels; undo restores', async () => {
+        const trimmed = await ok('PATCH', `/moments/${ma[0]}`, { cut_id: cutId, start_sec: 3, end_sec: 5 });
+        expect(trimmed).toMatchObject({ id: ma[0], start_sec: 3, end_sec: 5, speed: 1, status: 'confirmed' });
+        expect(trimmed.history.undo_label).toBe('Trim moment');
+        expect((await ok('PATCH', `/moments/${ma[0]}`, { cut_id: cutId, speed: 0.5 })).history.undo_label).toBe('Speed 50 %');
+        expect((await ok('PATCH', `/moments/${ma[0]}`, { cut_id: cutId, tier: 'hero' })).history.undo_label).toBe('\u2605');
+        expect((await ok('PATCH', `/moments/${ma[0]}`, { cut_id: cutId, tier: null })).history.undo_label).toBe('Remove \u2605');
+        expect(await rangeOf()).toEqual([3, 5, 0.5, 'user']);
+        await ok('POST', `/cuts/${cutId}/undo`);
+        await ok('POST', `/cuts/${cutId}/undo`);
+        await ok('POST', `/cuts/${cutId}/undo`);
+        expect(await rangeOf()).toEqual([3, 5, 1, 'user']);
+        await ok('POST', `/cuts/${cutId}/undo`);
+        expect(await rangeOf()).toEqual([2, 6, 1, 'ai']);
+      });
+
+      it('one request can trim and change speed; one undo step', async () => {
+        const r = await ok('PATCH', `/moments/${ma[0]}`, { cut_id: cutId, start_sec: 3, end_sec: 5, speed: 0.5 });
+        expect(r.history.undo_label).toBe('Trim moment, Speed 50 %');
+        await ok('POST', `/cuts/${cutId}/undo`);
+        expect(await rangeOf()).toEqual([2, 6, 1, 'ai']);
+      });
+
+      it('validates: cut_id, something to change, tier values, fps-gated speed', async () => {
+        for (const [body, re] of [
+          [{ start_sec: 3, end_sec: 5 }, /cut_id/],
+          [{ cut_id: cutId }, /Nothing to update/],
+          [{ cut_id: cutId, tier: 'best' }, /tier/i],
+          [{ cut_id: cutId, start_sec: 3, end_sec: 3.1 }, /0\.5/],
+        ] as const) {
+          const res = await send('PATCH', `/moments/${ma[0]}`, body);
+          expect(res.status, JSON.stringify(body)).toBe(400);
+          expect((await json(res)).error).toMatch(re);
+        }
+        const low = await send('PATCH', `/moments/${mb[0]}`, { cut_id: cutId, speed: 0.5 });
+        expect(low.status).toBe(400);
+        expect((await json(low)).error).toMatch(/fps/);
+        expect(await ok('GET', `/cuts/${cutId}/history`)).toEqual([]);
+      });
+
+      it('POST /moments/:id/reset goes back to the ai range and default speed; logged and undoable', async () => {
+        await ok('PATCH', `/moments/${ma[0]}`, { cut_id: cutId, start_sec: 3, end_sec: 5, speed: 0.5 });
+        expect((await send('POST', `/moments/${ma[0]}/reset`, {})).status).toBe(400);
+        const r = await ok('POST', `/moments/${ma[0]}/reset`, { cut_id: cutId });
+        expect(r).toMatchObject({ id: ma[0], start_sec: 2, end_sec: 6, speed: 1 });
+        expect(r.history.undo_label).toBe('Reset moment');
+        expect((await rangeOf()).slice(0, 3)).toEqual([2, 6, 1]);
+        await ok('POST', `/cuts/${cutId}/undo`);
+        expect((await rangeOf()).slice(0, 3)).toEqual([3, 5, 0.5]);
+      });
+
+      it('PATCH /panels/:id is intent only: start/end/speed are a 400', async () => {
+        for (const body of [{ start_sec: 3 }, { end_sec: 5 }, { speed: 0.5 }, { intent: 'x', speed: 1 }]) {
+          const res = await send('PATCH', `/panels/${panelId}`, body);
+          expect(res.status, JSON.stringify(body)).toBe(400);
+          expect((await json(res)).error).toMatch(/moment/i);
+        }
+        await ok('PATCH', `/panels/${panelId}`, { intent: 'new' });
+        expect((await ok('GET', `/cuts/${cutId}`)).scenes[0].panels[0].intent).toBe('new');
+      });
     });
 
     it('scene create accepts event_id', async () => {

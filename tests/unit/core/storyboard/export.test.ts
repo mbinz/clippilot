@@ -30,7 +30,7 @@ describe('cutToSegments', () => {
     const { segments, skipped_gaps } = cutToSegments(t.db, cutId);
     expect(skipped_gaps).toBe(1);
     expect(segments.map((s) => [s.position, s.clip_id, s.start_sec, s.end_sec, s.speed, s.scene_name])).toEqual([
-      [1, a, 3, 5, 0.5, 'Arrival'],
+      [1, a, 2, 6, 0.5, 'Arrival'],
       [2, a, 10, 14, 1, null],
       [3, b, 1, 4, 1, 'Beach'],
     ]);
@@ -45,20 +45,21 @@ describe('cutToSegments', () => {
     expect(segments.map((x) => [x.clip_id, x.start_sec, x.end_sec])).toEqual([[b, 1, 4]]);
   });
 
-  it('a candidates panel exports the first candidate at its default range (4 s centred, gated speed)', () => {
+  it('a candidates panel exports the first candidate with its whole moment range and its (fps-gated) speed', () => {
     const long = t.addMoments(b, [{ start_sec: 10, end_sec: 30, suggested_speed: 0.5 }]);
     const s = t.svc.addScene(cutId, 'S');
     t.svc.addPanel(s.id, { intent: 'pick', candidates: [long[0]] });
     const { segments } = cutToSegments(t.db, cutId);
-    expect(segments.map((x) => [x.start_sec, x.end_sec, x.speed])).toEqual([[18, 22, 1]]);
+    expect(segments.map((x) => [x.start_sec, x.end_sec, x.speed])).toEqual([[10, 30, 1]]);
   });
 
-  it('a user trim and speed override the moment', () => {
+  it('a moment trim and speed are what the export uses, for every panel on that moment', () => {
     const s = t.svc.addScene(cutId, 'S');
-    const p = t.svc.addPanel(s.id, { momentId: ma[0] });
-    t.svc.trimPanel(p.id, 3, 5);
-    t.svc.setSpeed(p.id, 1);
-    expect(cutToSegments(t.db, cutId).segments[0]).toMatchObject({ start_sec: 3, end_sec: 5, speed: 1 });
+    t.svc.addPanel(s.id, { momentId: ma[0] });
+    t.svc.addPanel(s.id, { momentId: ma[0] });
+    t.svc.trimMoment(ma[0], 3, 5);
+    t.svc.setMomentSpeed(ma[0], 1);
+    expect(cutToSegments(t.db, cutId).segments.map((x) => [x.start_sec, x.end_sec, x.speed])).toEqual([[3, 5, 1], [3, 5, 1]]);
   });
 
   it('OTIO of a 2-scene cut has 2 scene markers and a time warp only on the slowed panel', () => {

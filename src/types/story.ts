@@ -35,10 +35,8 @@ export interface Panel {
   state: PanelState;
   source: PanelSource;
   clip_id: number | null;
+  /** Range and speed live on the moment (v0.3); a filled panel only points at it. */
   moment_id: number | null;
-  start_sec: number | null;
-  end_sec: number | null;
-  speed: number;
   notes: string | null;
   created_at: string;
 }

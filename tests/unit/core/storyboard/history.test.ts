@@ -33,15 +33,74 @@ describe('undo / redo (operation log)', () => {
     expect(t.db.prepare('SELECT status FROM highlights WHERE id = ?').get(ma[0])).toEqual({ status: 'confirmed' });
   });
 
-  it('trim round-trip', () => {
+  const momentRow = (id: number) => t.db.prepare('SELECT status, start_sec, end_sec, speed, user_tier FROM highlights WHERE id = ?').get(id);
+
+  it('trim round-trip (the moment range, its status and the panel source)', () => {
     const scene = svc().addScene(cutId, 'A');
     const panel = svc().addPanel(scene.id, { momentId: ma[0] });
-    svc().command(cutId, 'Trim panel', () => svc().trimPanel(panel.id, 3, 5));
-    expect(panelsOf()[0]).toMatchObject({ start_sec: 3, end_sec: 5 });
+    svc().command(cutId, 'Trim moment', () => svc().trimMoment(ma[0], 3, 5));
+    expect(panelsOf()[0]).toMatchObject({ start_sec: 3, end_sec: 5, source: 'user' });
+    expect(momentRow(ma[0])).toMatchObject({ status: 'confirmed', start_sec: 3, end_sec: 5 });
     svc().undo(cutId);
-    expect(panelsOf()[0]).toMatchObject({ start_sec: 2, end_sec: 6 });
+    expect(panelsOf()[0]).toMatchObject({ id: panel.id, start_sec: 2, end_sec: 6, source: 'ai' });
+    expect(momentRow(ma[0])).toMatchObject({ status: 'proposed', start_sec: 2, end_sec: 6 });
     svc().redo(cutId);
     expect(panelsOf()[0]).toMatchObject({ start_sec: 3, end_sec: 5 });
+    expect(momentRow(ma[0])).toMatchObject({ status: 'confirmed' });
+  });
+
+  it('speed round-trip', () => {
+    const scene = svc().addScene(cutId, 'A');
+    svc().addPanel(scene.id, { momentId: ma[0] });
+    svc().command(cutId, 'Speed 50 %', () => svc().setMomentSpeed(ma[0], 0.5));
+    expect(panelsOf()[0].speed).toBe(0.5);
+    svc().undo(cutId);
+    expect(panelsOf()[0].speed).toBe(1);
+    svc().redo(cutId);
+    expect(panelsOf()[0].speed).toBe(0.5);
+  });
+
+  it('star round-trip works for a moment that is in no panel', () => {
+    svc().command(cutId, '\u2605', () => svc().setMomentTier(ma[1], 'hero'));
+    expect(momentRow(ma[1])).toMatchObject({ user_tier: 'hero', status: 'proposed' });
+    svc().undo(cutId);
+    expect(momentRow(ma[1])).toMatchObject({ user_tier: null });
+    svc().redo(cutId);
+    expect(momentRow(ma[1])).toMatchObject({ user_tier: 'hero' });
+  });
+
+  it('undo resets other edited moments of the project to their defaults, redo brings the edits back', () => {
+    svc().command(cutId, 'Trim moment', () => svc().trimMoment(ma[0], 3, 5));
+    svc().command(cutId, 'Trim moment', () => svc().trimMoment(ma[1], 11, 13));
+    svc().command(cutId, 'Speed 50 %', () => svc().setMomentSpeed(ma[1], 0.5));
+    svc().undo(cutId);
+    expect([momentRow(ma[0]), momentRow(ma[1])]).toEqual([
+      { status: 'confirmed', start_sec: 3, end_sec: 5, speed: 1, user_tier: null },
+      { status: 'confirmed', start_sec: 11, end_sec: 13, speed: 1, user_tier: null },
+    ]);
+    svc().undo(cutId);
+    svc().undo(cutId);
+    expect([momentRow(ma[0]), momentRow(ma[1])]).toEqual([
+      { status: 'proposed', start_sec: 2, end_sec: 6, speed: 1, user_tier: null },
+      { status: 'proposed', start_sec: 10, end_sec: 14, speed: 1, user_tier: null },
+    ]);
+    svc().redo(cutId);
+    svc().redo(cutId);
+    svc().redo(cutId);
+    expect([momentRow(ma[0]), momentRow(ma[1])]).toEqual([
+      { status: 'confirmed', start_sec: 3, end_sec: 5, speed: 1, user_tier: null },
+      { status: 'confirmed', start_sec: 11, end_sec: 13, speed: 0.5, user_tier: null },
+    ]);
+  });
+
+  it('the default speed of a moment (suggested speed on a fast clip) is not an edit and survives undo', () => {
+    const [fast] = t.addMoments(clipA, [{ start_sec: 20, end_sec: 24, suggested_speed: 0.5 }]);
+    expect((momentRow(fast) as { speed: number }).speed).toBe(0.5);
+    svc().command(cutId, 'Remove \u2605', () => svc().setMomentTier(fast, null));
+    svc().command(cutId, 'Trim moment', () => svc().trimMoment(ma[0], 3, 5));
+    svc().undo(cutId);
+    svc().undo(cutId);
+    expect((momentRow(fast) as { speed: number }).speed).toBe(0.5);
   });
 
   it('reject: undo brings back status, reason, candidates and the filled panel', () => {

@@ -3,6 +3,7 @@ import { runMigrations } from '../../../../src/db/migrations/runner.js';
 import { ClipRepository } from '../../../../src/db/repositories/clip.repository.js';
 import { ProjectRepository } from '../../../../src/db/repositories/project.repository.js';
 import { HighlightRepository, type InsertHighlight } from '../../../../src/db/repositories/highlight.repository.js';
+import { defaultSpeed } from '../../../../src/core/storyboard/range.js';
 import { StoryboardService } from '../../../../src/core/storyboard/service.js';
 
 export function setup() {
@@ -23,11 +24,13 @@ export function setup() {
   /** Adds moments to a clip (keeping existing ones) and returns their ids. */
   const addMoments = (clipId: number, items: Partial<InsertHighlight>[]) => {
     const existing = highlights.findByClip(clipId).length;
-    const ins = db.prepare(`INSERT INTO highlights (clip_id, start_sec, end_sec, description, tier, suggested_speed)
-      VALUES (?, ?, ?, ?, ?, ?)`);
+    const ins = db.prepare(`INSERT INTO highlights (clip_id, start_sec, end_sec, description, tier, suggested_speed, speed)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`);
+    const fps = (db.prepare('SELECT fps FROM clips WHERE id = ?').get(clipId) as { fps: number | null }).fps;
     return items.map((i, k) => {
       const m = { start_sec: 1 + (existing + k) * 5, end_sec: 5 + (existing + k) * 5, description: 'm', tier: 'solid', suggested_speed: 1, ...i };
-      return Number(ins.run(clipId, m.start_sec, m.end_sec, m.description, m.tier, m.suggested_speed).lastInsertRowid);
+      return Number(ins.run(clipId, m.start_sec, m.end_sec, m.description, m.tier, m.suggested_speed,
+        defaultSpeed(m.suggested_speed, fps)).lastInsertRowid);
     });
   };
   return { db, svc: new StoryboardService(db), projectId, addClip, addMoments };

@@ -11,8 +11,11 @@ export const labels = {
   deletePanel: (svc: StoryboardService, id: number) => `Delete panel ${svc.panelNo(id)}`,
   movePanel: (svc: StoryboardService, id: number) => `Move panel ${svc.panelNo(id)}`,
   intent: (svc: StoryboardService, id: number) => `Edit intent of panel ${svc.panelNo(id)}`,
-  trim: (svc: StoryboardService, id: number) => `Trim panel ${svc.panelNo(id)}`,
-  speed: (svc: StoryboardService, id: number, speed: number) => `Set speed of panel ${svc.panelNo(id)} to ${speed}x`,
+  trimMoment: () => 'Trim moment',
+  momentSpeed: (speed: number) => `Speed ${Math.round(speed * 100)} %`,
+  /** hero = ★; null / solid = no ★; filler is spelled out. */
+  momentTier: (tier: string | null) => (tier === 'hero' ? '\u2605' : tier === 'filler' ? 'Tier filler' : 'Remove \u2605'),
+  resetMoment: () => 'Reset moment',
   place: (svc: StoryboardService, id: number) => `Place moment in panel ${svc.panelNo(id)}`,
   pick: (svc: StoryboardService, id: number) => `Pick candidate for panel ${svc.panelNo(id)}`,
   reject: (momentId: number, reason?: string) => (reason?.trim() ? `\u{1F44E} ${reason.trim()}` : `Reject moment ${momentId}`),

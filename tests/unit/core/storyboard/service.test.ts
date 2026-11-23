@@ -86,7 +86,7 @@ describe('StoryboardService', () => {
 
     it('adds a gap panel', () => {
       const p = t.svc.addPanel(sceneA, { intent: 'arrival' });
-      expect(p).toMatchObject({ state: 'gap', intent: 'arrival', source: 'ai', speed: 1, clip_id: null, position: 0 });
+      expect(p).toMatchObject({ state: 'gap', intent: 'arrival', source: 'ai', clip_id: null, moment_id: null, position: 0 });
     });
 
     it('adds a candidates panel in the given order', () => {
@@ -98,11 +98,13 @@ describe('StoryboardService', () => {
       expect(tree.scenes[0].panels[0].candidates.map((m) => m.id)).toEqual([m3, m1, m2]);
     });
 
-    it('adds a filled panel from a moment (default range, AI source leaves the moment proposed)', () => {
+    it('adds a filled panel that points at a moment (AI source leaves the moment proposed, range stays on the moment)', () => {
       const clip = t.addClip({ fps: 120 });
       const [m] = t.addMoments(clip.id, [{ start_sec: 2, end_sec: 8, suggested_speed: 0.5 }]);
       const p = t.svc.addPanel(sceneA, { intent: 'x', momentId: m });
-      expect(p).toMatchObject({ state: 'filled', clip_id: clip.id, moment_id: m, start_sec: 4, end_sec: 6, speed: 0.5, source: 'ai' });
+      expect(p).toMatchObject({ state: 'filled', clip_id: clip.id, moment_id: m, source: 'ai' });
+      expect(p).not.toHaveProperty('start_sec');
+      expect(t.db.prepare('SELECT start_sec, end_sec, speed FROM highlights WHERE id = ?').get(m)).toEqual({ start_sec: 2, end_sec: 8, speed: 0.5 });
       expect(t.db.prepare('SELECT status FROM highlights WHERE id = ?').get(m)).toEqual({ status: 'proposed' });
     });
 
@@ -164,61 +166,118 @@ describe('StoryboardService', () => {
     });
   });
 
-  describe('trim and speed', () => {
-    let panelId: number;
-    let clipId: number;
-    const mk = (fps: number) => {
+  describe('trim and speed (on the moment)', () => {
+    let momentId: number;
+    let sceneId: number;
+    const mk = (fps: number, extra: Record<string, number | string> = {}) => {
       const clip = t.addClip({ fps, duration: 20 });
-      clipId = clip.id;
-      const [m] = t.addMoments(clip.id, [{ start_sec: 2, end_sec: 8 }]);
-      const scene = t.svc.addScene(cutId, 'S').id;
-      panelId = t.svc.addPanel(scene, { intent: 'x', momentId: m }).id;
+      [momentId] = t.addMoments(clip.id, [{ start_sec: 2, end_sec: 8, ...extra }]);
     };
-    const panel = () => t.svc.getCut(cutId)!.scenes.flatMap((sc) => sc.panels).find((p) => p.id === panelId)!;
+    beforeEach(() => { sceneId = t.svc.addScene(cutId, 'S').id; });
+    const row = () => t.db.prepare('SELECT status, start_sec, end_sec, speed FROM highlights WHERE id = ?').get(momentId) as any;
+    const userTier = () => t.db.prepare('SELECT user_tier FROM highlights WHERE id = ?').get(momentId);
 
     it('trims within the clip', () => {
       mk(25);
-      t.svc.trimPanel(panelId, 3, 6);
-      expect(panel()).toMatchObject({ start_sec: 3, end_sec: 6 });
-      expect(clipId).toBeGreaterThan(0);
+      t.svc.trimMoment(momentId, 3, 6);
+      expect(row()).toMatchObject({ start_sec: 3, end_sec: 6 });
     });
 
     it('clamps to the clip duration and to zero', () => {
       mk(25);
-      t.svc.trimPanel(panelId, -4, 99);
-      expect(panel()).toMatchObject({ start_sec: 0, end_sec: 20 });
+      t.svc.trimMoment(momentId, -4, 99);
+      expect(row()).toMatchObject({ start_sec: 0, end_sec: 20 });
     });
 
-    it('rejects a trim shorter than 0.5 s', () => {
+    it('rejects a trim shorter than 0.5 s and leaves the moment alone', () => {
       mk(25);
-      expect(() => t.svc.trimPanel(panelId, 5, 5.2)).toThrow(/0\.5/);
-      expect(panel()).toMatchObject({ start_sec: 3, end_sec: 7 }); // default range of moment 2-8
-    });
-
-    it('rejects trimming a panel without a clip', () => {
-      const scene = t.svc.addScene(cutId, 'G').id;
-      const g = t.svc.addPanel(scene, { intent: 'gap' });
-      expect(() => t.svc.trimPanel(g.id, 0, 3)).toThrow(/filled/);
+      expect(() => t.svc.trimMoment(momentId, 5, 5.2)).toThrow(/0\.5/);
+      expect(row()).toMatchObject({ start_sec: 2, end_sec: 8, status: 'proposed' });
     });
 
     it('speed 1 is always allowed; 0.5 needs fps >= 48; 0.25 needs fps >= 90', () => {
       mk(25);
-      expect(() => t.svc.setSpeed(panelId, 0.5)).toThrow(/fps/);
-      t.svc.setSpeed(panelId, 1);
+      expect(() => t.svc.setMomentSpeed(momentId, 0.5)).toThrow(/fps/);
+      t.svc.setMomentSpeed(momentId, 1);
 
       mk(50);
-      t.svc.setSpeed(panelId, 0.5);
-      expect(panel().speed).toBe(0.5);
-      expect(() => t.svc.setSpeed(panelId, 0.25)).toThrow(/fps/);
+      t.svc.setMomentSpeed(momentId, 0.5);
+      expect(row().speed).toBe(0.5);
+      expect(() => t.svc.setMomentSpeed(momentId, 0.25)).toThrow(/fps/);
 
       mk(120);
-      t.svc.setSpeed(panelId, 0.25);
-      expect(panel().speed).toBe(0.25);
+      t.svc.setMomentSpeed(momentId, 0.25);
+      expect(row().speed).toBe(0.25);
     });
 
     it('rejects speeds outside 1 | 0.5 | 0.25', () => {
       mk(120);
-      expect(() => t.svc.setSpeed(panelId, 2)).toThrow(/speed/i);
+      expect(() => t.svc.setMomentSpeed(momentId, 2)).toThrow(/speed/i);
+    });
+
+    it('trim and speed touch the moment: confirmed, and every panel using it becomes user-owned (intent does not)', () => {
+      mk(120);
+      const clipId = (t.db.prepare('SELECT clip_id FROM highlights WHERE id = ?').get(momentId) as any).clip_id;
+      const [m2] = t.addMoments(clipId, [{ start_sec: 10, end_sec: 14 }]);
+      const a = t.svc.addPanel(sceneId, { momentId, source: 'ai' });
+      const a2 = t.svc.addPanel(sceneId, { momentId, source: 'ai' });
+      const b = t.svc.addPanel(sceneId, { momentId: m2, source: 'ai' });
+      const src = (id: number) => (t.db.prepare('SELECT source FROM story_segments WHERE id = ?').get(id) as any).source;
+      t.svc.setIntent(a.id, 'new intent');
+      expect([src(a.id), row().status]).toEqual(['ai', 'proposed']);
+      t.svc.trimMoment(momentId, 3, 6);
+      expect([src(a.id), src(a2.id), src(b.id), row().status]).toEqual(['user', 'user', 'ai', 'confirmed']);
+      t.svc.setMomentSpeed(m2, 0.5);
+      expect(src(b.id)).toBe('user');
+      expect((t.db.prepare('SELECT status FROM highlights WHERE id = ?').get(m2) as any).status).toBe('confirmed');
+    });
+
+    it('the tree, totals and a shared moment read range and speed from the moment', () => {
+      mk(120);
+      const a = t.svc.addPanel(sceneId, { momentId });
+      const b = t.svc.addPanel(sceneId, { momentId });
+      t.svc.trimMoment(momentId, 3, 7);
+      t.svc.setMomentSpeed(momentId, 0.5);
+      const tree = t.svc.getCut(cutId)!;
+      expect(tree.scenes[0].panels.map((p) => [p.id, p.start_sec, p.end_sec, p.speed])).toEqual([[a.id, 3, 7, 0.5], [b.id, 3, 7, 0.5]]);
+      expect(tree.totals.duration_sec).toBe(16);
+    });
+
+    it('a rejected moment keeps its status when edited', () => {
+      mk(25);
+      t.svc.rejectMoment(momentId, 'shaky');
+      t.svc.trimMoment(momentId, 3, 6);
+      expect(row()).toMatchObject({ status: 'rejected', start_sec: 3, end_sec: 6 });
+    });
+
+    it('setMomentTier sets and clears the user tier without touching the moment', () => {
+      mk(25);
+      t.svc.setMomentTier(momentId, 'hero');
+      expect(t.db.prepare('SELECT user_tier, status FROM highlights WHERE id = ?').get(momentId)).toEqual({ user_tier: 'hero', status: 'proposed' });
+      t.svc.setMomentTier(momentId, null);
+      expect(userTier()).toEqual({ user_tier: null });
+      expect(() => t.svc.setMomentTier(momentId, 'best' as never)).toThrow(/tier/i);
+    });
+
+    it('starMoment stars; unstar goes back to the AI tier, or demotes an AI hero to solid', () => {
+      mk(25, { tier: 'solid' });
+      t.svc.starMoment(momentId, true);
+      expect(userTier()).toEqual({ user_tier: 'hero' });
+      t.svc.starMoment(momentId, false);
+      expect(userTier()).toEqual({ user_tier: null });
+      t.db.prepare("UPDATE highlights SET tier = 'hero' WHERE id = ?").run(momentId);
+      t.svc.starMoment(momentId, false);
+      expect(userTier()).toEqual({ user_tier: 'solid' });
+    });
+
+    it('resetMoment goes back to the ai range and the default speed, leaves status and tier', () => {
+      mk(50, { suggested_speed: 0.5 });
+      t.svc.trimMoment(momentId, 4, 5);
+      t.svc.setMomentSpeed(momentId, 1);
+      t.svc.setMomentTier(momentId, 'hero');
+      t.svc.resetMoment(momentId);
+      expect(row()).toEqual({ status: 'confirmed', start_sec: 2, end_sec: 8, speed: 0.5 });
+      expect(userTier()).toEqual({ user_tier: 'hero' });
     });
   });
 
@@ -241,7 +300,7 @@ describe('StoryboardService', () => {
     it('place fills a gap panel from the moment, marks it confirmed and source user', () => {
       const p = t.svc.addPanel(scene, { intent: 'x' });
       t.svc.placeMoment(p.id, m[0]);
-      expect(panel()).toMatchObject({ state: 'filled', clip_id: clip.id, moment_id: m[0], start_sec: 1.5, end_sec: 3.5, speed: 0.5, source: 'user' });
+      expect(panel()).toMatchObject({ state: 'filled', clip_id: clip.id, moment_id: m[0], start_sec: 1, end_sec: 4, speed: 0.5, source: 'user' });
       expect(status(m[0]).status).toBe('confirmed');
     });
 
@@ -346,8 +405,8 @@ describe('StoryboardService', () => {
       expect(first.clip).toMatchObject({ id: clip.id, fps: 120, duration_sec: 30 });
       expect(first.moment).toMatchObject({ id: m1 });
       expect(tree.scenes[1].panels[0].candidates.map((c) => c.id)).toEqual([m3, m2]);
-      // default ranges: 2 s source at 0.5x = 4 s, plus 4 s
-      expect(tree.totals).toEqual({ panels: 4, filled: 2, candidates: 1, gaps: 1, duration_sec: 8 });
+      // m1: 10 s of source at 0.5x = 20 s, m2: 4 s
+      expect(tree.totals).toEqual({ panels: 4, filled: 2, candidates: 1, gaps: 1, duration_sec: 24 });
     });
 
     it('has a null brief and no scenes for a fresh cut', () => {
@@ -357,61 +416,51 @@ describe('StoryboardService', () => {
       expect(tree.totals).toEqual({ panels: 0, filled: 0, candidates: 0, gaps: 0, duration_sec: 0 });
     });
   });
-  describe('F1: default range, confirm and user touch', () => {
+  describe('the moment is the edit: place, add and confirm', () => {
     let scene: number;
     const status = (id: number) => (t.db.prepare('SELECT status, reject_reason FROM highlights WHERE id = ?').get(id) as any);
     const panel = (i = 0) => t.svc.getCut(cutId)!.scenes[0].panels[i];
     beforeEach(() => { scene = t.svc.addScene(cutId, 'S').id; });
 
-    it('place stores a centred 4 s window of a long moment', () => {
+    it('place plays the whole moment (no 4 s window) and does not change its range', () => {
       const clip = t.addClip({ fps: 25 });
       const [m] = t.addMoments(clip.id, [{ start_sec: 10, end_sec: 31 }]);
       const p = t.svc.addPanel(scene, { intent: 'x' });
       t.svc.placeMoment(p.id, m);
-      expect(panel()).toMatchObject({ start_sec: 18.5, end_sec: 22.5, speed: 1, source: 'user' });
+      expect(panel()).toMatchObject({ start_sec: 10, end_sec: 31, speed: 1, source: 'user' });
     });
 
-    it('place ignores a suggested 0.5 on a 25 fps clip (speed 1)', () => {
+    it('a suggested 0.5 on a 25 fps clip never becomes the moment speed', () => {
       const clip = t.addClip({ fps: 25 });
       const [m] = t.addMoments(clip.id, [{ start_sec: 0, end_sec: 10, suggested_speed: 0.5 }]);
       const p = t.svc.addPanel(scene, { intent: 'x' });
       t.svc.placeMoment(p.id, m);
-      expect(panel()).toMatchObject({ start_sec: 3, end_sec: 7, speed: 1 });
+      expect(panel()).toMatchObject({ start_sec: 0, end_sec: 10, speed: 1 });
     });
 
-    it('addPanel with a moment (user source) uses the default range and confirms the moment; AI source does not confirm', () => {
+    it('addPanel with a moment (user source) confirms the moment; AI source does not', () => {
       const clip = t.addClip({ fps: 50 });
       const [m] = t.addMoments(clip.id, [{ start_sec: 0, end_sec: 10, suggested_speed: 0.5 }]);
       t.svc.addPanel(scene, { intent: 'x', momentId: m, source: 'user' });
-      expect(panel()).toMatchObject({ state: 'filled', start_sec: 4, end_sec: 6, speed: 0.5 });
+      expect(panel()).toMatchObject({ state: 'filled', start_sec: 0, end_sec: 10, speed: 0.5 });
       expect(status(m).status).toBe('confirmed');
       const [m2] = t.addMoments(clip.id, [{}]);
       t.svc.addPanel(scene, { momentId: m2 });
       expect(status(m2).status).toBe('proposed');
     });
 
-    it('addPanel keeps explicit in/out/speed', () => {
+    it('addPanel with explicit in/out/speed writes them to the moment without confirming it', () => {
       const clip = t.addClip({ fps: 120 });
       const [m] = t.addMoments(clip.id, [{ start_sec: 0, end_sec: 10, suggested_speed: 0.5 }]);
       t.svc.addPanel(scene, { momentId: m, startSec: 1, endSec: 9, speed: 1 });
       expect(panel()).toMatchObject({ start_sec: 1, end_sec: 9, speed: 1 });
+      expect(t.db.prepare('SELECT start_sec, end_sec, speed, status FROM highlights WHERE id = ?').get(m))
+        .toEqual({ start_sec: 1, end_sec: 9, speed: 1, status: 'proposed' });
     });
 
-    it('trim and speed change make an AI panel user-owned and confirm its moment; intent does not', () => {
-      const clip = t.addClip({ fps: 120, duration: 40 });
-      const [m, m2] = t.addMoments(clip.id, [{ start_sec: 0, end_sec: 10 }, { start_sec: 12, end_sec: 20 }]);
-      const a = t.svc.addPanel(scene, { momentId: m, source: 'ai' });
-      const b = t.svc.addPanel(scene, { momentId: m2, source: 'ai' });
-      t.db.prepare("UPDATE highlights SET status = 'proposed'").run();
-      t.svc.setIntent(a.id, 'new intent');
-      expect(panel(0).source).toBe('ai');
-      expect(status(m).status).toBe('proposed');
-      t.svc.trimPanel(a.id, 3, 6);
-      expect(panel(0).source).toBe('user');
-      expect(status(m).status).toBe('confirmed');
-      t.svc.setSpeed(b.id, 0.5);
-      expect(panel(1).source).toBe('user');
-      expect(status(m2).status).toBe('confirmed');
+    it('trimPanel and setSpeed are gone', () => {
+      const svc = t.svc as unknown as Record<string, unknown>;
+      expect([svc.trimPanel, svc.setSpeed]).toEqual([undefined, undefined]);
     });
 
     it('unrejectMoment restores proposed and clears the reason', () => {
