@@ -1076,6 +1076,8 @@ board components were also server-rendered once with fake data in every drawer s
   (mockup said "white edges" although the panel drawer's range is amber); moment-row marker for rejected is just 👎 (the
   reject reason is not in the moments payload); `unstar` sends `tier: null` (back to the AI tier) or `'solid'` when the AI
   itself starred it.
+- Follow-up (after the browser check): migration 018 now also sets `ai_start_sec/ai_end_sec` to the copied range when the
+  copying panel is `source = 'ai'` (old automatic window = AI's choice, so not "changed by you"); user panels keep the analysis range.
 - Not done / deferred: reset-moment button (`POST /moments/:id/reset` has no UI; "changed by you" is shown but cannot be
   cleared except by manual trim), no component tests (UI only), no real-browser check, `usageOf` in `logic.ts` is now unused.
 

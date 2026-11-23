@@ -56,27 +56,35 @@ function preDb(opts: { sharedMoment?: boolean } = {}) {
 const cols = (db: Database.Database, t: string) => (db.prepare(`PRAGMA table_info(${t})`).all() as { name: string }[]).map((c) => c.name);
 
 describe('migration 018 - the moment is the edit', () => {
-  it('adds moment columns and backfills the ai range', () => {
+  it('adds moment columns and backfills the ai range (an AI panel range replaces it)', () => {
     const db = preDb();
     migration018(db);
     expect(cols(db, 'highlights')).toEqual(expect.arrayContaining(['speed', 'ai_start_sec', 'ai_end_sec', 'user_tier', 'seen_at']));
     const rows = db.prepare('SELECT id, ai_start_sec, ai_end_sec, user_tier, seen_at FROM highlights ORDER BY id').all();
     expect(rows).toEqual([
       { id: 1, ai_start_sec: 2, ai_end_sec: 8, user_tier: null, seen_at: null },
-      { id: 2, ai_start_sec: 0, ai_end_sec: 10, user_tier: null, seen_at: null },
+      { id: 2, ai_start_sec: 4, ai_end_sec: 6, user_tier: null, seen_at: null }, // AI panel's range = AI choice
       { id: 3, ai_start_sec: 12, ai_end_sec: 16, user_tier: null, seen_at: null },
     ]);
   });
 
-  it('copies each filled panel range and speed into its moment; the ai range keeps the original', () => {
+  it('copies each filled panel range and speed into its moment; a user panel keeps the ai range, an ai panel adopts it', () => {
     const db = preDb();
     migration018(db);
     const m = db.prepare('SELECT id, start_sec, end_sec, speed, ai_start_sec, ai_end_sec FROM highlights ORDER BY id').all();
     expect(m).toEqual([
       { id: 1, start_sec: 3, end_sec: 7, speed: 1, ai_start_sec: 2, ai_end_sec: 8 },
-      { id: 2, start_sec: 4, end_sec: 6, speed: 0.5, ai_start_sec: 0, ai_end_sec: 10 },
+      { id: 2, start_sec: 4, end_sec: 6, speed: 0.5, ai_start_sec: 4, ai_end_sec: 6 },
       { id: 3, start_sec: 12, end_sec: 16, speed: 1, ai_start_sec: 12, ai_end_sec: 16 },
     ]);
+  });
+
+  it('an AI panel range is the AI choice (not "changed by you"); a user panel range stays an edit', () => {
+    const db = preDb();
+    migration018(db);
+    const r = (id: number) => db.prepare('SELECT start_sec, end_sec, ai_start_sec, ai_end_sec, speed FROM highlights WHERE id = ?').get(id);
+    expect(r(2)).toEqual({ start_sec: 4, end_sec: 6, ai_start_sec: 4, ai_end_sec: 6, speed: 0.5 });
+    expect(r(1)).toEqual({ start_sec: 3, end_sec: 7, ai_start_sec: 2, ai_end_sec: 8, speed: 1 });
   });
 
   it('uses the fps-gated suggested speed for moments no panel overrides', () => {

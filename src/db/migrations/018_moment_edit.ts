@@ -32,19 +32,22 @@ export function migration018(db: Database.Database): void {
   }
 
   // Filled panels: their range and speed become the moment's.
-  type Old = { id: number; clip_id: number; moment_id: number | null; start_sec: number; end_sec: number; speed: number };
+  type Old = { id: number; clip_id: number; moment_id: number | null; source: string; start_sec: number; end_sec: number; speed: number };
   const filled = db.prepare(`
-    SELECT p.id, p.clip_id, p.moment_id, p.start_sec, p.end_sec, p.speed
+    SELECT p.id, p.clip_id, p.moment_id, p.source, p.start_sec, p.end_sec, p.speed
     FROM story_segments p JOIN scenes s ON s.id = p.scene_id
     WHERE p.state = 'filled' ORDER BY p.story_id, s.position, p.position
   `).all() as Old[];
   const setRange = db.prepare('UPDATE highlights SET start_sec = ?, end_sec = ?, speed = ? WHERE id = ?');
+  // An AI panel's range was the AI's own choice (the old automatic window), so it is also the moment's ai range.
+  const setAiRange = db.prepare('UPDATE highlights SET ai_start_sec = ?, ai_end_sec = ? WHERE id = ?');
   const link = db.prepare('UPDATE story_segments SET moment_id = ? WHERE id = ?');
   const synth = db.prepare(`INSERT INTO highlights (clip_id, start_sec, end_sec, description, tier, status)
     VALUES (?, ?, ?, '', 'solid', 'confirmed')`);
   const done = new Set<number>();
   for (const p of filled) {
     let momentId = p.moment_id;
+    const synthesised = momentId === null;
     if (momentId === null) {
       // The moment was deleted after the panel was filled; keep the edit as a moment of its own.
       momentId = Number(synth.run(p.clip_id, p.start_sec, p.end_sec).lastInsertRowid);
@@ -53,6 +56,7 @@ export function migration018(db: Database.Database): void {
     if (done.has(momentId)) continue;
     done.add(momentId);
     setRange.run(p.start_sec, p.end_sec, p.speed, momentId);
+    if (p.source === 'ai' && !synthesised) setAiRange.run(p.start_sec, p.end_sec, momentId);
   }
 
   // Rebuild story_segments without start_sec / end_sec / speed. Dropping the table would cascade to
