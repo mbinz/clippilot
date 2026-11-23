@@ -36,7 +36,6 @@ describe("USER_PROMPT", () => {
     for (const w of ['hero', 'solid', 'filler', 'wide', 'medium', 'close', 'detail', 'establishing', 'action', 'reaction', 'transition', 'shake', 'blur', 'obstructed', 'overexposed', 'underexposed']) {
       expect(USER_PROMPT).toContain(w);
     }
-    expect(USER_PROMPT).toMatch(/gesamte Bandbreite/);
     expect(USER_PROMPT).not.toMatch(/technical_quality|editorial_value|suggested_use|"quality"|Bewertungsskala/);
   });
 });
@@ -57,7 +56,7 @@ describe("prompt cleanup", () => {
   });
 
   it("asks for usable moments for a travel montage", () => {
-    expect(USER_PROMPT).toContain("0 bis 5 brauchbare Momente für einen Reise-Montage-Film (leeres Array, wenn nichts taugt)");
+    expect(USER_PROMPT).toContain("0 bis 8 brauchbare Momente für einen Reise-Montage-Film (leeres Array, wenn nichts taugt)");
   });
 });
 
@@ -65,7 +64,38 @@ describe("audio tag prompt", () => {
   it("shows audio_keep and audio_type in the example and explains them", () => {
     expect(USER_PROMPT).toContain('"audio_keep": false');
     expect(USER_PROMPT).toContain('"audio_type": "ambient | speech | music | noise"');
-    expect(USER_PROMPT).toMatch(/audio_keep = true, wenn der Originalton/);
+    expect(USER_PROMPT).toMatch(/audio_keep = true nur, wenn der Originalton/);
     expect(USER_PROMPT).toMatch(/audio_type = was hauptsächlich zu hören ist/);
+  });
+});
+
+describe("moment prompt v3", () => {
+  it("asks for stable stretches of 3 to 8 seconds, several per long clip, covering the clip", () => {
+    expect(USER_PROMPT).toMatch(/3 bis 8 Sekunden/);
+    expect(USER_PROMPT).toMatch(/stabil/);
+    expect(USER_PROMPT).toMatch(/mehrere Momente/);
+    expect(USER_PROMPT).toMatch(/keine guten Teile zwischen den Momenten aus/);
+  });
+
+  it("starts after settling, ends before the camera leaves, avoids search moves", () => {
+    expect(USER_PROMPT).toMatch(/beruhigt/);
+    expect(USER_PROMPT).toMatch(/bevor die Kamera/);
+    expect(USER_PROMPT).toMatch(/schwenkt, neigt oder zoomt.*außer die Bewegung selbst ist die Einstellung/s);
+  });
+
+  it("limits hero to about 10 percent of the best moments of a trip", () => {
+    expect(USER_PROMPT).toMatch(/"hero" nur für die besten ca\. 10 %/);
+    expect(USER_PROMPT).toMatch(/die meisten Momente "solid"/);
+    expect(USER_PROMPT).not.toMatch(/gesamte Bandbreite/);
+  });
+
+  it("has a strict audio_keep rule", () => {
+    expect(USER_PROMPT).toMatch(/im Zweifel false/);
+    expect(USER_PROMPT).toMatch(/Meer- oder Windrauschen allein = false/);
+  });
+
+  it("allows 0 to 8 highlights and no longer 0 to 5", () => {
+    expect(USER_PROMPT).toMatch(/0 bis 8/);
+    expect(USER_PROMPT).not.toMatch(/0 bis 5/);
   });
 });

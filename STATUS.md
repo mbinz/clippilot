@@ -1168,6 +1168,26 @@ Why: on the board the moment *is* the edit, so the AI's moments must be good cut
 - Tests: normaliser (≤ 8 s, ≥ 3 s, overlap rule, clamping), schema accepts a missing description, prompt contains the
   3–8 s / ★ ~10 % / audio rules (cheap guard against regressions).
 
+**Q1 result (implementer, 2026-11-23)** — done, not evaluated against real Gemini (that is Q2). Tests 865 → 881; typecheck green.
+- `highlights.ts`: `MAX_MOMENT_SEC = 8` (exported). Pipeline: clamp → drop < 0.5 s → widen to 3 s → shorten to 8 s centred
+  (stays inside the clip because it works on the already clamped range) → sort → overlap rule → round.
+- **Overlap rule chosen: shift, not merge.** In start order, a moment starting before the previous kept moment's end is
+  moved to start at that end (its end unchanged); if < 3 s remain it is dropped (fully contained moments vanish).
+  Reason: merging could create > 8 s moments and blur the model's cut points. Touching moments are left alone.
+- `schema.ts`: highlight `description` defaults to `""`; the normaliser also falls back to `""`.
+- `prompts.ts`: German moment section rewritten (limit 0–8, stable 3–8 s, several moments, cover the clip, settle/leave rules,
+  no search pans, hero ≈ 10 %, strict audio_keep). Also added "Die Momente eines Clips dürfen sich nicht überlappen." and
+  "Im Zweifel "solid", nicht "hero"." (interpretation). Two existing prompt tests were updated because the spec changes
+  that text: `0 bis 5` → `0 bis 8`, `audio_keep = true, wenn` → `audio_keep = true nur, wenn`; the old
+  `gesamte Bandbreite` (use the full tier range) assertion was dropped since it contradicts "most moments solid".
+- Full new German text for the moments (in `USER_PROMPT`, after the JSON example):
+
+```
+highlights: 0 bis 8 brauchbare Momente für einen Reise-Montage-Film (leeres Array, wenn nichts taugt). Ein Moment ist die beste stabile Einstellung, die ein Cutter tatsächlich verwenden würde, 3 bis 8 Sekunden lang. Bei längeren Clips wähle mehrere Momente und decke den Clip ab: lass keine guten Teile zwischen den Momenten aus. Beginne einen Moment erst, nachdem sich das Bild beruhigt hat (Umrahmen, Einstellungen anpassen, Kamera zurechtrücken sind vorbei), und beende ihn, bevor die Kamera wegschwenkt oder sich vom Motiv entfernt. Vermeide Stellen, in denen die Kamera auf der Suche nach dem Motiv schwenkt, neigt oder zoomt, außer die Bewegung selbst ist die Einstellung. Die Momente eines Clips dürfen sich nicht überlappen.
+tier: wie stark der Moment als Einstellung in einem Reise-Montage-Video ist. "hero" nur für die besten ca. 10 % aller Momente einer Reise (würde eine Szene eröffnen oder tragen); die meisten Momente "solid" (gute, brauchbare Einstellung); "filler" = nur als Lückenfüller brauchbar. Im Zweifel "solid", nicht "hero".
+audio_keep = true nur, wenn der Originalton den Moment trägt (Lachen, eine gesprochene Ansage, ein Wellen-Ereignis wie eine brechende Welle, Live-Musik), sonst false; im Zweifel false. Meer- oder Windrauschen allein = false. audio_type = was hauptsächlich zu hören ist: "ambient" = Umgebungsgeräusche, "speech" = Sprache, "music" = Musik, "noise" = nur Wind, Rauschen oder Störgeräusche.
+```
+
 **Q2 — evaluation on Arrifana (planner, cost shown first)**
 - Script `scripts/eval/moment-eval.ts`: on a **copy** of the Arrifana DB, re-analyse a sample (~15 clips the user touched:
   trimmed, 👎 or placed) with prompt v3 without touching the real DB; report per clip the new moments vs the user's
