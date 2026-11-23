@@ -162,11 +162,11 @@ describe('HighlightRepository.replaceForClip keeps decisions', () => {
     db.prepare('INSERT INTO panel_candidates (panel_id, moment_id, position) VALUES (?, ?, 0)').run(cand, id('candidate'));
     const keptIds = [id('confirmed'), id('rejected'), id('in panel'), id('candidate')];
 
-    repo.replaceForClip(clip.id, [item(20, 22, 'new one'), item(1, 2, 'confirmed again')]);
+    repo.replaceForClip(clip.id, [item(20, 22, 'new one'), item(11, 13, 'other new')]);
 
     const after = repo.findByClip(clip.id);
     expect(after.map((h) => h.description).sort()).toEqual(
-      ['candidate', 'confirmed', 'confirmed again', 'in panel', 'new one', 'rejected'],
+      ['candidate', 'confirmed', 'in panel', 'new one', 'other new', 'rejected'],
     );
     expect(after.filter((h) => keptIds.includes(h.id))).toHaveLength(4);
     expect(after.find((h) => h.description === 'new one')!.status).toBe('proposed');
@@ -210,5 +210,60 @@ describe('HighlightRepository: the moment is the edit', () => {
     db.prepare('UPDATE highlights SET speed = 0.5 WHERE id = ?').run(id('speedy'));
     repo.replaceForClip(clipId, [item(20, 22, 'new')]);
     expect(repo.findByClip(clipId).map((h) => h.description).sort()).toEqual(['new', 'speedy', 'tiered', 'trimmed']);
+  });
+});
+
+describe('HighlightRepository.replaceForClip: no duplicates of kept moments', () => {
+  let db: Database.Database;
+  let repo: HighlightRepository;
+  let clipId: number;
+  const descs = () => repo.findByClip(clipId).map((h) => h.description).sort();
+
+  beforeEach(() => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    runMigrations(db);
+    const pid = new ProjectRepository(db).findOrCreate('p').id;
+    clipId = new ClipRepository(db).insert(makeClip({ project_id: pid })).id;
+    repo = new HighlightRepository(db);
+  });
+
+  const keep = (d: string, set: string) => {
+    const id = repo.findByClip(clipId).find((h) => h.description === d)!.id;
+    db.prepare(`UPDATE highlights SET ${set} WHERE id = ?`).run(id);
+  };
+
+  it('drops a new moment that overlaps the user-trimmed moment by >= 50 % of its own length (C0542)', () => {
+    repo.replaceForClip(clipId, [item(1, 8, 'trimmed')]);
+    keep('trimmed', "start_sec = 3.5, end_sec = 9.5, status = 'confirmed'");
+    repo.replaceForClip(clipId, [item(1.5, 8.5, 'dup')]); // overlap 3.5-8.5 = 5 of 7 s
+    expect(descs()).toEqual(['trimmed']);
+  });
+
+  it('keeps a new moment that overlaps less than 50 % of its own length', () => {
+    repo.replaceForClip(clipId, [item(1, 8, 'trimmed')]);
+    keep('trimmed', "status = 'confirmed'");
+    repo.replaceForClip(clipId, [item(6, 12, 'partial')]); // overlap 2 of 6 s
+    expect(descs()).toEqual(['partial', 'trimmed']);
+  });
+
+  it('uses the kept moment current (trimmed) range, not its ai range', () => {
+    repo.replaceForClip(clipId, [item(1, 8, 'trimmed')]);
+    keep('trimmed', 'start_sec = 5, end_sec = 8');
+    repo.replaceForClip(clipId, [item(1, 4, 'in old range')]); // no overlap with 5-8
+    expect(descs()).toEqual(['in old range', 'trimmed']);
+  });
+
+  it('drops a new moment overlapping a rejected moment', () => {
+    repo.replaceForClip(clipId, [item(1, 5, 'no')]);
+    keep('no', "status = 'rejected'");
+    repo.replaceForClip(clipId, [item(1, 5, 'again'), item(10, 14, 'elsewhere')]);
+    expect(descs()).toEqual(['elsewhere', 'no']);
+  });
+
+  it('does not count replaceable (deleted) moments; clips without kept moments are unchanged', () => {
+    repo.replaceForClip(clipId, [item(1, 5, 'old')]);
+    repo.replaceForClip(clipId, [item(1, 5, 'same range'), item(2, 6, 'overlapping new')]);
+    expect(descs()).toEqual(['overlapping new', 'same range']);
   });
 });

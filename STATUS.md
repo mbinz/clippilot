@@ -1188,6 +1188,18 @@ tier: wie stark der Moment als Einstellung in einem Reise-Montage-Video ist. "he
 audio_keep = true nur, wenn der Originalton den Moment trägt (Lachen, eine gesprochene Ansage, ein Wellen-Ereignis wie eine brechende Welle, Live-Musik), sonst false; im Zweifel false. Meer- oder Windrauschen allein = false. audio_type = was hauptsächlich zu hören ist: "ambient" = Umgebungsgeräusche, "speech" = Sprache, "music" = Musik, "noise" = nur Wind, Rauschen oder Störgeräusche.
 ```
 
+**Q1b result (implementer, 2026-11-23)** — re-analysis dedupe + 2 s minimum, from the Q2 eval (C0542: user trim 3.5-9.5 s,
+v3 added a near-duplicate 1.5-8.5 s; 3 of 10 user trims were < 3 s).
+- `HighlightRepository.replaceForClip`: after the replaceable moments are deleted, a new item is skipped when its overlap
+  with any remaining moment of the clip (kept = confirmed, rejected, edited, user_tier, used by panel/candidates) is
+  >= 50 % of the new item's own length. Uses the kept moment's current start/end (the user's trim). Rejected moments
+  count too (the user said no to that stretch). Clips without kept moments behave as before.
+- `MIN_MOMENT_SEC = 2` (was 3): widening and the overlap rule's "drop if < min" follow. Prompt length rule now
+  "2 bis 8 Sekunden (meist 3 bis 6) lang".
+- Existing tests updated because behaviour changed: normaliser widening/overlap expectations (3 s -> 2 s), prompt guard,
+  two analyze-clips tests (widened range 2.3-4.3; "Fresh" moved so it no longer duplicates the confirmed "Keep"), and
+  the repository "keeps decisions" test (re-inserting an identical range as "confirmed again" is now dropped).
+
 **Q2 — evaluation on Arrifana (planner, cost shown first)**
 - Script `scripts/eval/moment-eval.ts`: on a **copy** of the Arrifana DB, re-analyse a sample (~15 clips the user touched:
   trimmed, 👎 or placed) with prompt v3 without touching the real DB; report per clip the new moments vs the user's

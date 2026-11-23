@@ -56,7 +56,7 @@ describe('analyzeClips with highlights', () => {
     expect(clipRepo.findById(clip.id)!.analysis_status).toBe('done');
     const stored = hlRepo.findByClip(clip.id);
     expect(stored).toHaveLength(1);
-    expect(stored[0]).toMatchObject({ start_sec: 1.3, end_sec: 4.3, description: 'Wave', tier: 'hero', shot: 'wide', role: 'action' });
+    expect(stored[0]).toMatchObject({ start_sec: 2.3, end_sec: 4.3, description: 'Wave', tier: 'hero', shot: 'wide', role: 'action' });
     expect(JSON.parse(stored[0].issues)).toEqual(['shake']);
 
     const second = { analyzeVideo: async () => response([{ start_sec: 0.5, end_sec: 2, description: 'Gull', tier: 'filler', shot: 'close', role: 'detail' }]) };
@@ -75,7 +75,7 @@ describe('analyzeClips with highlights', () => {
     db.prepare("UPDATE highlights SET status = 'confirmed' WHERE id = ?").run(keep.id);
 
     clipRepo.resetAnalysis(undefined, [clip.id]);
-    const second = { analyzeVideo: async () => response([{ start_sec: 1, end_sec: 3, description: 'Fresh', tier: 'solid', shot: 'wide', role: 'action' }]) };
+    const second = { analyzeVideo: async () => response([{ start_sec: 2.5, end_sec: 4.3, description: 'Fresh', tier: 'solid', shot: 'wide', role: 'action' }]) };
     await analyzeClips([clipRepo.findById(clip.id)!], DEFAULT_CONFIG, clipRepo, () => {}, hlRepo, second);
 
     expect(hlRepo.findByClip(clip.id).map((h) => [h.description, h.status]).sort()).toEqual([

@@ -1,7 +1,7 @@
 import type { HighlightResponse, SlowmoLevel } from './schema.js';
 
 const MIN_LENGTH_SEC = 0.5;
-const MIN_MOMENT_SEC = 3;
+const MIN_MOMENT_SEC = 2;
 export const MAX_MOMENT_SEC = 8;
 
 /** Minimum source fps for 50 % / 25 % playback (assumes a 25 fps timeline). */
@@ -63,7 +63,7 @@ function shorten(start: number, end: number): [number, number] {
 }
 
 /**
- * Clamp to [0, duration], drop junk (< 0.5 s), widen to a 3 s minimum, shorten to an 8 s maximum (centred),
+ * Clamp to [0, duration], drop junk (< 0.5 s), widen to a 2 s minimum, shorten to an 8 s maximum (centred),
  * sort by start, resolve overlaps, round to 0.01 s, add suggested_speed.
  *
  * Overlap rule: walking the moments in start order, a moment that starts before the previous kept moment ends

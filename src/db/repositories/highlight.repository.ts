@@ -57,6 +57,7 @@ export class HighlightRepository {
   private stmtFindByClip: Database.Statement;
   private stmtListByProject: Database.Statement;
   private stmtListAll: Database.Statement;
+  private stmtRanges: Database.Statement;
   private stmtClearDup: Database.Statement;
   private stmtSetDup: Database.Statement;
 
@@ -69,6 +70,7 @@ export class HighlightRepository {
         AND id NOT IN (SELECT moment_id FROM story_segments WHERE moment_id IS NOT NULL)
         AND id NOT IN (SELECT moment_id FROM panel_candidates)
     `);
+    this.stmtRanges = db.prepare('SELECT start_sec, end_sec FROM highlights WHERE clip_id = ?');
     this.stmtDelete = db.prepare('DELETE FROM highlights WHERE id = ?');
     this.stmtInsert = db.prepare(
       'INSERT INTO highlights (clip_id, start_sec, end_sec, description, tier, shot, role, issues, slowmo, slowmo_reason, suggested_speed, audio_keep, audio_type, speed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -92,7 +94,8 @@ export class HighlightRepository {
   /**
    * Store a fresh analysis: proposed, unreferenced moments are replaced by `items`; moments that are
    * confirmed, rejected, edited (range / speed / ★), or used by a panel/candidate list are kept (so decisions
-   * and the timeline survive). New moments start at the fps-gated default speed.
+   * and the timeline survive). A new moment overlapping a kept one by >= 50 % of its own length is dropped (no
+   * near-duplicates of what the user already worked on). New moments start at the fps-gated default speed.
    */
   replaceForClip(clipId: number, items: InsertHighlight[]): void {
     const fps = (this.db.prepare('SELECT fps FROM clips WHERE id = ?').get(clipId) as { fps: number | null } | undefined)?.fps;
@@ -106,7 +109,12 @@ export class HighlightRepository {
           || r.speed !== defaultSpeed(r.suggested_speed, fps) || r.user_tier !== null;
         if (!edited) this.stmtDelete.run(r.id);
       }
+      // Whatever is left now was kept (decided, edited or in use): do not re-propose the same stretch.
+      const keptRanges = this.stmtRanges.all(clipId) as { start_sec: number; end_sec: number }[];
       for (const h of items) {
+        const len = h.end_sec - h.start_sec;
+        if (len > 0 && keptRanges.some((k) =>
+          Math.min(h.end_sec, k.end_sec) - Math.max(h.start_sec, k.start_sec) >= len / 2)) continue;
         const suggested = h.suggested_speed ?? 1;
         this.stmtInsert.run(clipId, h.start_sec, h.end_sec, h.description, h.tier,
           h.shot ?? null, h.role ?? null, JSON.stringify(h.issues ?? []),

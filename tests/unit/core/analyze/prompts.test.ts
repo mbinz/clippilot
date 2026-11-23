@@ -71,7 +71,7 @@ describe("audio tag prompt", () => {
 
 describe("moment prompt v3", () => {
   it("asks for stable stretches of 3 to 8 seconds, several per long clip, covering the clip", () => {
-    expect(USER_PROMPT).toMatch(/3 bis 8 Sekunden/);
+    expect(USER_PROMPT).toContain('2 bis 8 Sekunden (meist 3 bis 6)');
     expect(USER_PROMPT).toMatch(/stabil/);
     expect(USER_PROMPT).toMatch(/mehrere Momente/);
     expect(USER_PROMPT).toMatch(/keine guten Teile zwischen den Momenten aus/);

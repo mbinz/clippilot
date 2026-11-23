@@ -27,7 +27,7 @@ describe('normalizeHighlights', () => {
 
   it('drops zero-length and too-short entries', () => {
     const out = normalizeHighlights([h(4, 4), h(5, 5.3), h(12.8, 20), h(1, 2)], 13.0);
-    expect(out.map((x) => [x.start_sec, x.end_sec])).toEqual([[0, 3]]);
+    expect(out.map((x) => [x.start_sec, x.end_sec])).toEqual([[0.5, 2.5]]);
   });
 
   it('drops entries entirely beyond the duration', () => {
@@ -48,11 +48,14 @@ describe('normalizeHighlights', () => {
 
 describe('normalizeHighlights minimum length', () => {
   const table: [number, [number, number], [number, number] | null][] = [
-    [13, [1, 2], [0, 3]],
-    [13, [5, 6], [4, 7]],
-    [13, [12, 12.9], [10, 13]],
+    [13, [1, 2.5], [0.75, 2.75]],
+    [13, [1, 2], [0.5, 2.5]],
+    [13, [5, 6], [4.5, 6.5]],
+    [13, [12, 12.9], [11, 13]],
+    [13, [4, 6], [4, 6]],
     [13, [4, 8], [4, 8]],
-    [2.4, [0.5, 1.5], [0, 2.4]],
+    [2.4, [0.5, 1.5], [0, 2]],
+    [1.5, [0.2, 1.4], [0, 1.5]],
     [13, [5, 5.3], null],
   ];
   for (const [duration, [s, e], want] of table) {
@@ -141,9 +144,14 @@ describe('normalizeHighlights overlap rule (shift later start to earlier end)', 
     expect(out.map((x) => [x.start_sec, x.end_sec])).toEqual([[1, 6], [6, 11]]);
   });
 
-  it('drops the later moment when less than 3 s remain', () => {
-    const out = normalizeHighlights([h(1, 8), h(3, 10)], 30);
+  it('drops the later moment when less than 2 s remain', () => {
+    const out = normalizeHighlights([h(1, 8), h(3, 9.5)], 30);
     expect(out.map((x) => [x.start_sec, x.end_sec])).toEqual([[1, 8]]);
+  });
+
+  it('keeps the shifted later moment when exactly 2 s remain', () => {
+    const out = normalizeHighlights([h(1, 8), h(3, 10)], 30);
+    expect(out.map((x) => [x.start_sec, x.end_sec])).toEqual([[1, 8], [8, 10]]);
   });
 
   it('drops a moment fully inside an earlier one', () => {
@@ -157,9 +165,9 @@ describe('normalizeHighlights overlap rule (shift later start to earlier end)', 
   });
 
   it('applies the rule after widening and sorting, against the previous kept moment', () => {
-    // 4-5 widens to 3-6; 5.9-6.2 widens to 4.55-7.55 -> shifted to 6-7.55 (1.55 s) -> dropped
+    // 4-5 widens to 3.5-5.5; 5.9-6.2 widens to 5.05-7.05 -> shifted to 5.5-7.05 (1.55 s) -> dropped
     const out = normalizeHighlights([h(5.9, 6.2), h(0, 3), h(4, 5)], 30);
-    expect(out.map((x) => [x.start_sec, x.end_sec])).toEqual([[0, 3], [3, 6]]);
+    expect(out.map((x) => [x.start_sec, x.end_sec])).toEqual([[0, 3], [3.5, 5.5]]);
   });
 });
 
