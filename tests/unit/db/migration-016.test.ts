@@ -1,6 +1,21 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
-import { runMigrations } from '../../../src/db/migrations/runner.js';
+import { migration001 } from '../../../src/db/migrations/001_initial.js';
+import { migration002 } from '../../../src/db/migrations/002_stories.js';
+import { migration003 } from '../../../src/db/migrations/003_similarity.js';
+import { migration004 } from '../../../src/db/migrations/004_timecode.js';
+import { migration005 } from '../../../src/db/migrations/005_nb_frames.js';
+import { migration006 } from '../../../src/db/migrations/006_has_audio_video.js';
+import { migration007 } from '../../../src/db/migrations/007_scene_hint.js';
+import { migration008 } from '../../../src/db/migrations/008_highlights.js';
+import { migration009 } from '../../../src/db/migrations/009_calibration.js';
+import { migration010 } from '../../../src/db/migrations/010_reviewed_clips.js';
+import { migration011 } from '../../../src/db/migrations/011_slowmo.js';
+import { migration012 } from '../../../src/db/migrations/012_moment_tags.js';
+import { migration013 } from '../../../src/db/migrations/013_moment_audio.js';
+import { migration014 } from '../../../src/db/migrations/014_dup_groups.js';
+import { migration015 } from '../../../src/db/migrations/015_events.js';
+import { migration016 } from '../../../src/db/migrations/016_storyboard.js';
 
 type Col = { name: string; notnull: number; dflt_value: string | null };
 const cols = (db: Database.Database, t: string) => db.prepare(`PRAGMA table_info(${t})`).all() as Col[];
@@ -10,7 +25,9 @@ describe('migration 016 - storyboard', () => {
   beforeEach(() => {
     db = new Database(':memory:');
     db.pragma('foreign_keys = ON');
-    runMigrations(db);
+    // Schema as of 016 (later migrations reshape story_segments again; see migration-018.test.ts).
+    [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration008,
+      migration009, migration010, migration011, migration012, migration013, migration014, migration015, migration016].forEach((m) => m(db));
     db.prepare("INSERT INTO projects (name) VALUES ('p')").run();
     db.prepare("INSERT INTO stories (project_id, name) VALUES (1, 'Main')").run();
     db.prepare(`INSERT INTO clips (project_id, file_path, file_hash, file_size, duration_sec) VALUES (1, '/a.mp4', 'h', 1, 30)`).run();
