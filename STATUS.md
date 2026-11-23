@@ -1101,6 +1101,16 @@ Finder; route tested with a fake). Deferred to after A1: reset-moment button, re
 Deferred (v0.3): new moment from a clip range (two pieces of one clip); splitting large similarity groups (by place
 or time gap); event-level "unseen ★" count; seen per device; touch press-and-hold preview.
 
+#### P1 — proxy playback fix (2026-11-23)
+Cause: proxies inherited High 4:2:2 10-bit from the Sony originals (no browser hardware decode) and had a keyframe only
+every ~10 s (ffmpeg default), so loops/scrubs decoded up to 10 s. Built: `proxyArgs()` (pure; `-pix_fmt yuv420p`,
+`-profile:v high`, `-force_key_frames expr:gte(t,n_forced*1)`, `-sc_threshold 0`), used by `createProxy` too;
+`rebuildProxy()` (encode to `<proxy>.partial.mp4`, atomic rename, partial removed on failure) and `rebuildProxies()`
+(sequential, per-clip ok/skipped/failed, missing originals skipped, `--only-bad` probes pix_fmt); CLI
+`clippilot proxies rebuild [--project] [--only-bad] [--json]`. Sanity check on a generated 4:2:2 10-bit clip: proxy is
+High/yuv420p with keyframes at 0,1,2,3,4,5 s. 10 new unit tests (proxy-args, proxy-rebuild). Not yet run on a real
+project (planner runs it).
+
 ### M5 — Gap fillers (free) — roadmap item 5
 - Per-gap search over own library (unused clips, other projects).
 - Locally rendered title/chapter cards, animated route map, photo pan/zoom → ingested as clips.

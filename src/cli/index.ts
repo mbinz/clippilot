@@ -17,6 +17,7 @@ import { registerReviewImportCommand } from './commands/review-import.js';
 import { registerCalibrateCommand } from './commands/calibrate.js';
 import { registerEventsCommand } from './commands/events.js';
 import { registerCutCommands } from './commands/cut.js';
+import { registerProxiesCommand } from './commands/proxies.js';
 import { setLogLevel } from '../utils/logger.js';
 
 export function createProgram(): Command {
@@ -52,6 +53,7 @@ export function createProgram(): Command {
   registerCalibrateCommand(program);
   registerEventsCommand(program);
   registerCutCommands(program);
+  registerProxiesCommand(program);
 
   return program;
 }

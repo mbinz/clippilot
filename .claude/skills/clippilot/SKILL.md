@@ -55,6 +55,7 @@ on success. Always pass `--json` so output is parseable.
 | `clippilot summary [--project <name>] [--top N] --json` | Overview of a project: scene hints, places, moments, best highlights. Run after analyze, before storyboarding. |
 | `clippilot events list [--project <name>] --json` | Events: clips grouped by folder (deepest folder) or by recording time (gap > 45 min). See "Events" below. |
 | `clippilot cut show --json` / `cut brief` / `cut apply --file f.json` / `moments list --json` | The storyboard: brief, draft, read back. See "Storyboard" below. |
+| `clippilot proxies rebuild [--project <name>] [--only-bad] [--json]` | Playback is skippy/freezes: re-encode proxies to yuv420p with 1 s keyframes (sequential; `--only-bad` skips proxies already yuv420p; reports clips whose original is missing). |
 | `clippilot similar <id>` | User asks "what other takes of this exist" or "any duplicates of clip N". |
 | `clippilot mark-best <id> [--group <gid>]` | User picks the best take among similar clips. Defaults to all groups containing the clip. |
 | `clippilot tag <id> [-l <location>] [-t a,b,c] [--people n,m] --json` | User adds metadata. |
