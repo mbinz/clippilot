@@ -1149,6 +1149,38 @@ poll ("Updated: Trim moment", drawer stayed on panel 3, Undo offers it); the boa
 item 2. Small deferred items: reset-moment button, 👎 reason in the clip's moment list, `--min-tier` on the effective tier,
 `--only-bad` keyframe check, one selection file per project folder (two open boards overwrite each other).
 
+### Post-production plan (decided 2026-11-23, end of session)
+
+Workflow map (user + planner): ingest/backup → sorting ✅ → brief + storyboard + rough cut ✅ → music → sound design →
+stabilization → color correction → grading → titles/animations (maps) → **fine cut (manual)** → final mix + loudness →
+subtitles → feedback round → delivery (platform renders, YouTube text/chapters, thumbnail) → short versions → archive.
+- **Where it lives:** ClipPilot stops at the rough-cut export. Everything after = Claude skills/tools in a separate folder
+  (planned `~/dev/clippilot-post`, to be created with the first tool), consuming the export + originals. Memory:
+  scope-clippilot-vs-post-tools.
+- **Stays manual:** fine cut, timing (incl. cutting on beats, transition/animation timing), the mix, grading taste, the
+  final music choice. Beat markers: not wanted.
+- **Batch work** (stabilization, color) is the main pain: tools decide per clip (full-frame-rate analysis, not 1 fps
+  snapshots; "shake" 👎 = unusable footage, a different signal from "needs light stabilization"), mark clips via OTIO clip
+  colors + markers with notes, user applies in Resolve in one go (multi-select Stabilize ✅ tested; color: Shot Match /
+  Auto Color per camera group + a reference-clip marker; look = one LUT/grade). Computer use (Claude driving Resolve's UI)
+  is an option for repetitive applies; Resolve Studio scripting only if both prove too fragile.
+- **Music:** creative choice; later Claude + external sources (own discussion, licences). First step: place a chosen file
+  on its own track, lower original sound (FCPXML volume) except audio_keep moments.
+
+**Titles (first post-tool) — decided:** opening title + one chapter title per scene, rendered by Claude as transparent
+ProRes 4444 clips (4K/25, ~3 s default), placed on V2 at scene starts via OTIO; user retimes/speeds in Resolve, asks Claude
+to re-render when timing is off. **Style "D teal & yellow"**: Anton (Google Font) on solid blocks sized to the measured
+text width, slight −3° tilt, teal `#0E8F9A` block with white text + yellow `#FFD23F` tag with ink `#111418` text, soft
+shadow; opening "PORTUGAL" + "ARRIFANA · MAY 2025", chapter "DOLPHIN" / "TRIP" + "DAY 3 · 27 MAY". Animation plan: blocks
+slide in staggered (~0.15 s), hold, slide out. Previews + renderers: `~/Video/ClipPilot Arrifana/exports/resolve-test/`
+(`title-styles/D-teal-yellow-*.jpg`, `render-styles-blocks.mjs`, `render-title.mjs`). Google Fonts Anton, Bebas Neue,
+Archivo Black, Pacifico, Permanent Marker installed in the user's `~/Library/Fonts` (renderer = sharp/librsvg via CoreText
+needs them registered). Rejected: clean/editorial/journal (too restrained), red blocks.
+
+**Open next session:** create `~/dev/clippilot-post` + titles skill (render all chapter titles of the Arrifana cut with the
+animation, extended OTIO with V2), test import in Resolve; then music/sound placement; then stabilization + camera marking;
+then Q3 small fixes + full Portugal (Q4). ★ came out at 16 % on the Arrifana re-run (target ~10 %) — check on Portugal.
+
 ### Roadmap item 2 — Analysis polish + full Portugal (planned 2026-11-23)
 
 Why: on the board the moment *is* the edit, so the AI's moments must be good cuts. Example C0542: the analysis marked

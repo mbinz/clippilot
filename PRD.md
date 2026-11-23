@@ -138,12 +138,19 @@ imported cleanly into free Resolve, and the author prefers it over an empty time
 ★ moments, compare and swap shots, trim/speed moments, and ask Claude Code about "this panel" — and leaves with
 "I didn't see everything, but these are the right choices".
 
-## Roadmap (prioritized 2026-11-23)
+## Roadmap (prioritized 2026-11-23, updated end of day)
 
-1. **v0.3 — Board v3 + assistant link** (M7, M8).
-2. **Analysis polish + full Portugal** — tighter moments (the moment now plays at full length), audio flag too generous
-   (78 %), hero rate (26 %), footage timezone, Gemini omitting `description`, trailing spaces in event names; then
-   ingest + analyze the 508-clip trip (cost shown first).
+**Scope decision (2026-11-23):** ClipPilot = sorting + storyboard drafting + rough-cut export. Post-production
+automation (titles/animations, music + sound, stabilization, color) lives in **separate Claude skills/tools** next to
+ClipPilot (planned folder `~/dev/clippilot-post`), working on the OTIO/FCPXML export + originals. Resolve (free) stays the
+finishing tool; fine cut, timing, mix and grade taste stay manual. Full workflow map + who-does-what: STATUS.md
+"Post-production plan".
+
+1. **v0.3 — Board v3 + assistant link** (M7, M8) ✅.
+2. **Analysis polish** ✅ (prompt v3: 2–8 s moments, ★ ~10 %, strict audio; Q1/Q1b; Arrifana re-run). Small fixes (Q3)
+   and **full Portugal** (Q4) follow after the first post-tools.
+2a. **Post-tools (Claude skills, outside ClipPilot):** titles first (style chosen), then music + sound track placement,
+   stabilization + camera marking. Based on the Resolve capability test (STATUS.md).
 3. **Mac app + ingest/analyze from the UI** — Electron shell around the server + web UI, project picker, CLI keeps
    working on the same DB; no terminal for a new trip. CI comes with packaging.
 4. **Assistant in the app** — chat panel in the board (Claude via the Agent SDK with the user's login, acting through
