@@ -1081,6 +1081,15 @@ board components were also server-rendered once with fake data in every drawer s
 - Not done / deferred: reset-moment button (`POST /moments/:id/reset` has no UI; "changed by you" is shown but cannot be
   cleared except by manual trim), no component tests (UI only), no real-browser check, `usageOf` in `logic.ts` is now unused.
 
+**M7 verified (planner, 2026-11-23)** — merged B1 (f172337…965dd9f), B2 (c701477), B3 (83a2ea5, 9225df8), B4 (fd7368a…cc3d151);
+817 tests, typecheck + web build green. Migration dry run on copies of the real Arrifana DB: totals unchanged (44 panels,
+168.5 s), OTIO export byte-identical, 5 moments "changed by you" (only user panels). Browser check of B4 on a copy (narrow
+pane = small-screen layout): board loads, moment drawer, trim → "changed by you" (one undo step), "Compare in panel 1" →
+amber panel drawer, "Use this" → panel `source=user` + moment confirmed in the DB, two undos restore panel + moment exactly,
+seek outside → "playing on", back inside → "looping", seen stored, no console errors. Not clicked: Show in Finder (would open
+Finder; route tested with a fake). Deferred to after A1: reset-moment button, reject reason in the clip's moment list,
+`--min-tier` on the effective tier, desktop-width visual pass by the user.
+
 **A1 — M8 assistant link**
 - The board writes its selection (`cut_id`, `scene_id`, `panel_id`, `moment_id`, `drawer`) to
   `.clippilot/board-selection.json` via `PUT /board/selection` on every change. `clippilot board context --json` prints
