@@ -1006,6 +1006,27 @@ exports the real cut). Decisions from the grilling + mockup rounds (2026-11-22/2
   start/end/speed). CLI: `moment trim <id> <in> <out>`, `moment speed <id> <s>`, `moment star|unstar <id>`,
   `moment reset <id>`; remove `panel trim|speed`; update SKILL.md.
 
+**B1 result (implementer, 2026-11-23)** - done; tests 721 -> 749 (+28 net; typecheck, `test:all`, `web:build` green).
+- Built: migration 018 (`src/db/migrations/018_moment_edit.ts`); `trimMoment` / `setMomentSpeed` / `setMomentTier` /
+  `starMoment` / `resetMoment` in the service; `defaultSpeed` replaces `defaultRange` (`range.ts`); tree panels expose
+  derived `start_sec` / `end_sec` / `speed` from their moment (so web and CLI output keep their shape); `cutToSegments`,
+  totals, undo snapshot (every moment that differs from default), `replaceForClip`, routes
+  (`PATCH /moments/:id`, `POST /moments/:id/reset`, `PATCH /panels/:id` intent only), CLI `moment trim|speed|star|unstar|reset`,
+  SKILL.md. Web: `panelRange` reads the candidate's moment range/speed, web `defaultRange` removed, drawer trim/speed call
+  `PATCH /moments/:id` (no UI redesign). `scripts/mockups/extract-mockup-data.ts` joins the moment for range/speed.
+- Interpretations: (1) panels with `state='filled'` but `moment_id NULL` (link lost) get a synthetic confirmed moment
+  carrying the panel's range; (2) migration 018 clears the `operations` undo log (snapshots hold panel ranges); (3) a
+  `highlights_ai_range` trigger fills `ai_start_sec/ai_end_sec` on insert so direct inserts stay valid; (4) trim/speed on a
+  *rejected* moment edits it but keeps it rejected; (5) `touch` sets `source='user'` on panels using the moment in *all*
+  cuts, while undo snapshots only restore the logged cut's panels; (6) `unstar` = back to the AI tier, or `solid` when the AI
+  tier is hero (`starMoment`); star = `hero`; route labels: hero -> "★", null/solid -> "Remove ★"; (7) a lone `start_sec`
+  or `end_sec` in `PATCH /moments/:id` keeps the other bound; (8) a draft's explicit in/out/speed overwrites the moment even
+  if the user already edited it; (9) the filled CHECK is now `clip_id` + `moment_id` NOT NULL, so deleting a moment that a
+  filled panel uses fails (CHECK) instead of nulling the link; (10) `migration-016.test.ts` now builds the schema as of 016
+  (migrations 1-16) because later migrations reshape `story_segments`.
+- Deferred: `GET /projects/:id/moments` rows do not yet carry `speed`/`ai_*`/`user_tier` (B2); web drawers still show
+  panel-centric trim/speed copy (B4); a draft cannot yet report that it overwrote an edited moment.
+
 **B2 — server: seen, Show in Finder, moment data for the drawers**
 - `POST /moments/:id/seen {seen: boolean}` sets/clears `seen_at` (not logged). `POST /clips/:id/reveal` runs
   `open -R <file_path>` via an injectable opener (test with a fake; 404 for unknown clip, 409 if the file is missing).
