@@ -10,7 +10,7 @@ export interface PoolMoment {
   end_sec: number;
   tier: string;
   user_tier?: PoolTier | null;
-  role: string;
+  role: string | null;
   shot: string | null;
   status: string;
   seen?: boolean;
@@ -35,7 +35,7 @@ export const similarKey = (m: PoolMoment): string => `${m.clip.event_id}|${m.rol
 export const recTime = (m: PoolMoment): number =>
   (Date.parse(m.clip.recorded_at ?? '') || 0) / 1000 + m.start_sec;
 
-const isOut = (m: PoolMoment): boolean => m.status === 'rejected' || !!m.clip.hidden;
+export const isOut = (m: PoolMoment): boolean => m.status === 'rejected' || !!m.clip.hidden;
 
 const byTime = (a: PoolMoment, b: PoolMoment): number => recTime(a) - recTime(b);
 
