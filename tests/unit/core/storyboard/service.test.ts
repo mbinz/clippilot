@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { setup } from './_helpers.js';
+import { snapshot } from '../../../../src/core/storyboard/history.js';
 
 describe('StoryboardService', () => {
   let t: ReturnType<typeof setup>;
@@ -456,6 +457,46 @@ describe('StoryboardService', () => {
       expect(panel()).toMatchObject({ start_sec: 1, end_sec: 9, speed: 1 });
       expect(t.db.prepare('SELECT start_sec, end_sec, speed, status FROM highlights WHERE id = ?').get(m))
         .toEqual({ start_sec: 1, end_sec: 9, speed: 1, status: 'proposed' });
+    });
+
+    describe('AI draft range is the AI range', () => {
+      const aiRange = (m: number) => t.db.prepare('SELECT ai_start_sec, ai_end_sec FROM highlights WHERE id = ?').get(m);
+      const edited = (m: number) => snapshot(t.db, cutId).moments.some((x) => x.id === m);
+      const aiMoment = () => {
+        const clip = t.addClip({ fps: 50 });
+        const [m] = t.addMoments(clip.id, [{ start_sec: 0, end_sec: 10 }]);
+        t.db.prepare('UPDATE highlights SET ai_start_sec = 0, ai_end_sec = 10 WHERE id = ?').run(m);
+        return m;
+      };
+
+      it('an AI addPanel with explicit in/out sets ai_start/ai_end to the written range and is not an edit', () => {
+        const m = aiMoment();
+        t.svc.addPanel(scene, { momentId: m, startSec: 1, endSec: 9, source: 'ai' });
+        expect(aiRange(m)).toEqual({ ai_start_sec: 1, ai_end_sec: 9 });
+        expect(edited(m)).toBe(false);
+      });
+
+      it('a later trimMoment still counts as a user edit', () => {
+        const m = aiMoment();
+        t.svc.addPanel(scene, { momentId: m, startSec: 1, endSec: 9, source: 'ai' });
+        t.svc.trimMoment(m, 2, 8);
+        expect(aiRange(m)).toEqual({ ai_start_sec: 1, ai_end_sec: 9 });
+        expect(edited(m)).toBe(true);
+      });
+
+      it('a user-source addPanel leaves the ai range alone', () => {
+        const m = aiMoment();
+        t.svc.addPanel(scene, { momentId: m, startSec: 1, endSec: 9, source: 'user' });
+        expect(aiRange(m)).toEqual({ ai_start_sec: 0, ai_end_sec: 10 });
+        expect(edited(m)).toBe(true);
+      });
+
+      it('a confirmed moment keeps its ai range under a draft', () => {
+        const m = aiMoment();
+        t.svc.trimMoment(m, 2, 6);
+        t.svc.addPanel(scene, { momentId: m, startSec: 1, endSec: 9, source: 'ai' });
+        expect(aiRange(m)).toEqual({ ai_start_sec: 0, ai_end_sec: 10 });
+      });
     });
 
     it('a draft never overwrites the in/out/speed of a moment the user has confirmed', () => {

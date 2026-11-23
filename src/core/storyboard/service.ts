@@ -386,6 +386,11 @@ export class StoryboardService {
         if (m.status === 'proposed') {
           if (input.startSec !== undefined || input.endSec !== undefined) {
             this.writeMomentRange(m, input.startSec ?? m.start_sec, input.endSec ?? m.end_sec);
+            // A draft's range is the AI's choice, so the board must not show it as "changed by you".
+            // Speed has no ai_* column: history judges it against suggested_speed, and the board only flags the range.
+            if (input.source !== 'user') {
+              this.db.prepare('UPDATE highlights SET ai_start_sec = start_sec, ai_end_sec = end_sec WHERE id = ?').run(m.id);
+            }
           }
           if (input.speed !== undefined) this.writeMomentSpeed(m, input.speed);
         }

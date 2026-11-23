@@ -1199,6 +1199,7 @@ v3 added a near-duplicate 1.5-8.5 s; 3 of 10 user trims were < 3 s).
 - Existing tests updated because behaviour changed: normaliser widening/overlap expectations (3 s -> 2 s), prompt guard,
   two analyze-clips tests (widened range 2.3-4.3; "Fresh" moved so it no longer duplicates the confirmed "Keep"), and
   the repository "keeps decisions" test (re-inserting an identical range as "confirmed again" is now dropped).
+- Follow-up: an AI draft (`addPanel`, source != 'user', moment still proposed) with explicit in/out now also sets `ai_start_sec/ai_end_sec` to the written range, so the board no longer says "changed by you" for untouched moments; speed has no ai column and stays as is (board flags range only; history compares it to the computed default).
 
 **Q2 — evaluation on Arrifana (planner, cost shown first)**
 - Script `scripts/eval/moment-eval.ts`: on a **copy** of the Arrifana DB, re-analyse a sample (~15 clips the user touched:
