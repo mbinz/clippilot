@@ -127,14 +127,14 @@ Project (the trip — "Portugal")
 | **M2.8** | Events | Folders → events, flat files → time grouping, CLI rename/merge/split, simple events view in UI; `03 Arrifana` (104 clips) ingested + analyzed |
 | **M3** | Storyboard model + CLI | Events/brief/scene/panel schema (panel source ai/user, moment status); Claude proposes a brief and drafts the Arrifana cut in chat |
 | **M4** | Scene board UI | Mockup first; pool + board + placing/👎/hide, trim, speed, preview, export button |
-| **M7** | Board v3 | Moment = edit; panel drawer (choose) vs moment drawer (review); ★ first + similar side by side; alternatives; seen; ★ editable; Show in Finder — mockup `scene-board-v3.html` |
-| **M8** | Assistant link | Claude Code knows the board selection (`clippilot board context --json`); the board refreshes itself after any edit (CLI / Claude) |
+| **M7** ✅ | Board v3 | Moment = edit; panel drawer (choose) vs moment drawer (review); ★ first + similar side by side; alternatives; seen; ★ editable; Show in Finder — mockup `scene-board-v3.html` |
+| **M8** ✅ | Assistant link | Claude Code knows the board selection (`clippilot board context --json`); the board refreshes itself after any edit (CLI / Claude) |
 | **M5** | Gap fillers (free) | Per-gap library search; local title cards, route map, photo pan/zoom — ingested as clips |
 | **M6** | Plugins (optional) | Stock and AI-video gap fillers behind a plugin seam |
 
 **v0.2 = M0–M4 ✅ 2026-11-23.** Acceptance met: `03 Arrifana` went ingest → events → brief → storyboard → export,
 imported cleanly into free Resolve, and the author prefers it over an empty timeline.
-**v0.3 = M7 + M8** (board v3 + assistant link). Done when: on the real Arrifana cut the author can review a scene's
+**v0.3 = M7 + M8 ✅ 2026-11-23** (board v3 + assistant link). Done when: on the real Arrifana cut the author can review a scene's
 ★ moments, compare and swap shots, trim/speed moments, and ask Claude Code about "this panel" — and leaves with
 "I didn't see everything, but these are the right choices".
 

@@ -13,6 +13,8 @@ Next: Claude proposes the Arrifana brief → user confirms → draft via `cut ap
 **2026-11-23: v0.2 accepted** — the user imported the Arrifana cut into free Resolve and prefers it over an empty
 timeline; export seamless. v0.3 planned (board v3 + assistant link), roadmap re-prioritized in PRD. Mockup v3
 approved after three rounds. **Next: M7 slices B1 → B4, then M8 (A1)** — specs under "v0.3" below.
+**2026-11-23 (later): v0.3 code-complete** — M7 board v3 + M8 assistant link merged (865 tests), in use on the real
+Arrifana cut in Safari. Next: roadmap item 2 (analysis polish + full Portugal) once the user has used v0.3 for real.
 
 `v0.1.0` — ingest (resumable) / analyze with timestamped highlights / search / summary; OTIO + FCPXML export verified in free Resolve (M1). No story/storyboard workflow yet (M3).
 Solo project, MIT. Run via `tsx`, no compiled binary.
@@ -1137,8 +1139,15 @@ project (planner runs it).
 - Feedback after first use (66c6c20): moments used in the cut leave the pool ("unused only · n in the story"); the drawers
   still show them. User uses Safari — check video/UI behaviour there.
 
-**Next (2026-11-23):** user's desktop look at board v3 → A1 (M8 assistant link) closes v0.3. Small deferred items: reset-moment
-button, 👎 reason in the clip's moment list, `--min-tier` on the effective tier, `--only-bad` keyframe check.
+**M8 verified (planner, 2026-11-23)** — A1 merged (d35baff, e3f9f5f; 865 tests). End-to-end on a copy of the real DB with
+the board open: clicking panel 3 wrote the selection file; `board context --json` resolved scene, panel 3 "Layered rock
+formations", its moment (in/out, speed, ★) and 29 alternatives; a CLI `moment trim` showed up in the open board within one
+poll ("Updated: Trim moment", drawer stayed on panel 3, Undo offers it); the board's own undo did not trigger an
+"Updated" toast; no console errors. Note: write commands like `moment trim` have no `--json` (they print JSON anyway).
+
+**Next (2026-11-23):** v0.3 done → user uses it on Arrifana (incl. asking Claude Code about "this panel"); then roadmap
+item 2. Small deferred items: reset-moment button, 👎 reason in the clip's moment list, `--min-tier` on the effective tier,
+`--only-bad` keyframe check, one selection file per project folder (two open boards overwrite each other).
 
 ### M5 — Gap fillers (free) — roadmap item 5
 - Per-gap search over own library (unused clips, other projects).
