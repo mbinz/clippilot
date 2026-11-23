@@ -1110,6 +1110,18 @@ every ~10 s (ffmpeg default), so loops/scrubs decoded up to 10 s. Built: `proxyA
 `clippilot proxies rebuild [--project] [--only-bad] [--json]`. Sanity check on a generated 4:2:2 10-bit clip: proxy is
 High/yuv420p with keyframes at 0,1,2,3,4,5 s. 10 new unit tests (proxy-args, proxy-rebuild). Not yet run on a real
 project (planner runs it).
+- Run on Arrifana (2026-11-23): all 104 proxies rebuilt → 101 yuv420p + 2 yuvj420p (full range, fine), all 1 s keyframes
+  (one clip is 0.96 s long). Gap: `--only-bad` checks pix_fmt only, so 9 yuv420p proxies with 10 s keyframes were skipped →
+  should also check the keyframe gap (deferred).
+- **The real cause of the broken drawer playback was not the proxies** (user in Safari: slowed, jumpy, stopped after ~2 s
+  in both drawers; hover previews fine). B4's `DrawerPlayer` read `video.currentTime` twice per timeupdate and seeked when
+  they differed; Safari advances it between reads → a seek on every timeupdate. Fix ea0c823: pure `loopSeekTarget()`
+  (null unless a jump is due), one read. Confirmed working in Safari by the user. Lesson: read `currentTime` once.
+- Feedback after first use (66c6c20): moments used in the cut leave the pool ("unused only · n in the story"); the drawers
+  still show them. User uses Safari — check video/UI behaviour there.
+
+**Next (2026-11-23):** user's desktop look at board v3 → A1 (M8 assistant link) closes v0.3. Small deferred items: reset-moment
+button, 👎 reason in the clip's moment list, `--min-tier` on the effective tier, `--only-bad` keyframe check.
 
 ### M5 — Gap fillers (free) — roadmap item 5
 - Per-gap search over own library (unused clips, other projects).
