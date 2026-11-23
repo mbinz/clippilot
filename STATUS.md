@@ -10,6 +10,9 @@ Update this file whenever the answer to any of those questions shifts.
 4 folder events: Arrifana 48, Delfine 33, Arrifana Haus 10, Praia do Odeceixe 13) and analyzed: 104/104 (1 retry
 after Gemini omitted `description`), 2 proxies > 18 MB went through the Files API ✅. M3 code ✅ (665 tests).
 Next: Claude proposes the Arrifana brief → user confirms → draft via `cut apply` → Resolve import; M4 mockup feedback.
+**2026-11-23: v0.2 accepted** — the user imported the Arrifana cut into free Resolve and prefers it over an empty
+timeline; export seamless. v0.3 planned (board v3 + assistant link), roadmap re-prioritized in PRD. Mockup v3
+approved after three rounds. **Next: M7 slices B1 → B4, then M8 (A1)** — specs under "v0.3" below.
 
 `v0.1.0` — ingest (resumable) / analyze with timestamped highlights / search / summary; OTIO + FCPXML export verified in free Resolve (M1). No story/storyboard workflow yet (M3).
 Solo project, MIT. Run via `tsx`, no compiled binary.
@@ -747,7 +750,7 @@ Slices E1→E5, test-first, one commit each. Migration 015 (013/014 are taken by
 Done when: `events rebuild` on a copy of the pilot DB gives sensible events; then the user-facing step is ingesting
 `03 Arrifana` + the user running analyze.
 
-### M3 — Storyboard model + CLI — code ✅ 2026-11-22 (7d3b8cb…583ec69, 665 tests); brief ✅ draft ✅; Resolve import pending
+### M3 — Storyboard model + CLI — code ✅ 2026-11-22 (7d3b8cb…583ec69, 665 tests); brief ✅ draft ✅; Resolve import ✅ 2026-11-23 (v0.2 accepted)
 2026-11-22: brief proposed by Claude, confirmed by the user (2:45, family & grandparents, chronological, 5 must-haves,
 Odeceixe ending). Draft applied via `cut apply` in `~/Video/ClipPilot Arrifana`: 5 scenes, 42 panels (40 filled, 2
 candidates, 0 gaps), ~2:39, 3 slowed panels (50 fps only). Exported `exports/03 Arrifana – Main.otio` (25 fps, 42 clips,
@@ -958,11 +961,87 @@ Two implementer runs: **A = U1–U3 (server)**, then **B = W1–W3 (web)**. Test
 Verification (planner): run `clippilot ui` in `~/Video/ClipPilot Arrifana` (dist built) against a **copy** first, then the real
 cut; check every interaction incl. undo/redo in the browser.
 
-### M5 — Gap fillers (free) — v0.3
+### v0.3 — M7 Board v3 + M8 Assistant link (planned 2026-11-23)
+
+Design = `mockups/scene-board-v3.html` (approved; data via `scripts/mockups/extract-mockup-data.ts`, which now also
+exports the real cut). Decisions from the grilling + mockup rounds (2026-11-22/23):
+- **The moment is the edit.** In/out + speed live on the moment; a panel only points at it. Touching a moment (trim /
+  speed) confirms it and makes every panel using it `source = user`. The 4 s `defaultRange` window goes away — a panel
+  plays its whole moment (long AI moments get trimmed once; tighter moments = roadmap item 2).
+- **Two drawers, two jobs.** Panel drawer = choose the shot for this slot (amber = your edit; one decision "Use this in
+  panel N"; options = in the story now + similar; clicking an option previews only). Moment drawer = review the clip
+  (neutral; whole clip, all its moments, ★, 👎, hide, Show in Finder; similar collapsed; one link into the story).
+  Clicking a panel opens the panel drawer, clicking a pool moment the moment drawer. The drawer pushes the board aside;
+  < 900 px it is a full-screen sheet.
+- **Playback:** the moment loops; seeking outside it plays the clip on; seeking back inside loops again.
+- **Similar = same event + same role + same shot.** Pool: all ★ first, then groups side by side (group order = earliest
+  recording time; inside = recording time), small gap between groups, no labels, nothing collapsed but rejected/hidden.
+  Alternatives = same rule, ★ first. Large groups (Arrifana wide establishing = 29) accepted for now.
+- **Seen** = hovered ≥ 2 s or opened → faded + black-and-white in place; in-story moments never fade; hovered/selected
+  tiles full brightness; "Mark unseen"; stored server-side, not undoable.
+- **★ editable per moment** (user override of the tier; "yours" shown in the drawer only).
+- **Assistant route, not hard-wired AI buttons** — v0.3 only links Claude Code to the board (M8); the in-app chat is
+  roadmap item 4. Phone moved back (roadmap item 6).
+
+**B1 — server: the moment is the edit** (test-first; migration + service + export + CLI)
+- Migration 018: `highlights` + `speed REAL NOT NULL DEFAULT 1`, `ai_start_sec REAL`, `ai_end_sec REAL` (backfilled
+  from start/end), `user_tier TEXT NULL CHECK (user_tier IN ('hero','solid','filler'))`, `seen_at TEXT NULL`. Set
+  `speed` = suggested_speed when `speedAllowed` for the clip's fps, else 1. Then for every filled panel copy its
+  `start_sec/end_sec/speed` into its moment (first panel by cut/scene/position wins if a moment is used twice — none in
+  Arrifana today; 29 of 44 panels differ from their moment and get copied); rebuild `story_segments` without
+  `start_sec`, `end_sec`, `speed` (keep the filled CHECK on `clip_id`/`moment_id`). Test on a fixture DB: ranges and
+  speeds survive, totals unchanged.
+- Service: `trimMoment(id, start, end)` (clamped to clip, ≥ `MIN_PANEL_SEC`), `setMomentSpeed(id, speed)` (gated by
+  fps), both `touch` (status confirmed + panels using it `source='user'`); `setMomentTier(id, tier | null)`;
+  `resetMoment(id)` (back to ai_start/ai_end + default speed). Drop `trimPanel` / `setSpeed` / `defaultRange` /
+  `PANEL_DEFAULT_SEC` (and the web duplicate). `addPanel`/`placeMoment`/`pickCandidate`/draft apply just point at the
+  moment; a draft panel's explicit in/out/speed is written to the moment (no confirm).
+- Tree, totals, preview data and both exporters read range + speed from the moment (`cutToSegments`). Export test:
+  same OTIO for the migrated fixture as before the migration.
+- Undo snapshot: include every moment of the project that differs from default (status ≠ proposed, range ≠ ai range,
+  speed ≠ default, user_tier set); restore resets the others. Tests: trim/speed/★ undo round-trips.
+- Re-analysis (`replaceForClip`) also keeps edited moments (range/speed/user_tier changed).
+- Routes: `PATCH /moments/:id {cut_id, start_sec?, end_sec?, speed?, tier?}` (logged, labels "Trim moment", "Speed
+  50 %", "★" / "Remove ★"), `POST /moments/:id/reset {cut_id}`; `PATCH /panels/:id` keeps intent only (400 on
+  start/end/speed). CLI: `moment trim <id> <in> <out>`, `moment speed <id> <s>`, `moment star|unstar <id>`,
+  `moment reset <id>`; remove `panel trim|speed`; update SKILL.md.
+
+**B2 — server: seen, Show in Finder, moment data for the drawers**
+- `POST /moments/:id/seen {seen: boolean}` sets/clears `seen_at` (not logged). `POST /clips/:id/reveal` runs
+  `open -R <file_path>` via an injectable opener (test with a fake; 404 for unknown clip, 409 if the file is missing).
+- `/projects/:id/moments` rows gain `speed`, `ai_start_sec`, `ai_end_sec`, `user_tier`, effective `tier`, `seen`, and
+  `clip.recorded_at`, `clip.event_id`. The board loads with `include_rejected=1&include_hidden=1` and filters itself.
+
+**B3 — web logic (pure, tested in `tests/unit/web/board-logic.test.ts`)**
+- `similarKey(m)`, `poolOrder(moments)` → `{ heroes: Moment[][], rest: Moment[][] }` (groups; ★ by effective tier),
+  `alternatives(m, moments)`, `slotFor(m, tree)` (own panel → panel with a similar moment in this scene → any scene →
+  null), `fades(m, used, seen)`, loop/play-on rule `nextTime(t, a, b, free)`. Port from the mockup.
+
+**B4 — web UI (port the mockup faithfully)**
+- Panel drawer + moment drawer as in the mockup (amber tokens for the panel drawer + selected strip panel; neutral
+  moment drawer), playback rule, trim handles + speed on the moment in both drawers, options/alternatives grid,
+  moment list for the clip, ★ / 👎 / hide / mark unseen / Show in Finder, "Compare in panel N" / "Add to scene".
+- Pool: ★ section + groups, bold in-story marks with panel number (scene·panel when in another scene), seen fade after
+  2 s hover or open (calls B2), hovered/selected full brightness. Drag stays but is not advertised.
+- Small screens (< 900 px): scene tabs, drawer as full-screen sheet. Remove the old drawers' trim/speed on panels.
+- Planner browser check on a **copy** of the Arrifana DB first, then the real one.
+
+**A1 — M8 assistant link**
+- The board writes its selection (`cut_id`, `scene_id`, `panel_id`, `moment_id`, `drawer`) to
+  `.clippilot/board-selection.json` via `PUT /board/selection` on every change. `clippilot board context --json` prints
+  it resolved (scene name, panel intent + its moment, moment details, alternatives ids) — Claude reads "this panel".
+- Live refresh: the board polls `GET /cuts/:id/history` (latest op id) every 2 s and refetches the tree + moments when it
+  changes (CLI/Claude edits). Toast "Updated by Claude: <label>" when the change didn't come from this tab.
+- SKILL.md: "when the user says this / that panel, run `clippilot board context --json` first".
+
+Deferred (v0.3): new moment from a clip range (two pieces of one clip); splitting large similarity groups (by place
+or time gap); event-level "unseen ★" count; seen per device; touch press-and-hold preview.
+
+### M5 — Gap fillers (free) — roadmap item 5
 - Per-gap search over own library (unused clips, other projects).
 - Locally rendered title/chapter cards, animated route map, photo pan/zoom → ingested as clips.
 
-### M6 — Plugins (optional) — v0.3
+### M6 — Plugins (optional) — roadmap item 5
 - Stock (Pexels/Pixabay) and AI-video (Kling/Veo) gap fillers behind a plugin seam.
 
 ## Deferred / future

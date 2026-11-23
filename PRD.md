@@ -1,5 +1,9 @@
 # ClipPilot — PRD
 
+> 2026-11-23: v0.2 accepted (Arrifana rough cut preferred over an empty timeline, export clean). v0.3 planned after a
+> grilling round + three mockup rounds (`mockups/scene-board-v3.html`): **the moment is the edit**, two drawers
+> (panel = choose, moment = review), similar moments + alternatives, "seen". Prioritized roadmap below.
+>
 > Re-planned 2026-11-21 after a second grilling session (events + scene board). Builds on the 2026-11-18 re-plan
 > (storyboard workflow, Resolve export fixed in M1).
 > Key learnings that triggered it: absolute AI scores (clip and moment) don't discriminate; a learned "taste profile"
@@ -54,15 +58,29 @@ finishing.
    - Claude renames / merges / splits events in chat; the user can do the same in the UI. Optional, ~5 min per trip; nothing waits for it.
 4. **Brief** — per cut: target length, mood, must-have moments, ending. **Claude proposes a brief** from the events and their best moments; the user adjusts it in a UI form or in chat. Drives the draft and defines what counts as a gap.
 5. **Storyboard draft** — Claude drafts scenes and panels in chat from the brief. Each scene starts from one event but may use moments from any event. Each **panel** (one shot slot) has an intent and is:
-   - **filled** — a moment with in/out and speed
+   - **filled** — points at a moment (the moment carries in/out and speed — see Data model)
    - **candidates** — 2–5 moments to choose from
    - **gap** — intent only, nothing suitable found yet
-6. **Scene board (web UI)** — the user opens an already-filled board and steers. Sorting happens here, as a side effect:
-   - **Moment pool** per scene: grouped by role, hero first, filler collapsed, duplicates stacked, rejected / hidden behind a "hidden: n" link.
-   - **Placing** a moment (drag onto a panel, or picking a candidate) = confirmed. **👎** rejects a moment (optional reason). **Hide clip** hides a whole clip. Untouched moments stay "proposed".
-   - **AI picks and human picks are visually distinct**; both are usable and exportable any time.
-   - Edit: scenes add / rename / delete / reorder; panels add / delete / reorder; trim in/out; speed 100 / 50 / 25 % (within the clip's fps).
-   - **Preview** a scene or the whole cut in the browser (panels played in order, at their speed).
+6. **Scene board (web UI)** — the user opens an already-filled board and steers. Sorting happens here, as a side effect.
+   Goal: *"I didn't look at everything, but I have a good feeling these are the right choices."* (v3, 2026-11-23)
+   - **Moment pool** per scene: all ★ first; below, **similar moments side by side** (same event + same kind of shot =
+     role + framing), groups ordered by time, a small gap between groups, no labels; nothing collapsed except
+     rejected / hidden behind a link. **Seen** moments (hovered ≥ 2 s or opened) fade into the background in place
+     (faded, black-and-white); moments in the story never fade. In-story marks are bold: thick solid green ✓ = yours,
+     thick dashed violet = AI's pick, with the panel number.
+   - **Panel drawer — "choose the shot for this slot"** (amber = your edit): the panel's place in the story
+     (neighbours), its intent, the shot playing, **one decision** ("Use this in panel N" instead of the current one),
+     options = the shot in the story first, then similar moments; clicking an option only previews it.
+   - **Moment drawer — "review this clip"** (neutral): the whole clip, all its moments (click to select), ★ on/off,
+     👎 with reason, hide clip, Show in Finder; similar moments collapsed; one link into the story ("In panel N",
+     "Compare in panel N" when a similar shot is used, or "Add to scene").
+   - **Playback:** the moment loops; click the bar outside it and the whole clip plays on; click back inside to loop.
+   - **The moment is the edit:** in/out and speed (100 / 50 / 25 % within the clip's fps) are set on the moment, in
+     either drawer; every panel using it plays it like that. Touching a moment confirms it.
+   - **Placing** a moment = confirmed. **👎** rejects a moment. **Hide clip** hides a whole clip. Untouched moments stay
+     "proposed". AI picks and human picks are visually distinct; both are exportable any time. Undo for every edit.
+   - Edit: scenes add / rename / delete / reorder; panels add / delete / reorder / intent.
+   - **Preview** a scene or the whole cut in the browser (panels played in order, at their moment's speed).
 7. **Fill gaps** (M5) — reshape the story around what exists, or find a filler for that gap: own library → locally generated (title cards, route map, photo pan/zoom) → stock (plugin) → AI video (plugin).
 8. **Export** — "Export to Resolve" button: one OTIO timeline per cut with scene markers (FCPXML secondary), into free Resolve, every clip online, correct speed.
 
@@ -71,15 +89,17 @@ finishing.
 ```
 Project (the trip — "Portugal")
   ├─ Event          ← what was shot; from deepest folder or recording-time grouping; renamable / mergeable / splittable
-  │    └─ Clip → Moment (tier, shot, role, issues, slow-mo, audio, duplicate group; status proposed | confirmed | rejected)
+  │    └─ Clip → Moment (tier, shot, role, issues, slow-mo, audio, duplicate group; status proposed | confirmed | rejected;
+  │                      in/out + speed = the edit (v0.3); ★ override by the user; seen)
   └─ Cut            ← one edit; has a brief (Claude-proposed, user-adjusted)
        └─ Scene      ← story unit; ordered, named; starts from an event
             └─ Panel  ← one shot slot; ordered; intent + state (filled | candidates | gap); source ai | user
-                         filled: moment/clip, in/out (start_sec/end_sec), speed (default 100 %)
+                         filled: points at a moment — no own in/out or speed (v0.3)
 ```
 
 - Event = footage side (objective, shared by all cuts). Scene = story side (per cut).
-- Same clip may appear in several panels ("only part slowed down" = same clip twice: 100 % then 50 %).
+- **The moment is the edit** (2026-11-23): a moment is a micro edit (in/out + speed); a panel only points at it, so
+  changing a moment changes every panel that uses it. Two different pieces of one clip = two moments.
 - Clips can be hidden (flag); originals untouched.
 - Model allows several cuts per project; the UI shows one cut for now.
 - Schema keeps `stories` (= Cut) / `story_segments` (= Panel) names; product vocabulary is Event / Cut / Scene / Panel / Moment.
@@ -107,24 +127,38 @@ Project (the trip — "Portugal")
 | **M2.8** | Events | Folders → events, flat files → time grouping, CLI rename/merge/split, simple events view in UI; `03 Arrifana` (104 clips) ingested + analyzed |
 | **M3** | Storyboard model + CLI | Events/brief/scene/panel schema (panel source ai/user, moment status); Claude proposes a brief and drafts the Arrifana cut in chat |
 | **M4** | Scene board UI | Mockup first; pool + board + placing/👎/hide, trim, speed, preview, export button |
+| **M7** | Board v3 | Moment = edit; panel drawer (choose) vs moment drawer (review); ★ first + similar side by side; alternatives; seen; ★ editable; Show in Finder — mockup `scene-board-v3.html` |
+| **M8** | Assistant link | Claude Code knows the board selection (`clippilot board context --json`); the board refreshes itself after any edit (CLI / Claude) |
 | **M5** | Gap fillers (free) | Per-gap library search; local title cards, route map, photo pan/zoom — ingested as clips |
 | **M6** | Plugins (optional) | Stock and AI-video gap fillers behind a plugin seam |
 
-**v0.2 = M0–M4.** Acceptance: `03 Arrifana` goes ingest → events → brief → storyboard → export, imports cleanly into
-free Resolve, and the author would rather start from it than from an empty timeline. Full Portugal follows once that holds.
-**v0.3:** M5–M6.
+**v0.2 = M0–M4 ✅ 2026-11-23.** Acceptance met: `03 Arrifana` went ingest → events → brief → storyboard → export,
+imported cleanly into free Resolve, and the author prefers it over an empty timeline.
+**v0.3 = M7 + M8** (board v3 + assistant link). Done when: on the real Arrifana cut the author can review a scene's
+★ moments, compare and swap shots, trim/speed moments, and ask Claude Code about "this panel" — and leaves with
+"I didn't see everything, but these are the right choices".
 
-## Roadmap (after v0.2)
+## Roadmap (prioritized 2026-11-23)
 
-- **AI actions from the UI** — UI becomes the main workspace: buttons tied to context ("Draft cut", "Redraft scene", "Alternatives for this panel", "Find filler for gap") with a text hint; local server runs Claude via the Agent SDK with the user's login, acting through the same CLI verbs; background progress, one undo per action. Later maybe a chat panel.
-- Ingest / analyze from the UI (with cost shown first).
-- Full Portugal; library across trips.
+1. **v0.3 — Board v3 + assistant link** (M7, M8).
+2. **Analysis polish + full Portugal** — tighter moments (the moment now plays at full length), audio flag too generous
+   (78 %), hero rate (26 %), footage timezone, Gemini omitting `description`, trailing spaces in event names; then
+   ingest + analyze the 508-clip trip (cost shown first).
+3. **Mac app + ingest/analyze from the UI** — Electron shell around the server + web UI, project picker, CLI keeps
+   working on the same DB; no terminal for a new trip. CI comes with packaging.
+4. **Assistant in the app** — chat panel in the board (Claude via the Agent SDK with the user's login, acting through
+   the CLI verbs, one undo step per action, suggestion chips by context). Replaces hard-wired "AI action" buttons
+   (decided 2026-11-23: assistant route, not fixed buttons).
+5. **M5 gap fillers**, then **M6 plugins**.
+6. **Phone review** (moved back 2026-11-23) — Mac as server via Tailscale + access key; review-first (preview, swap,
+   👎, ★, reorder); cloud sync only if "Mac must be awake" proves to be the blocker.
+7. Wishlist (below), as it becomes relevant.
 
-## Out of scope for v0.2
+## Out of scope for v0.2 / v0.3
 
 - Music awareness (track selection, length fitting, beat sync)
 - Voice-over and VO-script drafting
-- Speed ramps (only constant per-panel speed)
+- Speed ramps (only constant speed per moment)
 - Talking-head / A-roll layering; multi-track timelines
 - Effects, transitions, audio mixing
 - Touching originals (delete / move / rename)

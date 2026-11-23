@@ -31,7 +31,7 @@ src/
   db/
     connection.ts          # better-sqlite3 handle
     index.ts               # public DB surface
-    migrations/            # 001..012 + runner
+    migrations/            # 001..018 + runner
     repositories/          # clip, project, similarity, story, thumbnail, highlight
   types/, utils/, constants.ts
 tests/{unit,integration,fixtures}
@@ -61,7 +61,8 @@ ingest (resumable) → analyze proxy video → moments (tagged, no scores)
 - **Moment status** `proposed | confirmed | rejected`; **panel source** `ai | user` (M3). Clips get a `hidden` flag. Originals never touched.
 
 - **Highlights (moments)** are the unit the storyboard reasons about (clip_id + start/end + description + tags), not whole clips. `highlights` table since M2 (migration 008). Timestamps are ~1 s precise (Gemini samples ~1 fps) — a starting point to trim, not frame-accurate.
-- **Panels** = `story_segments` gaining `scene_id`, `intent`, `state`, `speed`; candidates are a child table of panel → highlight. M3.
+- **Panels** = `story_segments` with `scene_id`, `intent`, `state`, `source`; candidates are a child table of panel → highlight (M3).
+  Since v0.3 a filled panel only points at a moment (`moment_id`, `clip_id`) — in/out and speed live on the moment (decision 11).
 - **Fillers** are files on disk ingested like any clip, tagged with a source (`library | generated | stock | ai`). Exporters never special-case.
 
 ### Export facts learned in M1 (keep — they explain the code)
@@ -96,6 +97,14 @@ ingest (resumable) → analyze proxy video → moments (tagged, no scores)
    with original row ids, so the UI selection survives and a whole Claude draft is one undo step. Snapshots are small
    (a cut is ≲ 100 panels); per-op inverses aren't worth the bug surface. Moment reject / clip hide are project-wide but
    are logged on the cut they were done from.
+11. **The moment is the edit** (2026-11-23, v0.3). A moment (`highlights` row) is a micro edit: in/out (`start_sec`,
+   `end_sec`) and `speed` are the values every panel, the preview, the totals and the exporters use. A panel stores
+   no range of its own. The analysis' original in/out is kept (`ai_start_sec`, `ai_end_sec`) so "changed by you" and a
+   reset are possible. Trim or speed on a moment confirms it and makes every panel using it `source = user`. Why: one
+   place to edit, no drift between what you reviewed and what is in the cut; two pieces of one clip = two moments.
+   Consequence: re-analysing a clip must not replace moments that are edited or used in a cut.
+12. **Board state that isn't an edit stays out of undo** (2026-11-23). "Seen" (`highlights.seen_at`) and the board
+   selection (for `clippilot board context`) are stored, not logged in `operations`.
 7. **Paid / vendor-specific sources are plugins.** Stock and AI-video gap fillers sit behind a plugin seam (M6); the core stays free and offline-capable except for Gemini analysis.
 
 ## Testing

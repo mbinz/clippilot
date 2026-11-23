@@ -1,0 +1,797 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scene board v3</title>
+<!-- Board v3 mockup (feedback 2026-11-22/23). Static; serve with scripts/mockups/serve.ts so proxies play.
+     Data: scene-board-v3.data.js (gitignored, scripts/mockups/extract-mockup-data.ts) = the real Arrifana "Main" cut.
+     v3 changes: one clip drawer (panel + moment) that pushes the board aside, whole-clip playback, clickable moments on
+     the clip timeline, back/forward inside the drawer, live alternatives (same event + same kind of shot), stars on top,
+     similar moments next to each other, "seen" = desaturated in place, bolder in-cut marks, editable ★, Show in Finder. -->
+<style>
+  /* One meaning per colour: neutral white = selection/primary · violet = AI proposed · green = mine/confirmed
+     amber = needs your decision · red = rejected/problem/destructive. */
+  :root{
+    --bg:#0e0f12; --s1:#16181d; --s2:#1d2026; --line:#272a31; --line2:#363a43;
+    --text:#eceef2; --muted:#8a909c; --dim:#5d636e; --focus:#f4f5f7;
+    --ai:#a78bfa; --mine:#34d399; --attn:#fbbf24; --bad:#f87171;
+    --dw:0px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);font:13px/1.45 -apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif;display:flex;flex-direction:column;overflow:hidden}
+  button{font:inherit;color:inherit}
+  .btn{background:var(--s2);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer;white-space:nowrap}
+  .btn:hover{border-color:var(--line2)}
+  .btn.primary{background:var(--focus);border-color:var(--focus);color:#0e0f12;font-weight:600}
+  .btn.icon{padding:6px 9px}
+  .btn.ghost{background:none;border-color:transparent;color:var(--muted)}
+  .btn.ghost:hover{color:var(--text)}
+  .btn.danger{color:var(--bad)}
+  .btn.on-mine{color:var(--mine);border-color:color-mix(in srgb,var(--mine) 50%,transparent)}
+  .btn:disabled{opacity:.3;cursor:not-allowed}
+  .muted{color:var(--muted)}
+  .kbd{font-size:11px;color:var(--dim)}
+  .spacer{flex:1}
+
+  header{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line);flex:none}
+  header h1{font-size:14px;margin:0;font-weight:600}
+  .crumb{color:var(--muted);white-space:nowrap}
+  .brief{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:4px 12px 4px 8px;cursor:pointer;max-width:420px;background:none;min-width:0}
+  .brief .txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+  .dot{width:8px;height:8px;border-radius:50%;flex:none}
+  .len{display:flex;align-items:center;gap:8px;font-variant-numeric:tabular-nums;color:var(--muted)}
+  .len b{color:var(--text);font-weight:600}
+  .meter{width:90px;height:4px;border-radius:2px;background:var(--s2);overflow:hidden}
+  .meter i{display:block;height:100%;background:var(--muted)}
+  .attn-chip{color:var(--attn);border:1px solid color-mix(in srgb,var(--attn) 40%,transparent);border-radius:999px;padding:2px 10px;cursor:pointer;background:none}
+
+  /* layout: the drawer is a real column, so it pushes the board instead of covering it */
+  .app{flex:1;display:grid;grid-template-columns:200px minmax(0,1fr) var(--dw);min-height:0;transition:grid-template-columns .18s ease}
+  .app.with-drawer{--dw:min(480px,42vw)}
+  nav{border-right:1px solid var(--line);padding:12px 8px;overflow:auto}
+  main{overflow:auto;padding:16px 22px 60px;min-width:0}
+  .scene-item{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;cursor:pointer;color:var(--muted)}
+  .scene-item:hover{background:var(--s1);color:var(--text)}
+  .scene-item.sel{background:var(--s2);color:var(--text)}
+  .scene-item .n{width:16px;font-variant-numeric:tabular-nums;color:var(--dim)}
+  .scene-item .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .scene-item .need{width:7px;height:7px;border-radius:50%;background:var(--attn)}
+  .nav-tools{display:flex;gap:2px;margin-top:8px}
+
+  .scene-head{display:flex;align-items:baseline;gap:12px;margin-bottom:12px}
+  .scene-head h2{margin:0;font-size:18px;font-weight:600;outline:none;border-radius:4px}
+  .scene-head h2:focus{box-shadow:0 0 0 1px var(--line2)}
+  .scene-head .meta{color:var(--muted)}
+
+  /* storyboard strip */
+  .strip{display:flex;gap:12px;overflow-x:auto;padding:4px 4px 14px;align-items:flex-start}
+  .panel{flex:none;width:190px;cursor:pointer}
+  .panel .frame{position:relative;aspect-ratio:16/9;border-radius:9px;overflow:hidden;background:#000}
+  .panel .frame::after{content:'';position:absolute;inset:0;border-radius:9px;border:2px solid var(--line);pointer-events:none;z-index:3}
+  .panel.ai .frame::after{border:3px dashed var(--ai)}
+  .panel.mine .frame::after{border:3px solid var(--mine)}
+  .panel.gap .frame{background:var(--s1);display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:12px}
+  .panel.gap .frame::after{border:2px dashed var(--line2)}
+  .panel.sel .frame{box-shadow:0 0 0 3px var(--focus)}
+  .panel.drop .frame{box-shadow:0 0 0 3px var(--focus);transform:scale(1.03)}
+  .frame .tag,.frame .choose,.frame .dur,.frame .who{position:absolute;z-index:4;font-size:10.5px;border-radius:5px;padding:0 6px;font-variant-numeric:tabular-nums}
+  .frame .tag{top:6px;left:6px;background:#000c}
+  .frame .who{top:6px;right:6px;font-weight:700}
+  .panel.mine .who{background:var(--mine);color:#00281a}
+  .panel.ai .who{background:var(--ai);color:#1a0b3d}
+  .frame .choose{top:6px;right:6px;font-weight:700;background:var(--attn);color:#1d1400}
+  .frame .dur{bottom:6px;right:6px;background:#000c}
+  .panel .intent{margin-top:6px;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .panel:hover .intent{color:var(--text)}
+  .with-drawer .panel{width:150px}
+  .add{flex:none;width:64px;aspect-ratio:9/12.6;border:2px dashed var(--line2);border-radius:9px;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:22px;cursor:pointer}
+  .add:hover,.add.drop{color:var(--text);border-color:var(--muted)}
+
+  /* video thumbs: poster + hover playback */
+  .vt{position:absolute;inset:0;background:center/cover no-repeat}
+  .vt video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .vt .prog{position:absolute;left:0;bottom:0;height:2px;background:var(--focus);width:0}
+
+  /* pool */
+  .pool-bar{display:flex;align-items:center;gap:10px;margin:26px 0 12px;flex-wrap:wrap}
+  .pool-bar h3{margin:0;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg button{background:none;border:0;padding:4px 10px;cursor:pointer;color:var(--muted)}
+  .seg button.on{background:var(--s2);color:var(--text)}
+  .seg button:disabled{opacity:.3;cursor:not-allowed}
+  .sect h4{margin:0 0 6px;font-size:11.5px;color:var(--dim);font-weight:500}
+  .sect + .sect{margin-top:18px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+  .grid + .grid{margin-top:16px} /* the gap between groups of similar moments — no labels */
+  .mo{position:relative;aspect-ratio:16/9;border-radius:7px;overflow:hidden;background:#000;cursor:pointer}
+  .mo::after{content:'';position:absolute;inset:0;border-radius:7px;pointer-events:none;z-index:3}
+  .mo:hover{box-shadow:0 0 0 2px var(--line2)}
+  .mo.sel{box-shadow:0 0 0 3px var(--focus)}
+  .mo.in-mine::after{border:3px solid var(--mine)}
+  .mo.in-ai::after{border:3px dashed var(--ai)}
+  .mo .star{position:absolute;top:3px;left:6px;font-size:13px;text-shadow:0 1px 4px #000;z-index:4}
+  .mo .warn{position:absolute;top:4px;right:6px;font-size:11px;color:var(--bad);text-shadow:0 1px 4px #000;z-index:4}
+  .mo .pn{position:absolute;bottom:5px;left:5px;font-size:10.5px;font-weight:700;border-radius:5px;padding:0 6px;z-index:4}
+  .mo.in-mine .pn{background:var(--mine);color:#00281a}
+  .mo.in-ai .pn{background:var(--ai);color:#1a0b3d}
+  /* seen = background: faded + black-and-white. Tiles in the story never fade — you need to find them. */
+  .mo.seen:not(.in-mine):not(.in-ai):not(:hover):not(.sel){opacity:.38}
+  .mo.seen:not(.in-mine):not(.in-ai):not(:hover):not(.sel) .vt{filter:saturate(0) brightness(.7)}
+  .mo.seen:hover,.mo.sel{opacity:1}
+  .mo.seen:hover .vt,.mo.sel .vt{filter:none}
+  .mo.rej{opacity:.35}
+  .mo.rej .vt{filter:grayscale(1)}
+  .more{font-size:12px;color:var(--muted);cursor:pointer;background:none;border:0;padding:4px 0;text-decoration:underline;text-underline-offset:3px;margin-top:14px}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--dim)}
+  .legend i{display:inline-block;width:18px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:5px}
+
+  /* clip drawer — one drawer for panels and moments */
+  .drawer{grid-column:3;overflow:auto;border-left:1px solid var(--line2);background:var(--s1);padding:14px 16px 30px;display:none;min-width:0}
+  .with-drawer .drawer{display:block}
+  .drawer .top{display:flex;align-items:center;gap:6px;margin-bottom:10px}
+  .drawer .top h3{margin:0;font-size:14px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .crumbs{font-size:11.5px;color:var(--dim);margin:-6px 0 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .player{position:relative;aspect-ratio:16/9;background:#000;border-radius:10px;overflow:hidden}
+  .player video{width:100%;height:100%;object-fit:contain;display:block}
+  .player .spd{position:absolute;top:8px;right:8px;font-size:11px;background:#000c;border-radius:5px;padding:1px 7px}
+  .pctl{display:flex;align-items:center;gap:10px;margin-top:8px;font-variant-numeric:tabular-nums}
+  .pctl label{display:flex;align-items:center;gap:5px;color:var(--muted);cursor:pointer}
+  .tl{margin-top:8px}
+  .lane-m{position:relative;height:18px}
+  .lane-m .mm{position:absolute;top:2px;bottom:2px;min-width:6px;border-radius:3px;background:var(--line2);cursor:pointer;border:0;padding:0}
+  .lane-m .mm:hover{background:var(--muted)}
+  .lane-m .mm.hero::before{content:'★';position:absolute;left:3px;top:-3px;font-size:10px;color:var(--text)}
+  .lane-m .mm.u-mine{background:color-mix(in srgb,var(--mine) 55%,var(--s2))}
+  .lane-m .mm.u-ai{background:color-mix(in srgb,var(--ai) 55%,var(--s2))}
+  .lane-m .mm.cur{background:var(--focus)}
+  .lane-m .mm.cur.hero::before{color:#0e0f12}
+  .lane-s{position:relative;height:26px;margin-top:3px;background:var(--s2);border-radius:6px;cursor:pointer}
+  .lane-s .rng{position:absolute;top:0;bottom:0;border:2px solid var(--focus);border-radius:6px;background:#ffffff14;pointer-events:none}
+  .lane-s .ph{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--focus);pointer-events:none}
+  .lane-s input{position:absolute;inset:0;width:100%;margin:0;background:none;pointer-events:none;-webkit-appearance:none;appearance:none}
+  .lane-s input::-webkit-slider-thumb{pointer-events:auto;-webkit-appearance:none;width:14px;height:26px;cursor:ew-resize;background:transparent}
+  .tl-lbl{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:4px;font-variant-numeric:tabular-nums}
+  .box{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+  .box > .h{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .box > .h b{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600}
+  .sec{margin-top:12px}
+  .sec label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);margin-bottom:6px}
+  .sec textarea{width:100%;background:var(--s2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:7px 9px;font:inherit;min-height:44px;resize:vertical}
+  .facts{display:flex;flex-wrap:wrap;gap:6px}
+  .fact{font-size:11.5px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 9px}
+  .desc{color:#cfd3db;margin:0;font-size:12.5px}
+  .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .alts{grid-template-columns:repeat(auto-fill,minmax(118px,1fr))}
+  /* drawer kinds: the panel drawer is framed like a slot in the story (neighbours, intent as title);
+     the moment drawer is a clip review (file name, recording time, list of all moments). */
+  .dhead{margin:-14px -16px 12px;padding:12px 16px 12px;border-bottom:1px solid var(--line2)}
+  /* panel drawer = your edit: amber (same family as "needs your decision"). Moment drawer stays neutral = review. */
+  .drawer.k-panel{background:color-mix(in srgb,var(--attn) 6%,var(--s1));border-left:3px solid var(--attn)}
+  .k-panel .dhead{background:color-mix(in srgb,var(--attn) 16%,var(--s1));border-bottom-color:color-mix(in srgb,var(--attn) 45%,transparent)}
+  .k-panel .kicker{color:var(--attn)}
+  .k-panel .decide{border-color:color-mix(in srgb,var(--attn) 55%,transparent);background:color-mix(in srgb,var(--attn) 10%,var(--s2))}
+  .k-panel .btn.primary{background:var(--attn);border-color:var(--attn);color:#1d1400}
+  .k-panel .nb.me{box-shadow:0 0 0 2px var(--attn)}
+  .k-panel .lane-s .rng{border-color:var(--attn);background:color-mix(in srgb,var(--attn) 12%,transparent)}
+  .k-moment .kicker::before{content:'◉ ';color:var(--muted)}
+  .with-panel .panel.sel .frame{box-shadow:0 0 0 3px var(--attn)}
+  .kicker{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600;margin-bottom:4px}
+  .dhead .top{margin:0}
+  .k-panel .dhead h3{font-size:16px;white-space:normal}
+  .nbs{display:flex;align-items:center;gap:6px;margin-top:10px}
+  .nbs .arr{color:var(--dim);font-style:normal}
+  .nb{position:relative;width:76px;aspect-ratio:16/9;border-radius:6px;background:#000 center/cover;cursor:pointer;opacity:.55}
+  .nb.me{width:104px;opacity:1;cursor:default;box-shadow:0 0 0 2px var(--focus)}
+  .nb.none{background:none;border:1px dashed var(--line);cursor:default}
+  .nb.mine{outline:2px solid var(--mine);outline-offset:-2px}
+  .nb.ai{outline:2px dashed var(--ai);outline-offset:-2px}
+  .nb span{position:absolute;top:2px;left:3px;font-size:10px;background:#000c;border-radius:4px;padding:0 4px}
+  .nb:not(.me):not(.none):hover{opacity:1}
+  .mrow{display:flex;gap:10px;padding:6px;border-radius:8px;cursor:pointer;border:1px solid transparent}
+  .mrow:hover{background:var(--s2)}
+  .mrow.sel{border-color:var(--focus);background:var(--s2)}
+  .mrow.rej{opacity:.5}
+  .mth{width:84px;aspect-ratio:16/9;border-radius:5px;background:#000 center/cover;flex:none}
+  .mtx{min-width:0;flex:1}
+  .mt1{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .mt1 .st{font-size:12px}
+  .mdesc{font-size:12px;color:#cfd3db;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:2px}
+  .story{margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)}
+  .decide{margin-top:12px;padding:10px 12px;border:1px solid var(--line2);border-radius:10px;background:var(--s2);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .decide .btn.primary{padding:8px 16px}
+  .cur-thumb{width:64px;aspect-ratio:16/9;border-radius:4px;background:center/cover;flex:none}
+  .reasons{display:none;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .reasons.on{display:flex}
+  .reasons button{background:none;border:1px solid color-mix(in srgb,var(--bad) 45%,transparent);color:var(--bad);border-radius:999px;padding:2px 10px;cursor:pointer;font-size:12px}
+  .tag-ai{font-size:10px;font-weight:700;color:var(--ai);border:1px solid var(--ai);border-radius:5px;padding:0 6px}
+  .tag-mine{font-size:10px;font-weight:700;color:var(--mine);border:1px solid var(--mine);border-radius:5px;padding:0 6px}
+  .link{background:none;border:0;color:var(--text);text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:0}
+
+  /* modals */
+  .modal-bg{position:fixed;inset:0;background:#000c;display:none;align-items:center;justify-content:center;z-index:20}
+  .modal-bg.on{display:flex}
+  .modal{background:var(--s1);border:1px solid var(--line2);border-radius:14px;width:min(560px,92vw);max-height:88vh;overflow:auto;padding:20px 22px}
+  .modal h3{margin:0;font-size:16px}
+  .field{margin:12px 0}
+  .field label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);margin-bottom:5px}
+  .field input,.field textarea{width:100%;background:var(--s2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:7px 9px;font:inherit}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .mh{display:flex;gap:8px;align-items:center;margin-bottom:5px}
+  .mh i{width:56px;aspect-ratio:16/9;border-radius:4px;background:center/cover;flex:none}
+  .mh span{flex:1;font-size:12px}
+  .pv{width:min(1000px,94vw)}
+  .screen{position:relative;aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden}
+  .screen video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+  .screen .title{position:absolute;left:26px;bottom:24px;font-size:24px;font-weight:600;text-shadow:0 2px 14px #000;opacity:0;transition:opacity .5s}
+  .screen .title.on{opacity:1}
+  .screen .spd{position:absolute;top:12px;right:14px;font-size:12px;background:#000a;border-radius:6px;padding:1px 8px}
+  .ptrack{display:flex;gap:2px;margin-top:10px;height:10px}
+  .ptrack span{background:var(--s2);border-radius:2px;position:relative;overflow:hidden;cursor:pointer}
+  .ptrack span i{position:absolute;inset:0;width:0;background:var(--muted)}
+  .ptrack span.now i{background:var(--focus)}
+  .pv-bar{display:flex;align-items:center;gap:10px;margin-top:10px}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--s2);border:1px solid var(--line2);padding:9px 14px;border-radius:10px;opacity:0;transition:opacity .2s;z-index:30;display:flex;gap:12px;align-items:center;max-width:92vw}
+  .toast.on{opacity:1}
+  .toast button{background:none;border:0;color:var(--focus);font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+
+  /* small screens: scenes become tabs, the drawer becomes a full-screen sheet with a back arrow */
+  @media (max-width: 900px){
+    header{flex-wrap:wrap;gap:8px}
+    .brief{order:9;max-width:100%;flex-basis:100%}
+    .app,.app.with-drawer{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+    nav{display:flex;gap:4px;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:6px 8px}
+    nav #scenes{display:flex;gap:4px}
+    .scene-item{flex:none}
+    .nav-tools{margin:0}
+    main{padding:12px 16px 60px}
+    .drawer{position:fixed;inset:0;z-index:15;border-left:0}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>ClipPilot</h1>
+  <span class="crumb">03 Arrifana › Main</span>
+  <button class="brief" id="briefBtn"></button>
+  <div class="spacer"></div>
+  <span id="attn"></span>
+  <span class="len" id="len"></span>
+  <button class="btn icon" id="undo" title="Undo (⌘Z)">↶</button>
+  <button class="btn icon" id="redo" title="Redo (⇧⌘Z)">↷</button>
+  <button class="btn" id="pvCut">▶ Preview</button>
+  <button class="btn primary" id="export">Export</button>
+</header>
+
+<div class="app" id="app">
+  <nav>
+    <div id="scenes"></div>
+    <div class="nav-tools">
+      <button class="btn ghost" id="sAdd" title="Add scene">＋</button>
+      <button class="btn ghost" id="sUp" title="Move up">↑</button>
+      <button class="btn ghost" id="sDown" title="Move down">↓</button>
+      <button class="btn ghost" id="sDel" title="Delete scene">✕</button>
+    </div>
+  </nav>
+  <main>
+    <div class="scene-head">
+      <h2 id="sName" contenteditable spellcheck="false"></h2>
+      <span class="meta" id="sMeta"></span>
+      <div class="spacer"></div>
+      <button class="btn ghost" id="pvScene">▶ Scene</button>
+    </div>
+    <div class="strip" id="strip"></div>
+    <div class="pool-bar">
+      <h3>Moments</h3>
+      <div class="seg" id="scope"><button data-v="event">This event</button><button data-v="all">All</button></div>
+      <div class="spacer"></div>
+      <div class="legend"><span><i style="border:3px solid var(--mine)"></i>yours</span><span><i style="border:3px dashed var(--ai)"></i>AI's pick</span><span><i style="background:#555"></i>seen</span></div>
+    </div>
+    <div id="pool"></div>
+  </main>
+  <aside class="drawer" id="drawer"></aside>
+</div>
+
+<div class="modal-bg" id="briefModal"><div class="modal" id="briefBody"></div></div>
+<div class="modal-bg" id="pvModal"><div class="modal pv" id="pvBody"></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="scene-board-v3.data.js"></script>
+<script>
+const D = window.DATA;
+const clipById = Object.fromEntries(D.clips.map(c => [c.id, c]));
+const momById = Object.fromEntries(D.moments.map(m => [m.id, m]));
+const eventById = Object.fromEntries(D.events.map(e => [e.id, e]));
+const evOf = m => clipById[m.clip_id].event_id;
+const poster = id => D.thumbs[id] ? `url(${D.thumbs[id]})` : 'none';
+const src = clipId => clipById[clipId].proxy ? `proxies/${clipById[clipId].proxy}` : '';
+const fmt = s => { s = Math.max(0, Math.round(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+const f1 = s => s.toFixed(1) + ' s';
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+// recording time of a moment (clip start + offset) → time order everywhere
+const tKey = m => (Date.parse(clipById[m.clip_id].recorded_at) || 0) / 1000 + m.start_sec;
+// "similar" = same event + same kind of shot (role + framing)
+const gKey = m => `${evOf(m)}|${m.role}|${m.shot}`;
+const kindLabel = m => `${m.shot} ${m.role}`;
+
+/* ---------------- state + undo/redo ---------------- */
+let doc = {
+  brief: D.cut.brief, status: {}, reason: {}, tier: {},
+  hidden: D.clips.filter(c => c.hidden).map(c => c.id),
+  scenes: D.cut.scenes.map(s => ({ id: s.id, name: s.name, event_id: s.event_id, panels: s.panels.map(p => ({
+    id: p.id, intent: p.intent, state: p.state, source: p.source === 'user' ? 'mine' : 'ai', clip_id: p.clip_id,
+    moment_id: p.moment_id, start: p.start_sec, end: p.end_sec, speed: p.speed, cands: p.cands })) })),
+};
+D.moments.forEach(m => { m.a0 = m.start_sec; m.b0 = m.end_sec; });
+doc.mr = {}; // moment in/out changed by you: {id: {a, b}}
+doc.ms = {}; // moment speed set by you: {id: 0.5}
+// a panel only points at a moment; the moment IS the edit. Carry the real cut's panel trims/speeds into their moments.
+doc.scenes.forEach(s => s.panels.forEach(p => {
+  if (p.state !== 'filled') return;
+  const m = momById[p.moment_id];
+  if (Math.abs(p.start - m.start_sec) > 0.05 || Math.abs(p.end - m.end_sec) > 0.05) doc.mr[m.id] = { a: p.start, b: p.end };
+  if (p.speed !== defSpeed(m)) doc.ms[m.id] = p.speed;
+  delete p.start; delete p.end; delete p.speed;
+}));
+function applyMr() { D.moments.forEach(m => { const o = doc.mr[m.id]; m.start_sec = o ? o.a : m.a0; m.end_sec = o ? o.b : m.b0; }); }
+D.moments.forEach(m => { if (m.status !== 'proposed') doc.status[m.id] = m.status; if (m.reject_reason) doc.reason[m.id] = m.reject_reason; });
+let pid = Math.max(...doc.scenes.flatMap(s => s.panels.map(p => p.id))) + 1;
+// ui.open = which drawer: {kind:'panel', slot, preview} | {kind:'moment', mid, similar}
+const ui = { scene: 0, open: null, scope: 'event', showHidden: false };
+const past = [], future = [];
+function act(label, fn) { const before = structuredClone(doc); fn(); past.push({ label, doc: before }); future.length = 0; render(); toast(label, true); }
+function undo() { const h = past.pop(); if (!h) return; future.push({ label: h.label, doc: structuredClone(doc) }); doc = h.doc; fixSel(); render(); toast('Undone: ' + h.label); }
+function redo() { const h = future.pop(); if (!h) return; past.push({ label: h.label, doc: structuredClone(doc) }); doc = h.doc; fixSel(); render(); toast('Redone: ' + h.label); }
+function fixSel() { ui.scene = Math.min(ui.scene, doc.scenes.length - 1); if (ui.open?.kind === 'panel' && !panelById(ui.open.slot)) ui.open = null; }
+
+// seen: hovered ≥ 2 s or opened. Not an edit → no undo; kept per browser.
+let seen = new Set();
+try { seen = new Set(JSON.parse(localStorage.getItem('cp-seen-v3') || '[]')); } catch {}
+function markSeen(mid, on = true) {
+  if (on === seen.has(mid)) return;
+  on ? seen.add(mid) : seen.delete(mid);
+  try { localStorage.setItem('cp-seen-v3', JSON.stringify([...seen])); } catch {}
+  document.querySelectorAll(`.mo[data-mid="${mid}"]`).forEach(e => e.classList.toggle('seen', on));
+}
+
+/* ---------------- model helpers ---------------- */
+const scene = () => doc.scenes[ui.scene];
+const panelById = id => { for (const s of doc.scenes) for (const p of s.panels) if (p.id === id) return p; return null; };
+const sceneOf = p => doc.scenes.find(s => s.panels.includes(p));
+const pNum = p => sceneOf(p).panels.indexOf(p) + 1;
+const tier = m => doc.tier[m.id] ?? m.tier;
+const isHero = m => tier(m) === 'hero';
+const firstMoment = p => p.state === 'filled' ? momById[p.moment_id] : p.state === 'candidates' ? momById[p.cands[0]] : null;
+function defSpeed(m) { return speedOk(clipById[m.clip_id], m.suggested_speed) ? m.suggested_speed : 1; }
+function mSpeed(m) { return doc.ms[m.id] ?? defSpeed(m); }
+// touching a moment (trim / speed) confirms it, and every panel using it becomes yours
+function touch(m) { doc.status[m.id] = 'confirmed'; doc.scenes.forEach(s => s.panels.forEach(p => { if (p.state === 'filled' && p.moment_id === m.id) p.source = 'mine'; })); }
+const momentLbl = (m, editable) => `${f1(m.start_sec)} – ${f1(m.end_sec)}${mSpeed(m) !== 1 ? ` → ${f1((m.end_sec - m.start_sec) / mSpeed(m))} at ${mSpeed(m) * 100} %` : ''}${doc.mr[m.id] ? ' · changed by you' : ''}${editable ? ' · drag the white edges' : ''}`;
+const speedSeg = m => { const c = clipById[m.clip_id]; return `<div class="sec"><label>Speed · clip is ${c.fps} fps</label><div class="seg" id="speed">${[1, .5, .25].map(v => `<button data-sp="${v}" class="${mSpeed(m) === v ? 'on' : ''}" ${speedOk(c, v) ? '' : 'disabled title="Footage has too few frames"'}>${v * 100} %</button>`).join('')}</div></div>`; };
+function speedOk(clip, sp) { return sp === 1 || (sp === 0.5 && clip.fps >= 48) || (sp === 0.25 && clip.fps >= 90); }
+const range = p => {
+  const m = firstMoment(p); if (!m) return null;
+  return { clip: m.clip_id, a: m.start_sec, b: m.end_sec, sp: mSpeed(m) };
+};
+const pLen = p => { const r = range(p); return r ? (r.b - r.a) / r.sp : 0; };
+const sLen = s => s.panels.reduce((t, p) => t + pLen(p), 0);
+// moment id → where it is used in the cut
+const usage = () => { const u = {}; doc.scenes.forEach(s => s.panels.forEach((p, i) => { if (p.state === 'filled' && !u[p.moment_id]) u[p.moment_id] = { src: p.source, n: i + 1, scene: s, p }; })); return u; };
+const isHidden = m => doc.hidden.includes(m.clip_id);
+const isOut = m => isHidden(m) || doc.status[m.id] === 'rejected';
+
+function place(p, mid) {
+  const m = momById[mid];
+  Object.assign(p, { state: 'filled', moment_id: mid, clip_id: m.clip_id, source: 'mine', cands: [] });
+  doc.status[mid] = 'confirmed';
+}
+function dropFromPanels(pred) {
+  doc.scenes.forEach(s => s.panels.forEach(p => {
+    p.cands = p.cands.filter(c => !pred(momById[c]));
+    if (p.state === 'candidates' && !p.cands.length) p.state = 'gap';
+    if (p.state === 'filled' && pred(momById[p.moment_id])) Object.assign(p, { state: 'gap', moment_id: null, clip_id: null, speed: 1 });
+  }));
+}
+// alternatives for a moment: same event + same kind of shot, ★ first, then recording time
+function alternatives(m) {
+  return D.moments.filter(x => x.id !== m.id && !isOut(x) && gKey(x) === gKey(m))
+    .sort((a, b) => (isHero(b) - isHero(a)) || tKey(a) - tKey(b));
+}
+
+/* ---------------- video helpers ---------------- */
+let hoverV = null, seenTimer = null;
+function hoverPlay(el, clipId, a, b, rate = 2) {
+  stopHover();
+  if (!src(clipId)) return;
+  const v = document.createElement('video');
+  Object.assign(v, { muted: true, playsInline: true, preload: 'auto', src: `${src(clipId)}#t=${a}` });
+  const bar = document.createElement('div'); bar.className = 'prog';
+  v.addEventListener('loadedmetadata', () => { v.currentTime = a; v.playbackRate = rate; v.play().catch(() => {}); });
+  v.addEventListener('timeupdate', () => { if (v.currentTime >= b) v.currentTime = a; bar.style.width = ((v.currentTime - a) / (b - a) * 100) + '%'; });
+  el.append(v, bar); hoverV = { v, bar };
+}
+function stopHover() { clearTimeout(seenTimer); if (hoverV) { hoverV.v.pause(); hoverV.v.remove(); hoverV.bar.remove(); hoverV = null; } }
+document.addEventListener('mouseover', e => {
+  const t = e.target.closest('[data-hover]'); if (!t || t.contains(hoverV?.v)) return;
+  const [c, a, b, r] = t.dataset.hover.split(',').map(Number); hoverPlay(t, c, a, b, r || 2);
+  const mo = t.closest('.mo'); if (mo) seenTimer = setTimeout(() => markSeen(+mo.dataset.mid), 2000);
+});
+document.addEventListener('mouseout', e => { const t = e.target.closest('[data-hover]'); if (t && !t.contains(e.relatedTarget)) stopHover(); });
+
+/* ---------------- render ---------------- */
+function render() { applyMr(); renderHeader(); renderNav(); renderScene(); renderPool(); renderDrawer(); }
+const slotPanel = () => ui.open?.kind === 'panel' ? panelById(ui.open.slot) : null;
+
+function renderHeader() {
+  const b = doc.brief;
+  $('briefBtn').innerHTML = `<i class="dot" style="background:${b.state === 'confirmed' ? 'var(--mine)' : 'var(--ai)'}"></i><span class="txt">Brief · ${fmt(b.target_sec)} · ${esc(b.audience)} · ${esc(b.mood)}</span>`;
+  let tot = 0, choose = 0;
+  doc.scenes.forEach(s => s.panels.forEach(p => { tot += pLen(p); if (p.state === 'candidates') choose++; }));
+  const over = tot > b.target_sec * 1.1;
+  $('len').innerHTML = `<b style="color:${over ? 'var(--attn)' : 'var(--text)'}">${fmt(tot)}</b> / ${fmt(b.target_sec)}<span class="meter"><i style="width:${Math.min(100, tot / b.target_sec * 100)}%;background:${over ? 'var(--attn)' : 'var(--muted)'}"></i></span>`;
+  $('attn').innerHTML = choose ? `<button class="attn-chip" id="nextChoose">${choose} to choose →</button>` : '';
+  $('undo').disabled = !past.length; $('redo').disabled = !future.length;
+  $('undo').title = past.length ? `Undo: ${past.at(-1).label} (⌘Z)` : 'Nothing to undo';
+  $('redo').title = future.length ? `Redo: ${future.at(-1).label} (⇧⌘Z)` : 'Nothing to redo';
+}
+function renderNav() {
+  $('scenes').innerHTML = doc.scenes.map((s, i) => `<div class="scene-item ${i === ui.scene ? 'sel' : ''}" data-i="${i}">
+    <span class="n">${i + 1}</span><span class="name">${esc(s.name)}</span>${s.panels.some(p => p.state === 'candidates') ? '<i class="need" title="Has panels to choose"></i>' : ''}</div>`).join('');
+}
+function panelHTML(p, i) {
+  const r = range(p), cls = p.state === 'gap' ? 'gap' : p.source === 'mine' ? 'mine' : 'ai';
+  const tp = slotPanel();
+  let inner;
+  if (p.state === 'gap') inner = `<span>empty — drop a moment</span>`;
+  else {
+    const m = firstMoment(p);
+    inner = `<div class="vt" style="background-image:${poster(m.id)}" data-hover="${r.clip},${r.a},${r.b},${Math.max(1, 2 * r.sp)}"></div>
+      ${p.state === 'candidates' ? `<span class="choose">CHOOSE · ${p.cands.length}</span>` : `<span class="who">${p.source === 'mine' ? '✓ YOURS' : 'AI'}</span>`}
+      <span class="dur">${r.sp !== 1 ? `🐢 ${r.sp * 100}% · ` : ''}${f1(pLen(p))}</span>`;
+  }
+  return `<div class="panel ${cls} ${tp?.id === p.id ? 'sel' : ''}" data-pid="${p.id}">
+    <div class="frame">${inner}<span class="tag">${i + 1}</span></div><div class="intent">${esc(p.intent)}</div></div>`;
+}
+function renderScene() {
+  const s = scene();
+  if (document.activeElement !== $('sName')) $('sName').textContent = s.name;
+  $('sMeta').textContent = `${eventById[s.event_id]?.name ?? ''} · ${s.panels.length} panels · ${fmt(sLen(s))}`;
+  $('strip').innerHTML = s.panels.map(panelHTML).join('') + `<div class="add" id="addPanel" title="Add panel (or drop a moment here)">＋</div>`;
+}
+// one tile, used in the pool and in the drawer's alternatives
+function moHTML(m, used, extraCls = '') {
+  const out = isOut(m), u = used[m.id], cur = ui.open?.kind === 'panel' ? ui.open.preview === m.id : ui.open?.mid === m.id;
+  const inCls = u ? (u.src === 'mine' ? 'in-mine' : 'in-ai') : '';
+  const pn = u ? `${u.scene === scene() ? '' : doc.scenes.indexOf(u.scene) + 1 + '·'}${u.n}` : '';
+  return `<div class="mo ${inCls} ${seen.has(m.id) ? 'seen' : ''} ${out ? 'rej' : ''} ${cur ? 'sel' : ''} ${extraCls}" draggable="${!out}" data-mid="${m.id}"
+      title="${esc(m.description)}">
+    <div class="vt" style="background-image:${poster(m.id)}" data-hover="${m.clip_id},${m.start_sec},${m.end_sec},2"></div>
+    ${isHero(m) ? '<span class="star">★</span>' : ''}
+    ${(m.issues || []).length ? `<span class="warn" title="${esc(m.issues.join(', '))}">⚠</span>` : ''}
+    ${u ? `<span class="pn" title="In panel ${u.n} of “${esc(u.scene.name)}”">${u.src === 'mine' ? '✓ ' : ''}${pn}</span>` : ''}</div>`;
+}
+function renderPool() {
+  const s = scene(), used = usage();
+  document.querySelectorAll('#scope button').forEach(b => b.classList.toggle('on', b.dataset.v === ui.scope));
+  const all = D.moments.filter(m => ui.scope === 'all' || evOf(m) === s.event_id);
+  const vis = all.filter(m => !isOut(m)), out = all.filter(isOut);
+  // groups of similar moments, ordered by when the group starts; inside a group by recording time
+  const gStart = {};
+  vis.forEach(m => { const k = gKey(m); gStart[k] = Math.min(gStart[k] ?? Infinity, tKey(m)); });
+  const byGroupThenTime = (a, b) => (gStart[gKey(a)] - gStart[gKey(b)]) || tKey(a) - tKey(b);
+  const groups = (ms) => { const g = []; ms.sort(byGroupThenTime).forEach(m => { const l = g.at(-1); l && gKey(l[0]) === gKey(m) ? l.push(m) : g.push([m]); }); return g; };
+  const heroes = vis.filter(isHero), rest = vis.filter(m => !isHero(m));
+  let h = '';
+  if (heroes.length) h += `<div class="sect"><h4>★ ${heroes.length}</h4>${groups(heroes).map(g => `<div class="grid">${g.map(m => moHTML(m, used)).join('')}</div>`).join('')}</div>`;
+  if (rest.length) h += `<div class="sect"><h4>All other moments · ${rest.length} · similar ones side by side</h4>${groups(rest).map(g => `<div class="grid">${g.map(m => moHTML(m, used)).join('')}</div>`).join('')}</div>`;
+  if (out.length) h += `<button class="more" id="tHid">${ui.showHidden ? 'hide' : 'show'} rejected / hidden · ${out.length}</button>${ui.showHidden ? `<div class="grid" style="margin-top:8px">${out.map(m => moHTML(m, used)).join('')}</div>` : ''}`;
+  $('pool').innerHTML = h;
+}
+
+/* ---------------- drawers ----------------
+   Two drawers with two jobs:
+   PANEL drawer  — "choose the shot for this slot": the panel's place in the story, its intent, the shot playing,
+                   ONE decision ("Use this in panel N"), options (in the story now + similar), trim/speed.
+   MOMENT drawer — "review this clip": the whole clip, all its moments, ★ / 👎 / hide; similar moments collapsed;
+                   one link into the story ("Open panel N" / "Compare in panel N" / "Add to scene").
+   Playback in both: the range (moment / panel) loops; click the bar outside it and the clip plays on. */
+let drawerV = null, seenSkip = null;
+// ui.open = {kind:'panel', slot, preview} | {kind:'moment', mid}
+// the panel a moment would compete for: its own panel, else one holding a similar shot (this scene first)
+function slotFor(m) {
+  const u = usage()[m.id]; if (u) return u.p.id;
+  const sib = doc.scenes.flatMap(s => s.panels.map(p => ({ s, p }))).filter(x => x.p.state !== 'gap' && firstMoment(x.p) && gKey(firstMoment(x.p)) === gKey(m));
+  const here = sib.find(x => x.s === scene()) ?? sib[0];
+  return here ? here.p.id : null;
+}
+function openPanel(id, preview) {
+  seenSkip = null;
+  if (ui.open?.kind === 'panel' && ui.open.slot === id && preview === undefined) { ui.open = null; return render(); }
+  const p = panelById(id); ui.scene = doc.scenes.indexOf(sceneOf(p));
+  ui.open = { kind: 'panel', slot: id, preview: preview ?? firstMoment(p)?.id ?? null }; render();
+}
+function openMoment(mid) { seenSkip = null; if (ui.open?.kind === 'moment' && ui.open.mid === mid) { ui.open = null; return render(); } ui.open = { kind: 'moment', mid, similar: false }; render(); }
+
+function renderDrawer() {
+  const d = $('drawer');
+  $('app').classList.toggle('with-drawer', !!ui.open); $('app').classList.toggle('with-panel', ui.open?.kind === 'panel');
+  d.classList.toggle('k-panel', ui.open?.kind === 'panel'); d.classList.toggle('k-moment', ui.open?.kind === 'moment');
+  if (!ui.open) { drawerV?.pause(); d.innerHTML = ''; return; }
+  if (ui.open.kind === 'panel' && !slotPanel()) { ui.open = null; return renderDrawer(); }
+  ui.open.kind === 'panel' ? panelDrawer(d) : momentDrawer(d);
+}
+const playerHTML = (clip, sp, hint) => `<div class="player"><video id="dv" playsinline preload="auto" muted src="${src(clip.id)}"></video>${sp !== 1 ? `<span class="spd">🐢 ${sp * 100} %</span>` : ''}</div>
+  <div class="pctl"><button class="btn icon" id="pp">⏸</button><span id="ptime" class="muted">0:00 / ${fmt(clip.duration_sec)}</span><div class="spacer"></div><span class="kbd">${hint}</span></div>`;
+
+/* ----- PANEL drawer ----- */
+function panelDrawer(d) {
+  const used = usage(), p = slotPanel(), s = sceneOf(p), i = s.panels.indexOf(p), cur = firstMoment(p);
+  const m = ui.open.preview != null ? momById[ui.open.preview] : cur;
+  const isCur = !!(cur && m && cur.id === m.id), trim = !!m && !isOut(m);
+  const clip = m ? clipById[m.clip_id] : null;
+  const rng = m ? { a: m.start_sec, b: m.end_sec } : null, sp = m ? mSpeed(m) : 1;
+  const nb = [s.panels[i - 1], p, s.panels[i + 1]];
+  let h = `<div class="dhead"><div class="kicker">Panel ${i + 1} of ${s.panels.length} · ${esc(s.name)}</div>
+      <div class="top"><h3>${esc(p.intent)}</h3><button class="btn ghost" id="dClose" title="Close (Esc)">✕</button></div>
+      <div class="nbs">${nb.map((x, k) => x ? `<div class="nb ${k === 1 ? 'me' : ''} ${x.state === 'gap' ? 'gap' : x.source === 'mine' ? 'mine' : 'ai'}" ${k === 1 ? '' : `data-panel="${x.id}"`} style="background-image:${firstMoment(x) ? poster(firstMoment(x).id) : 'none'}"><span>${i + k}</span></div>` : '<div class="nb none"></div>').join('<i class="arr">›</i>')}</div></div>`;
+  if (clip) h += playerHTML(clip, sp, 'loops the moment · click outside it to play on') + timeline(clip, m.id, rng, trim, used, 'pv')
+    + `<div class="tl-lbl"><span>0:00</span><span id="tlMid">${momentLbl(m, trim)}</span><span>${fmt(clip.duration_sec)} · ${esc(clip.file)}</span></div>`;
+  // the one decision
+  if (m && isOut(m)) h += `<div class="decide"><span class="muted">${doc.status[m.id] === 'rejected' ? '👎 rejected' : 'Clip hidden'} — review it in the moment drawer</span></div>`;
+  else if (m && !isCur) h += `<div class="decide"><button class="btn primary" id="uUse">Use this in panel ${i + 1}</button>
+      ${cur ? `<span class="muted">instead of</span><i class="cur-thumb" style="background-image:${poster(cur.id)}"></i><button class="btn ghost" id="uBack">Back to current</button>` : ''}</div>`;
+  else if (isCur && p.state === 'candidates') h += `<div class="decide"><span class="muted">Claude's default pick</span><div class="spacer"></div><button class="btn primary" id="uUse">Use this one</button></div>`;
+  else if (isCur) h += `<div class="decide"><span style="color:${p.source === 'mine' ? 'var(--mine)' : 'var(--ai)'};font-weight:600">${p.source === 'mine' ? '✓ Your pick' : 'AI pick'}</span><span class="kbd">click an option below to compare</span></div>`;
+  else h += `<div class="decide"><span class="muted">Empty panel — click an option below to try it.</span></div>`;
+  // options: in the story now first, then similar shots
+  const base = cur ?? m;
+  let opts = base ? [base, ...alternatives(base)]
+    : D.moments.filter(x => !isOut(x) && evOf(x) === s.event_id).sort((a, b) => (isHero(b) - isHero(a)) || tKey(a) - tKey(b));
+  if (p.state === 'candidates') opts = [...p.cands.map(c => momById[c]), ...opts.filter(x => !p.cands.includes(x.id))];
+  if (m && !opts.includes(m)) opts.unshift(m);
+  h += `<div class="box"><div class="h"><b>Options</b><span class="kbd">${base ? `${esc(kindLabel(base))} · ` : ''}${opts.length}${cur ? ' · first = in the story now' : ''}</span></div>
+    <div class="grid alts">${opts.map(x => moHTML(x, used)).join('')}</div></div>`;
+  if (m) h += `<div class="box"><div class="h"><b>This moment</b><span class="kbd">${tier(m)} · ${m.shot} · ${m.role}</span><div class="spacer"></div><button class="link" data-review="${m.id}">Review clip →</button></div>
+    <p class="desc">${esc(m.description)}</p>${trim ? speedSeg(m) : ''}
+    <p class="kbd" style="margin:8px 0 0">In/out and speed belong to the moment — wherever it's used, it plays like this.</p></div>`;
+  h += `<div class="box"><div class="h"><b>Panel</b>${p.state === 'filled' ? (p.source === 'mine' ? '<span class="tag-mine">✓ YOURS</span>' : '<span class="tag-ai">AI</span>') : ''}</div>`;
+  h += `<div class="sec"><label>Intent</label><textarea id="intent">${esc(p.intent)}</textarea></div>
+    <div class="sec row"><button class="btn" id="pL" ${i === 0 ? 'disabled' : ''}>← Move</button><button class="btn" id="pR" ${i === s.panels.length - 1 ? 'disabled' : ''}>Move →</button><div class="spacer"></div><button class="btn danger" id="pDel">Delete panel</button></div></div>`;
+  d.innerHTML = h;
+  if (clip) wirePlayer(clip, rng, sp);
+  if (m && seenSkip !== m.id) markSeen(m.id);
+}
+
+/* ----- MOMENT drawer ----- */
+function momentDrawer(d) {
+  const used = usage(), m = momById[ui.open.mid], clip = clipById[m.clip_id], out = isOut(m), mine = doc.tier[m.id] !== undefined;
+  const ms = D.moments.filter(x => x.clip_id === clip.id);
+  const when = new Date(clip.recorded_at);
+  let h = `<div class="dhead"><div class="kicker">Clip review · ${esc(eventById[clip.event_id]?.name ?? '')} · ${isNaN(when) ? '' : when.toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
+      <div class="top"><h3>${esc(clip.file)}</h3><span class="kbd">${fmt(clip.duration_sec)} · ${clip.fps} fps</span>
+        <button class="btn ghost" id="dFinder" title="${esc(clip.file_path)}">Show in Finder</button><button class="btn ghost" id="dClose" title="Close (Esc)">✕</button></div></div>`;
+  h += playerHTML(clip, mSpeed(m), 'loops the moment · click outside it to play the clip') + timeline(clip, m.id, { a: m.start_sec, b: m.end_sec }, !out, used, 'sel')
+    + `<div class="tl-lbl"><span>0:00</span><span id="tlMid">${momentLbl(m, !out)}</span><span>${fmt(clip.duration_sec)} · whole clip</span></div>`;
+  // all moments of the clip; the selected one carries the review actions
+  h += `<div class="box"><div class="h"><b>Moments in this clip · ${ms.length}</b></div>${ms.map(x => {
+    const u = used[x.id], sel = x.id === m.id, xo = isOut(x);
+    return `<div class="mrow ${sel ? 'sel' : ''} ${xo ? 'rej' : ''}" data-sel="${x.id}">
+      <i class="mth" style="background-image:${poster(x.id)}"></i>
+      <div class="mtx"><div class="mt1">${isHero(x) ? '<span class="st">★</span>' : ''}<span class="kbd">${f1(x.start_sec)} – ${f1(x.end_sec)}</span>
+        ${u ? `<span class="${u.src === 'mine' ? 'tag-mine' : 'tag-ai'}">${u.src === 'mine' ? '✓ ' : ''}PANEL ${u.n}</span>` : ''}${xo ? `<span class="kbd" style="color:var(--bad)">${doc.status[x.id] === 'rejected' ? '👎 ' + esc(doc.reason[x.id] ?? '') : 'hidden'}</span>` : ''}</div>
+        <div class="mdesc">${esc(x.description)}</div></div></div>`;
+  }).join('')}</div>`;
+  // review actions for the selected moment
+  let story;
+  const u = used[m.id], slot = !u && slotFor(m), sp = slot && panelById(slot);
+  if (out) story = '';
+  else if (u) story = `<span class="muted">In the story:</span><button class="link" data-panel="${u.p.id}">panel ${u.n} · ${esc(u.scene.name)}</button>`;
+  else if (sp) story = `<span class="muted">Panel ${pNum(sp)} has a similar shot.</span><button class="btn" data-compare="${sp.id}">Compare in panel ${pNum(sp)} →</button>`;
+  else story = `<span class="muted">Nothing similar in the story.</span><button class="btn" id="uAdd">Add to “${esc(scene().name)}”</button>`;
+  h += `<div class="box"><div class="h"><b>Selected moment</b><span class="kbd">${tier(m)} · ${m.shot} · ${m.role}${m.audio_keep ? ' · 🔊 ' + m.audio_type : ''}${m.slowmo !== 'none' ? ` · 🐢 ${clip.fps >= 48 ? 'slow-mo ok' : 'slow-mo wanted'}` : ''}</span></div>
+    <div class="row">${out ? `<button class="btn" id="mRestore">${doc.status[m.id] === 'rejected' ? 'Undo 👎' : 'Unhide clip'}</button>` : `
+      <button class="btn ${isHero(m) ? (mine ? 'on-mine' : '') : ''}" id="mStar" title="${mine ? 'Star set by you' : 'Star from the analysis'}">${isHero(m) ? '★ Starred' : '☆ Star'}${mine ? ' · yours' : ''}</button>
+      <button class="btn" id="mRej">👎 Not usable</button>`}<div class="spacer"></div><button class="btn ghost" id="mUnseen">Mark unseen</button></div>
+    <div class="reasons" id="reasons">${['shake', 'blur', 'boring', 'duplicate', 'bad timing', 'other'].map(r => `<button data-r="${r}">${r}</button>`).join('')}</div>
+    ${out ? '' : speedSeg(m)}
+    ${story ? `<div class="row story">${story}</div>` : ''}</div>`;
+  // similar (collapsed)
+  const alts = alternatives(m);
+  h += `<div class="box"><div class="h"><button class="link" id="tSim">${ui.open.similar ? '▾' : '▸'} Similar moments · ${alts.length}</button><span class="kbd">${esc(kindLabel(m))}</span></div>
+    ${ui.open.similar ? `<div class="grid alts">${alts.map(x => moHTML(x, used)).join('')}</div>` : ''}</div>`;
+  h += `<div class="box row"><span class="kbd">The whole clip:</span>${out && isHidden(m) ? '' : '<button class="btn" id="mHide">Hide clip</button>'}<span class="kbd">hidden clips leave the pool and the story</span></div>`;
+  d.innerHTML = h;
+  wirePlayer(clip, { a: m.start_sec, b: m.end_sec }, mSpeed(m));
+  if (seenSkip !== m.id) markSeen(m.id);
+}
+
+function timeline(clip, curMid, rng, trim, used, clickMode) {
+  const L = clip.duration_sec, ms = D.moments.filter(x => x.clip_id === clip.id && !isOut(x));
+  return `<div class="tl">
+    <div class="lane-m">${ms.map(x => { const u = used[x.id];
+      return `<button class="mm ${x.id === curMid ? 'cur' : ''} ${u ? 'u-' + u.src : ''} ${isHero(x) ? 'hero' : ''}" data-${clickMode}="${x.id}"
+        style="left:${x.start_sec / L * 100}%;width:${(x.end_sec - x.start_sec) / L * 100}%"
+        title="${isHero(x) ? '★ ' : ''}${esc(x.description)}${u ? ` — in panel ${u.n}` : ''}"></button>`; }).join('')}</div>
+    <div class="lane-s" id="scrub">
+      ${rng ? `<div class="rng" style="left:${rng.a / L * 100}%;width:${(rng.b - rng.a) / L * 100}%"></div>` : ''}
+      ${trim ? `<input type="range" id="tIn" min="0" max="${L}" step="0.1" value="${rng.a}"><input type="range" id="tOut" min="0" max="${L}" step="0.1" value="${rng.b}">` : ''}
+      <i class="ph"></i></div></div>`;
+}
+// loops [a,b]; a seek outside it lets the clip play on (and stop at the end); a seek back inside loops again
+function wirePlayer(clip, rng, rate) {
+  const v = $('dv'); drawerV = v; if (!v) return;
+  const L = clip.duration_sec, ph = document.querySelector('#scrub .ph'), a = rng ? rng.a : 0, b = rng ? rng.b : L;
+  let free = false;
+  v.seekTo = t => { free = t < a - 0.05 || t > b + 0.05; v.currentTime = t; v.playbackRate = free ? 1 : rate; v.play().catch(() => {}); };
+  v.addEventListener('loadedmetadata', () => { v.currentTime = a; v.playbackRate = rate; v.play().catch(() => {}); });
+  v.addEventListener('timeupdate', () => {
+    if (!free && (v.currentTime >= b || v.currentTime < a - 0.3)) v.currentTime = a;
+    if (ph) ph.style.left = (v.currentTime / L * 100) + '%';
+    const t = $('ptime'); if (t) t.textContent = `${fmt(v.currentTime)} / ${fmt(L)}${free ? ' · playing on' : ' · looping'}`;
+  });
+  const pp = $('pp');
+  v.addEventListener('play', () => pp.textContent = '⏸'); v.addEventListener('pause', () => pp.textContent = '▶');
+  v.addEventListener('click', () => v.paused ? v.play() : v.pause());
+}
+
+/* ---------------- interactions ---------------- */
+$('scenes').onclick = e => { const it = e.target.closest('.scene-item'); if (it) { ui.scene = +it.dataset.i; ui.open = null; render(); } };
+$('sName').addEventListener('blur', e => { const v = e.target.textContent.trim(); if (v && v !== scene().name) act(`Rename scene to “${v}”`, () => { scene().name = v; }); });
+$('sName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
+const gapPanel = intent => ({ id: pid++, intent, state: 'gap', source: 'ai', speed: 1, cands: [] });
+$('sAdd').onclick = () => act('Add scene', () => { doc.scenes.splice(ui.scene + 1, 0, { id: Date.now(), name: 'New scene', event_id: scene().event_id, panels: [gapPanel('Describe the shot')] }); ui.scene++; ui.open = null; });
+$('sUp').onclick = () => { const i = ui.scene; if (i > 0) act('Move scene up', () => { [doc.scenes[i - 1], doc.scenes[i]] = [doc.scenes[i], doc.scenes[i - 1]]; ui.scene--; }); };
+$('sDown').onclick = () => { const i = ui.scene; if (i < doc.scenes.length - 1) act('Move scene down', () => { [doc.scenes[i + 1], doc.scenes[i]] = [doc.scenes[i], doc.scenes[i + 1]]; ui.scene++; }); };
+$('sDel').onclick = () => { if (doc.scenes.length > 1) act(`Delete scene “${scene().name}”`, () => { doc.scenes.splice(ui.scene, 1); ui.scene = Math.max(0, ui.scene - 1); ui.open = null; }); };
+
+$('strip').onclick = e => {
+  if (e.target.closest('#addPanel')) return act('Add panel', () => { const p = gapPanel('New shot'); scene().panels.push(p); ui.open = { kind: 'panel', slot: p.id, preview: null }; });
+  const pe = e.target.closest('.panel'); if (pe) openPanel(+pe.dataset.pid);
+};
+// drag still works (not advertised): onto a panel = use it there, onto + = new panel
+document.addEventListener('dragstart', e => { const m = e.target.closest?.('.mo'); if (m) { stopHover(); e.dataTransfer.setData('text/plain', m.dataset.mid); } });
+$('strip').addEventListener('dragover', e => { const t = e.target.closest('.panel,.add'); if (t) { e.preventDefault(); document.querySelectorAll('.drop').forEach(x => x !== t && x.classList.remove('drop')); t.classList.add('drop'); } });
+$('strip').addEventListener('dragleave', e => { const t = e.target.closest('.panel,.add'); if (t && !t.contains(e.relatedTarget)) t.classList.remove('drop'); });
+$('strip').addEventListener('drop', e => {
+  e.preventDefault(); const mid = +e.dataTransfer.getData('text/plain'); const t = e.target.closest('.panel,.add'); if (!mid || !t) return;
+  if (t.classList.contains('add')) return act('Add moment as new panel', () => { const p = gapPanel(momById[mid].description.split(/[,.]/)[0]); scene().panels.push(p); place(p, mid); });
+  const p = panelById(+t.dataset.pid);
+  act(`Use moment in panel ${pNum(p)}`, () => place(p, mid));
+});
+
+$('pool').onclick = e => {
+  if (e.target.id === 'tHid') { ui.showHidden = !ui.showHidden; return renderPool(); }
+  const mo = e.target.closest('.mo'); if (mo) openMoment(+mo.dataset.mid);
+};
+$('scope').onclick = e => { if (e.target.dataset.v) { ui.scope = e.target.dataset.v; renderPool(); } };
+
+const drawer = $('drawer');
+drawer.addEventListener('click', e => {
+  const t = e.target; if (!ui.open) return;
+  if (t.id === 'dClose') { ui.open = null; return render(); }
+  if (t.id === 'pp') { const v = $('dv'); return v.paused ? v.play() : v.pause(); }
+  if (t.closest('#scrub') && !/^t(In|Out)$/.test(t.id)) { const r = $('scrub').getBoundingClientRect(), v = $('dv'); return v.seekTo((e.clientX - r.left) / r.width * v.duration); }
+  const go = t.closest('[data-panel]'); if (go) return openPanel(+go.dataset.panel);
+  if (t.dataset.compare) return openPanel(+t.dataset.compare, ui.open.mid);
+  if (t.dataset.review) return openMoment(+t.dataset.review);
+  const playing = ui.open.kind === 'moment' ? momById[ui.open.mid] : (ui.open.preview != null ? momById[ui.open.preview] : firstMoment(slotPanel()));
+  if (t.dataset.sp && !t.disabled && playing) return act(`Speed ${+t.dataset.sp * 100} %`, () => { doc.ms[playing.id] = +t.dataset.sp; touch(playing); });
+
+  if (ui.open.kind === 'panel') {
+    const p = slotPanel(), s = sceneOf(p), i = s.panels.indexOf(p), cur = firstMoment(p);
+    const m = ui.open.preview != null ? momById[ui.open.preview] : cur;
+    const pv = t.closest('[data-pv]') ?? t.closest('.mo'); if (pv) { seenSkip = null; ui.open.preview = +(pv.dataset.pv ?? pv.dataset.mid); return render(); }
+    if (t.id === 'uUse') return act(`Use moment in panel ${i + 1}`, () => place(p, m.id));
+    if (t.id === 'uBack') { ui.open.preview = cur.id; return render(); }
+    if (t.id === 'pL') return act('Move panel', () => { [s.panels[i - 1], s.panels[i]] = [s.panels[i], s.panels[i - 1]]; });
+    if (t.id === 'pR') return act('Move panel', () => { [s.panels[i + 1], s.panels[i]] = [s.panels[i], s.panels[i + 1]]; });
+    if (t.id === 'pDel') return act(`Delete panel ${i + 1}`, () => { s.panels.splice(i, 1); ui.open = null; });
+    return;
+  }
+  // moment drawer
+  const sel = t.closest('[data-sel]'); if (sel) { seenSkip = null; ui.open.mid = +sel.dataset.sel; return render(); }
+  const mo = t.closest('.mo'); if (mo) return openMoment(+mo.dataset.mid);
+  const m = momById[ui.open.mid];
+  if (t.id === 'tSim') { ui.open.similar = !ui.open.similar; return render(); }
+  if (t.id === 'dFinder') return toast(`Would reveal in Finder: ${clipById[m.clip_id].file_path}`);
+  if (t.id === 'uAdd') return act(`Add moment to “${scene().name}”`, () => { const np = gapPanel(m.description.split(/[,.]/)[0]); scene().panels.push(np); place(np, m.id); });
+  if (t.id === 'mStar') return act(isHero(m) ? 'Remove ★' : 'Add ★', () => {
+    const want = isHero(m) ? (m.tier === 'hero' ? 'solid' : m.tier) : 'hero';
+    if (want === m.tier) delete doc.tier[m.id]; else doc.tier[m.id] = want;
+  });
+  if (t.id === 'mUnseen') { markSeen(m.id, false); seenSkip = m.id; return toast('Marked unseen'); }
+  if (t.id === 'mRej') return $('reasons').classList.toggle('on');
+  if (t.dataset.r) return act(`👎 ${t.dataset.r}`, () => { doc.status[m.id] = 'rejected'; doc.reason[m.id] = t.dataset.r; dropFromPanels(x => x.id === m.id); });
+  if (t.id === 'mHide') return act(`Hide clip ${clipById[m.clip_id].file}`, () => { doc.hidden.push(m.clip_id); dropFromPanels(x => x.clip_id === m.clip_id); });
+  if (t.id === 'mRestore') return act(doc.status[m.id] === 'rejected' ? 'Undo 👎' : 'Unhide clip', () => { if (doc.status[m.id] === 'rejected') delete doc.status[m.id]; doc.hidden = doc.hidden.filter(c => c !== m.clip_id); });
+});
+drawer.addEventListener('change', e => {
+  if (ui.open && /^t(In|Out)$/.test(e.target.id)) {
+    const m = ui.open.kind === 'moment' ? momById[ui.open.mid] : (ui.open.preview != null ? momById[ui.open.preview] : firstMoment(slotPanel()));
+    const a = +$('tIn').value, b = +$('tOut').value;
+    if (b - a >= 0.5) act('Change moment in/out', () => { doc.mr[m.id] = { a, b }; touch(m); }); else render();
+    return;
+  }
+  const p = ui.open?.kind === 'panel' && slotPanel(); if (!p) return;
+  if (e.target.id === 'intent' && e.target.value !== p.intent) act('Edit intent', () => { p.intent = e.target.value; });
+});
+drawer.addEventListener('input', e => {
+  if (!ui.open || !/^t(In|Out)$/.test(e.target.id)) return;
+  const m = ui.open.kind === 'moment' ? momById[ui.open.mid] : (ui.open.preview != null ? momById[ui.open.preview] : firstMoment(slotPanel()));
+  const a = +$('tIn').value, b = +$('tOut').value, L = clipById[m.clip_id].duration_sec; if (b - a < 0.5) return;
+  const r = drawer.querySelector('.rng'); r.style.left = a / L * 100 + '%'; r.style.width = (b - a) / L * 100 + '%';
+  $('tlMid').textContent = `${f1(a)} – ${f1(b)} · release to apply`;
+  const v = $('dv'); v.currentTime = e.target.id === 'tIn' ? a : Math.max(a, b - 1);
+});
+document.addEventListener('click', e => { if (e.target.id === 'nextChoose') { for (const s of doc.scenes) { const p = s.panels.find(p => p.state === 'candidates'); if (p) return openPanel(p.id); } } });
+
+/* ---------------- brief ---------------- */
+function openBrief() {
+  const b = doc.brief;
+  $('briefBody').innerHTML = `<div style="display:flex;align-items:center;gap:10px"><h3>Brief</h3>${b.state === 'confirmed' ? '<span class="tag-mine">CONFIRMED</span>' : '<span class="tag-ai">PROPOSED BY CLAUDE</span>'}</div>
+    <div class="two"><div class="field"><label>Length (min)</label><input id="bLen" type="number" step="0.25" value="${b.target_sec / 60}"></div><div class="field"><label>Audience</label><input id="bAud" value="${esc(b.audience)}"></div></div>
+    <div class="field"><label>Mood</label><input id="bMood" value="${esc(b.mood)}"></div>
+    <div class="field"><label>Must-haves</label>${b.must_have.map(x => `<div class="mh"><i style="background-image:${poster(x.moment_id)}"></i><span>${esc(x.text)}</span></div>`).join('')}</div>
+    <div class="field"><label>Ending</label><input id="bEnd" value="${esc(b.ending)}"></div>
+    <div class="field"><label>Notes</label><textarea id="bNotes">${esc(b.notes)}</textarea></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn" id="bClose">Close</button></div>`;
+  $('briefModal').classList.add('on');
+}
+$('briefBtn').onclick = openBrief;
+$('briefBody').onclick = e => { if (e.target.id === 'bClose') $('briefModal').classList.remove('on'); };
+
+/* ---------------- preview: real proxy playback, in order ---------------- */
+let pv = null;
+function preview(items) {
+  stopHover(); drawerV?.pause();
+  const seq = items.filter(x => range(x.p));
+  $('pvBody').innerHTML = `<div class="screen"><video id="pvA" playsinline preload="auto"></video><div class="title" id="pvT"></div><span class="spd" id="pvS"></span></div>
+    <div class="ptrack">${seq.map((x, k) => `<span data-k="${k}" style="flex:${pLen(x.p)}" title="${esc(x.s.name)} · ${esc(x.p.intent)}"><i></i></span>`).join('')}</div>
+    <div class="pv-bar"><button class="btn" id="pvPlay">⏸</button><span class="muted" id="pvInfo"></span><div class="spacer"></div>
+      <div class="seg" id="pvRate"><button data-r="1" class="on">1×</button><button data-r="2">2×</button></div></div>`;
+  $('pvModal').classList.add('on');
+  const v = $('pvA'), bars = [...document.querySelectorAll('.ptrack span')];
+  pv = { v, k: 0, rate: 1, lastScene: null };
+  const go = k => {
+    if (k >= seq.length) { v.pause(); $('pvInfo').textContent = 'End'; return; }
+    pv.k = k; const { s, p } = seq[k], r = range(p);
+    bars.forEach((b, j) => { b.classList.toggle('now', j === k); b.querySelector('i').style.width = j < k ? '100%' : '0'; });
+    $('pvInfo').textContent = `${s.name} · ${p.intent}`; $('pvS').textContent = r.sp !== 1 ? `🐢 ${r.sp * 100} %` : '';
+    if (s !== pv.lastScene) { $('pvT').textContent = s.name; $('pvT').classList.add('on'); setTimeout(() => $('pvT')?.classList.remove('on'), 1800); pv.lastScene = s; }
+    const start = () => { v.currentTime = r.a; v.playbackRate = r.sp * pv.rate; v.play().catch(() => {}); };
+    const want = new URL(src(r.clip), location.href).href;
+    if (v.src !== want) { v.src = want; v.onloadedmetadata = start; } else start();
+    v.ontimeupdate = () => { const pr = (v.currentTime - r.a) / (r.b - r.a); bars[k].querySelector('i').style.width = Math.min(100, pr * 100) + '%'; if (v.currentTime >= r.b) go(k + 1); };
+  };
+  pv.go = go; go(0);
+}
+$('pvBody').onclick = e => {
+  if (!pv) return;
+  const k = e.target.closest('[data-k]'); if (k) pv.go(+k.dataset.k);
+  if (e.target.id === 'pvPlay') { pv.v.paused ? pv.v.play() : pv.v.pause(); e.target.textContent = pv.v.paused ? '▶' : '⏸'; }
+  if (e.target.dataset.r) { pv.rate = +e.target.dataset.r; document.querySelectorAll('#pvRate button').forEach(b => b.classList.toggle('on', b === e.target)); pv.go(pv.k); }
+};
+function closePv() { if (pv) { pv.v.pause(); pv.v.removeAttribute('src'); pv = null; } $('pvModal').classList.remove('on'); }
+$('pvCut').onclick = () => preview(doc.scenes.flatMap(s => s.panels.map(p => ({ s, p }))));
+$('pvScene').onclick = () => preview(scene().panels.map(p => ({ s: scene(), p })));
+$('export').onclick = () => { let n = 0, g = 0; doc.scenes.forEach(s => s.panels.forEach(p => p.state === 'gap' ? g++ : n++)); toast(`Would write “03 Arrifana – Main.otio”: ${n} clips, ${doc.scenes.length} scene markers, ${g} gaps skipped`); };
+
+/* ---------------- keyboard, modals, toast ---------------- */
+document.addEventListener('keydown', e => {
+  const typing = /INPUT|TEXTAREA/.test(document.activeElement.tagName) || document.activeElement.isContentEditable;
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !typing) { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+  if (e.key === 'Escape') { if ($('pvModal').classList.contains('on')) closePv(); else if ($('briefModal').classList.contains('on')) $('briefModal').classList.remove('on'); else { ui.open = null; render(); } }
+});
+$('undo').onclick = undo; $('redo').onclick = redo;
+document.querySelectorAll('.modal-bg').forEach(bg => bg.addEventListener('click', e => { if (e.target === bg) bg.id === 'pvModal' ? closePv() : bg.classList.remove('on'); }));
+function toast(t, withUndo) {
+  const el = $('toast'); el.innerHTML = `<span>${esc(t)}</span>${withUndo ? '<button id="tUndo">Undo</button>' : ''}`;
+  el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('on'), 3500);
+  const b = $('tUndo'); if (b) b.onclick = () => { undo(); };
+}
+render();
+</script>
+</body>
+</html>
