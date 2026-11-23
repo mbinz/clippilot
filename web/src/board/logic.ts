@@ -1,5 +1,5 @@
 // Pure board logic (no React, no DOM): tested from the root vitest in tests/unit/web/board-logic.test.ts.
-import type { BoardMoment, BoardPanel, BoardScene } from './types';
+import type { BoardPanel, BoardScene } from './types';
 
 export interface PanelRange {
   clipId: number;
@@ -67,43 +67,6 @@ export function usageOf(scenes: BoardScene[]): Record<number, 'mine' | 'ai'> {
     if (p.state === 'filled' && p.moment_id !== null) u[p.moment_id] = p.source === 'user' ? 'mine' : 'ai';
   }
   return u;
-}
-
-export const ROLES = ['establishing', 'action', 'reaction', 'detail', 'transition'] as const;
-const TIER_RANK: Record<string, number> = { hero: 0, solid: 1, filler: 2 };
-
-export interface RoleGroup {
-  role: string;
-  main: BoardMoment[];
-  filler: BoardMoment[];
-  total: number;
-}
-
-export interface PoolGroups {
-  roles: RoleGroup[];
-  /** Rejected moments and moments of hidden clips (behind the "rejected / hidden" link). */
-  hidden: BoardMoment[];
-}
-
-export const isMomentHidden = (m: BoardMoment): boolean => m.status === 'rejected' || Boolean(m.clip?.hidden);
-
-/** Pool layout: moments by role (hero first, then solid; filler separate), event-scoped or all. */
-export function groupMoments(
-  moments: BoardMoment[],
-  opts: { scope: 'event' | 'all'; eventId: number | null },
-): PoolGroups {
-  const scoped = moments.filter((m) => opts.scope === 'all' || opts.eventId === null || m.event_id === opts.eventId);
-  const visible = scoped.filter((m) => !isMomentHidden(m));
-  const hidden = scoped.filter(isMomentHidden);
-  const present = new Set(visible.map((m) => m.role ?? 'other'));
-  const order = [...ROLES.filter((r) => present.has(r)), ...[...present].filter((r) => !(ROLES as readonly string[]).includes(r))];
-  const roles = order.map<RoleGroup>((role) => {
-    const ms = visible
-      .filter((m) => (m.role ?? 'other') === role)
-      .sort((x, y) => (TIER_RANK[x.tier] ?? 1) - (TIER_RANK[y.tier] ?? 1) || x.clip_id - y.clip_id);
-    return { role, main: ms.filter((m) => m.tier !== 'filler'), filler: ms.filter((m) => m.tier === 'filler'), total: ms.length };
-  });
-  return { roles, hidden };
 }
 
 /** m:ss */

@@ -1060,6 +1060,25 @@ exports the real cut). Decisions from the grilling + mockup rounds (2026-11-22/2
 - Small screens (< 900 px): scene tabs, drawer as full-screen sheet. Remove the old drawers' trim/speed on panels.
 - Planner browser check on a **copy** of the Arrifana DB first, then the real one.
 
+**B4 result (implementer, 2026-11-23)** - built, not browser-checked (planner does that on a DB copy); `test:all` 792 -> 816
+(+27 new in `tests/unit/web/board-drawer.test.ts`, -3 old role-grouping tests removed; typecheck + `web:build` green; all
+board components were also server-rendered once with fake data in every drawer state as a crash smoke test).
+- New `web/src/board/drawer.ts` (pure, tested): `decisionFor`, `optionList`, `storyLink`, `panelPosition`, `starTarget`/`starLabel`,
+  `rangeLabel`, `playLabel`, `storyMark`, `poolView`, `isValidTrim`. `pool.ts`: `PoolMoment.role` may be null, `isOut` exported.
+- UI: `PanelDrawer` (amber) / `MomentDrawer` (neutral) are grid column 3 of the board (pushes it aside; < 900 px fixed
+  full-screen sheet, scene nav = horizontal tabs). Shared `ClipPlayer` (player + `ClipTimeline` + trim via `useTrim`, one
+  PATCH /moments/:id per release), `MomentTile` (pool + option/similar grids), `DrawerPlayer` uses `loopStep`/`seekState`.
+  Pool = ★ section + `poolOrder` groups, rejected/hidden behind a link. Old role sections / filler collapse / `groupMoments`
+  / hint text removed. Seen: hover >= 2 s or opening a moment -> `useBoard.setSeen` (optimistic, no refetch).
+- Interpretations: preview state is `null` = "the current moment"; "Use this" on a candidate panel calls pick when the moment
+  is one of its candidates, else place; reject / hide keep the moment drawer open (restore button shown), as in the mockup;
+  "Add to scene" stays in the moment drawer (the link then turns into "In the story"); the label says "drag the edges"
+  (mockup said "white edges" although the panel drawer's range is amber); moment-row marker for rejected is just 👎 (the
+  reject reason is not in the moments payload); `unstar` sends `tier: null` (back to the AI tier) or `'solid'` when the AI
+  itself starred it.
+- Not done / deferred: reset-moment button (`POST /moments/:id/reset` has no UI; "changed by you" is shown but cannot be
+  cleared except by manual trim), no component tests (UI only), no real-browser check, `usageOf` in `logic.ts` is now unused.
+
 **A1 — M8 assistant link**
 - The board writes its selection (`cut_id`, `scene_id`, `panel_id`, `moment_id`, `drawer`) to
   `.clippilot/board-selection.json` via `PUT /board/selection` on every change. `clippilot board context --json` prints

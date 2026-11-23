@@ -1,56 +1,44 @@
 import { useState } from 'react';
-import type { BoardMoment } from '../../board/types';
-import { groupMoments, isMomentHidden } from '../../board/logic';
-import { VideoThumb, stopHoverPlayback } from './VideoThumb';
+import type { PM } from '../../board/types';
+import type { UsageEntry } from '../../board/pool';
+import { poolView } from '../../board/drawer';
+import { MomentTile } from './MomentTile';
 
 interface Props {
-  moments: BoardMoment[];
+  moments: PM[];
   eventId: number | null;
-  usage: Record<number, 'mine' | 'ai'>;
+  usage: Record<number, UsageEntry>;
+  currentSceneIndex: number;
   selectedId: number | null;
   onSelect: (id: number) => void;
-}
-
-function MomentTile({ m, used, selected, onSelect }: { m: BoardMoment; used?: 'mine' | 'ai'; selected: boolean; onSelect: () => void }) {
-  const hid = isMomentHidden(m);
-  return (
-    <div
-      draggable={!hid}
-      onDragStart={(e) => {
-        stopHoverPlayback();
-        e.dataTransfer.setData('text/plain', String(m.id));
-      }}
-      onClick={onSelect}
-      className={`relative aspect-video cursor-pointer overflow-hidden rounded-[7px] bg-black ${
-        selected ? 'shadow-[0_0_0_3px_var(--color-bd-focus)]' : 'hover:shadow-[0_0_0_2px_var(--color-bd-line2)]'
-      } ${hid ? 'opacity-35 grayscale' : m.tier === 'filler' ? 'opacity-55' : ''}`}
-    >
-      <VideoThumb poster={m.thumbnail} src={m.clip?.proxy_url ?? null} a={m.start_sec} b={m.end_sec} rate={2} />
-      {m.tier === 'hero' && <span className="pointer-events-none absolute left-1.5 top-1 text-xs [text-shadow:0_1px_4px_#000]" title="hero">{'★'}</span>}
-      {m.issues.length > 0 && (
-        <span className="pointer-events-none absolute right-1.5 top-1 text-[11px] text-bd-bad [text-shadow:0_1px_4px_#000]" title={m.issues.join(', ')}>{'⚠'}</span>
-      )}
-      {used && (
-        <i
-          className={`pointer-events-none absolute bottom-[5px] left-1.5 h-2 w-2 rounded-full ${used === 'mine' ? 'bg-bd-mine' : 'bg-bd-ai'}`}
-          title="In the cut"
-        />
-      )}
-    </div>
-  );
+  onSeen: (id: number) => void;
 }
 
 const moreBtn = 'cursor-pointer border-0 bg-transparent py-1 text-xs text-bd-muted underline underline-offset-[3px]';
+export const GRID = 'grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-2';
 
-export function MomentPool({ moments, eventId, usage, selectedId, onSelect }: Props) {
+export function MomentPool({ moments, eventId, usage, currentSceneIndex, selectedId, onSelect, onSeen }: Props) {
   const [scope, setScope] = useState<'event' | 'all'>('event');
-  const [filler, setFiller] = useState<Record<string, boolean>>({});
-  const [showHidden, setShowHidden] = useState(false);
-  const groups = groupMoments(moments, { scope, eventId });
+  const [showOut, setShowOut] = useState(false);
+  const view = poolView(moments, scope, eventId);
+  const nHeroes = view.heroes.reduce((n, g) => n + g.length, 0);
+  const nRest = view.rest.reduce((n, g) => n + g.length, 0);
+
+  const tile = (m: PM) => (
+    <MomentTile
+      key={m.id} m={m} used={usage[m.id]} currentSceneIndex={currentSceneIndex}
+      selected={selectedId === m.id} onSelect={() => onSelect(m.id)} onSeen={onSeen}
+    />
+  );
+  // Groups of similar moments sit side by side; a small gap between their grids, no labels.
+  const groups = (gs: PM[][]) => (
+    <div className="flex flex-col gap-4">{gs.map((g) => <div key={g[0].id} className={GRID}>{g.map(tile)}</div>)}</div>
+  );
+  const h4 = 'mb-1.5 mt-0 text-[11.5px] font-medium text-bd-dim';
 
   return (
     <>
-      <div className="mb-3 mt-[26px] flex items-center gap-2.5">
+      <div className="mb-3 mt-[26px] flex flex-wrap items-center gap-2.5">
         <h3 className="m-0 text-[11px] font-semibold uppercase tracking-[.07em] text-bd-muted">Moments</h3>
         <div className="inline-flex overflow-hidden rounded-lg border border-bd-line">
           {(['event', 'all'] as const).map((v) => (
@@ -64,40 +52,34 @@ export function MomentPool({ moments, eventId, usage, selectedId, onSelect }: Pr
             </button>
           ))}
         </div>
-        <span className="text-[11px] text-bd-dim">Hover to play {'·'} click for details {'·'} drag onto a panel</span>
+        <div className="flex-1" />
+        <div className="flex flex-wrap gap-3.5 text-[11px] text-bd-dim">
+          <span><i className="mr-[5px] inline-block h-[11px] w-[18px] rounded-[3px] border-[3px] border-solid border-bd-mine align-[-1px]" />yours</span>
+          <span><i className="mr-[5px] inline-block h-[11px] w-[18px] rounded-[3px] border-[3px] border-dashed border-bd-ai align-[-1px]" />AI{'’'}s pick</span>
+          <span><i className="mr-[5px] inline-block h-[11px] w-[18px] rounded-[3px] bg-[#555] align-[-1px]" />seen</span>
+        </div>
       </div>
 
-      {groups.roles.map((g) => (
-        <div key={g.role} className="mb-3.5">
-          <h4 className="mx-0 mb-1.5 mt-0 text-[11.5px] font-medium text-bd-dim">
-            {g.role[0].toUpperCase() + g.role.slice(1)} {'·'} {g.total}
-          </h4>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(148px,1fr))] gap-2">
-            {(filler[g.role] ? [...g.main, ...g.filler] : g.main).map((m) => (
-              <MomentTile key={m.id} m={m} used={usage[m.id]} selected={selectedId === m.id} onSelect={() => onSelect(m.id)} />
-            ))}
-          </div>
-          {g.filler.length > 0 && (
-            <button className={moreBtn} onClick={() => setFiller((f) => ({ ...f, [g.role]: !f[g.role] }))}>
-              {filler[g.role] ? 'hide' : 'show'} {g.filler.length} filler
-            </button>
-          )}
+      {nHeroes > 0 && (
+        <div>
+          <h4 className={h4}>{'★'} {nHeroes}</h4>
+          {groups(view.heroes)}
         </div>
-      ))}
+      )}
+      {nRest > 0 && (
+        <div className={nHeroes > 0 ? 'mt-[18px]' : ''}>
+          <h4 className={h4}>All other moments {'·'} {nRest} {'·'} similar ones side by side</h4>
+          {groups(view.rest)}
+        </div>
+      )}
 
-      {groups.hidden.length > 0 && (
-        <>
-          <button className={moreBtn} onClick={() => setShowHidden((v) => !v)}>
-            {showHidden ? 'hide' : 'show'} rejected / hidden {'·'} {groups.hidden.length}
+      {view.out.length > 0 && (
+        <div className="mt-3.5">
+          <button className={moreBtn} onClick={() => setShowOut((v) => !v)}>
+            {showOut ? 'hide' : 'show'} rejected / hidden {'·'} {view.out.length}
           </button>
-          {showHidden && (
-            <div className="mt-2 grid grid-cols-[repeat(auto-fill,minmax(148px,1fr))] gap-2">
-              {groups.hidden.map((m) => (
-                <MomentTile key={m.id} m={m} used={usage[m.id]} selected={selectedId === m.id} onSelect={() => onSelect(m.id)} />
-              ))}
-            </div>
-          )}
-        </>
+          {showOut && <div className={`${GRID} mt-2`}>{view.out.map(tile)}</div>}
+        </div>
       )}
     </>
   );

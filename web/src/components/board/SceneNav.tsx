@@ -13,13 +13,13 @@ interface Props {
 export function SceneNav({ scenes, selectedId, onSelect, onAdd, onMove, onDelete }: Props) {
   const idx = scenes.findIndex((s) => s.id === selectedId);
   return (
-    <nav className="overflow-auto border-r border-bd-line px-2 py-3">
-      <div>
+    <nav className="overflow-auto border-r border-bd-line px-2 py-3 max-[900px]:flex max-[900px]:gap-1 max-[900px]:overflow-x-auto max-[900px]:border-b max-[900px]:border-r-0 max-[900px]:py-1.5">
+      <div className="max-[900px]:flex max-[900px]:gap-1">
         {scenes.map((s, i) => (
           <div
             key={s.id}
             onClick={() => onSelect(s.id)}
-            className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-[7px] hover:bg-bd-s1 hover:text-bd-text ${
+            className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-[7px] max-[900px]:flex-none hover:bg-bd-s1 hover:text-bd-text ${
               s.id === selectedId ? 'bg-bd-s2 text-bd-text' : 'text-bd-muted'
             }`}
           >
@@ -31,7 +31,7 @@ export function SceneNav({ scenes, selectedId, onSelect, onAdd, onMove, onDelete
           </div>
         ))}
       </div>
-      <div className="mt-2 flex gap-0.5">
+      <div className="mt-2 flex gap-0.5 max-[900px]:mt-0">
         <button className={btnGhost} onClick={onAdd} title="Add scene">{'＋'}</button>
         <button className={btnGhost} onClick={() => onMove(-1)} disabled={idx <= 0} title="Move up">{'↑'}</button>
         <button className={btnGhost} onClick={() => onMove(1)} disabled={idx < 0 || idx >= scenes.length - 1} title="Move down">{'↓'}</button>

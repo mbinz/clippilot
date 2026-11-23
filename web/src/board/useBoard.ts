@@ -88,6 +88,16 @@ export function useBoard(projectId: number | undefined) {
     }
   }, [cutId, projectId, reload, say]);
 
+  /** Seen is board state, not an edit: optimistic local update, no refetch, not undoable. */
+  const momentsRef = useRef(moments);
+  momentsRef.current = moments;
+  const setSeen = useCallback((id: number, seen: boolean) => {
+    const cur = momentsRef.current.find((m) => m.id === id);
+    if (!cur || cur.seen === seen) return;
+    setMoments((ms) => ms.map((m) => (m.id === id ? { ...m, seen } : m)));
+    api.markSeen(id, seen).catch(() => {});
+  }, []);
+
   const undo = useCallback(async () => {
     if (cutId === null || projectId === undefined) return;
     try {
@@ -115,7 +125,7 @@ export function useBoard(projectId: number | undefined) {
   return {
     cutId, tree, moments, history, loading, error, toast, say,
     dismissToast: () => setToast(null),
-    undo, redo, act,
+    undo, redo, act, setSeen,
     actions: {
       addScene: (name: string, position?: number, eventId?: number | null) =>
         act(`Add scene "${name}"`, () => api.addScene(cutId!, name, position, eventId)),
@@ -126,7 +136,7 @@ export function useBoard(projectId: number | undefined) {
         act(label, () => api.addPanel(sceneId, input)),
       patchPanel: (id: number, patch: { intent?: string }, label: string) =>
         act(label, () => api.patchPanel(id, patch)),
-      patchMoment: (id: number, patch: { start_sec?: number; end_sec?: number; speed?: number }, label: string) =>
+      patchMoment: (id: number, patch: api.MomentPatch, label: string) =>
         act(label, () => api.patchMoment(id, cutId!, patch)),
       movePanel: (id: number, sceneId: number, position: number) => act('Move panel', () => api.movePanel(id, sceneId, position)),
       placeMoment: (panelId: number, momentId: number, label: string) => act(label, () => api.placeMoment(panelId, momentId)),

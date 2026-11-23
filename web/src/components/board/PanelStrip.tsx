@@ -7,6 +7,8 @@ import { panelMedia } from './media';
 interface Props {
   panels: BoardPanel[];
   selectedId: number | null;
+  /** A drawer is open: panels shrink to leave room. */
+  compact: boolean;
   momentsById: Map<number, BoardMoment>;
   onSelect: (id: number) => void;
   onAdd: () => void;
@@ -14,7 +16,7 @@ interface Props {
   onDropMoment: (momentId: number, panelId: number | null) => void;
 }
 
-export function PanelStrip({ panels, selectedId, momentsById, onSelect, onAdd, onDropMoment }: Props) {
+export function PanelStrip({ panels, selectedId, compact, momentsById, onSelect, onAdd, onDropMoment }: Props) {
   const [drop, setDrop] = useState<number | 'add' | null>(null);
   const selectedRef = useRef<HTMLDivElement>(null);
 
@@ -44,14 +46,14 @@ export function PanelStrip({ panels, selectedId, momentsById, onSelect, onAdd, o
         const { poster, src } = panelMedia(p, momentsById);
         const ring =
           p.state === 'gap' ? 'border-2 border-dashed border-bd-line2'
-          : p.source === 'user' ? 'border-[2.5px] border-solid border-bd-mine'
-          : 'border-2 border-dashed border-bd-ai';
-        const sel = p.id === selectedId || drop === p.id;
+          : p.source === 'user' ? 'border-[3px] border-solid border-bd-mine'
+          : 'border-[3px] border-dashed border-bd-ai';
+        const sel = p.id === selectedId;
         return (
           <div
             key={p.id}
             ref={p.id === selectedId ? selectedRef : undefined}
-            className="group w-[200px] flex-none cursor-pointer"
+            className={`group flex-none cursor-pointer ${compact ? 'w-[150px]' : 'w-[190px]'}`}
             onClick={() => onSelect(p.id)}
             onDragOver={over(p.id)}
             onDragLeave={leave(p.id)}
@@ -59,8 +61,8 @@ export function PanelStrip({ panels, selectedId, momentsById, onSelect, onAdd, o
           >
             <div
               className={`relative aspect-video overflow-hidden rounded-[9px] transition-transform ${
-                sel ? 'shadow-[0_0_0_3px_var(--color-bd-focus)]' : ''
-              } ${drop === p.id ? 'scale-[1.02]' : ''} ${p.state === 'gap' ? 'flex items-center justify-center bg-bd-s1 text-xs text-bd-dim' : 'bg-black'}`}
+                drop === p.id ? 'scale-[1.03] shadow-[0_0_0_3px_var(--color-bd-focus)]' : sel ? 'shadow-[0_0_0_3px_var(--color-bd-attn)]' : ''
+              } ${p.state === 'gap' ? 'flex items-center justify-center bg-bd-s1 text-xs text-bd-dim' : 'bg-black'}`}
             >
               {p.state === 'gap' ? (
                 <span>empty {'—'} drop a moment</span>
@@ -72,6 +74,15 @@ export function PanelStrip({ panels, selectedId, momentsById, onSelect, onAdd, o
               {p.state === 'candidates' && (
                 <span className="pointer-events-none absolute right-1.5 top-1.5 z-[4] rounded-[5px] bg-bd-attn px-1.5 text-[10.5px] font-bold text-[#1d1400]">
                   CHOOSE {'·'} {p.candidates.length}
+                </span>
+              )}
+              {p.state === 'filled' && (
+                <span
+                  className={`pointer-events-none absolute right-1.5 top-1.5 z-[4] rounded-[5px] px-1.5 text-[10.5px] font-bold ${
+                    p.source === 'user' ? 'bg-bd-mine text-[#00281a]' : 'bg-bd-ai text-[#1a0b3d]'
+                  }`}
+                >
+                  {p.source === 'user' ? '✓ YOURS' : 'AI'}
                 </span>
               )}
               {r && (

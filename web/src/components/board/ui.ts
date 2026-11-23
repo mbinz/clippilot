@@ -12,3 +12,6 @@ export const fieldInput = 'w-full bg-bd-s2 border border-bd-line text-bd-text ro
 
 /** Mockup's "first clause of the description" used as the intent of a panel created from a moment. */
 export const intentFrom = (description: string): string => description.split(/[,.]/)[0].trim();
+/** Primary button inside the amber panel drawer. */
+export const btnAttn = `${BASE} bg-bd-attn border-bd-attn text-[#1d1400] font-semibold`;
+export const kbd = 'text-[11px] text-bd-dim';

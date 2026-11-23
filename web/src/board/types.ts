@@ -119,3 +119,6 @@ export interface CutTree {
   scenes: BoardScene[];
   totals: { panels: number; filled: number; candidates: number; gaps: number; duration_sec: number };
 }
+
+/** A moment whose clip is known (every moment the server lists has one). */
+export type PM = BoardMoment & { clip: ClipInfo };

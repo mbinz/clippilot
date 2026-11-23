@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
-  panelRange, panelLength, sceneLength, cutLength, speedOk, toChoose, usageOf, groupMoments,
+  panelRange, panelLength, sceneLength, cutLength, speedOk, toChoose, usageOf,
   fmtClock, fmtSec, isOverTarget, firstSpeed,
 } from '../../../web/src/board/logic.js';
-import type { BoardMoment, BoardPanel, BoardScene } from '../../../web/src/board/types.js';
+import type { BoardPanel, BoardScene } from '../../../web/src/board/types.js';
 
 const cand = (id: number, clip_id: number, start_sec: number, end_sec: number, suggested_speed = 1, speed = 1) =>
   ({ id, clip_id, start_sec, end_sec, description: 'd', tier: 'solid', suggested_speed, speed, thumbnail: null, proxy_url: null, clip: null });
@@ -16,12 +16,6 @@ const filled = (id: number, start: number, end: number, speed = 1, source: 'ai' 
   panel({ id, state: 'filled', clip_id: 7, moment_id, start_sec: start, end_sec: end, speed, source });
 const scene = (id: number, panels: BoardPanel[]): BoardScene =>
   ({ id, position: id, name: `S${id}`, event_id: null, event: null, panels });
-
-const mo = (id: number, o: Partial<BoardMoment> = {}): BoardMoment => ({
-  id, clip_id: id, event_id: 1, start_sec: 0, end_sec: 4, tier: 'solid', shot: null, role: 'action', issues: [],
-  slowmo: 'none', suggested_speed: 1, audio_keep: false, audio_type: 'none', status: 'proposed', description: '',
-  thumbnail: null, clip: { id, file_name: `C${id}.MP4`, duration_sec: 30, fps: 25, proxy_url: null, hidden: false }, ...o,
-});
 
 describe('panel timeline length', () => {
   it('filled panel: range divided by speed', () => {
@@ -93,34 +87,6 @@ describe('usage', () => {
   it('maps filled moments to mine (user) or ai', () => {
     const scenes = [scene(1, [filled(1, 0, 1, 1, 'user', 11), filled(2, 0, 1, 1, 'ai', 12), panel({ id: 3 })])];
     expect(usageOf(scenes)).toEqual({ 11: 'mine', 12: 'ai' });
-  });
-});
-
-describe('moment pool grouping', () => {
-  const moments = [
-    mo(1, { role: 'action', tier: 'filler' }),
-    mo(2, { role: 'action', tier: 'hero' }),
-    mo(3, { role: 'establishing', tier: 'solid', event_id: 2 }),
-    mo(4, { role: 'action', tier: 'solid', status: 'rejected' }),
-    mo(5, { role: 'detail', tier: 'solid', clip: { id: 5, file_name: 'C5', duration_sec: 9, fps: 25, proxy_url: null, hidden: true } }),
-    mo(6, { role: 'action', tier: 'solid' }),
-  ];
-  it('orders roles, sorts hero first, splits filler, separates rejected/hidden', () => {
-    const g = groupMoments(moments, { scope: 'all', eventId: 1 });
-    expect(g.roles.map((r) => r.role)).toEqual(['establishing', 'action']);
-    const action = g.roles.find((r) => r.role === 'action')!;
-    expect(action.main.map((m) => m.id)).toEqual([2, 6]);
-    expect(action.filler.map((m) => m.id)).toEqual([1]);
-    expect(action.total).toBe(3);
-    expect(g.hidden.map((m) => m.id)).toEqual([4, 5]);
-  });
-  it('scope "event" keeps only the scene event', () => {
-    const g = groupMoments(moments, { scope: 'event', eventId: 1 });
-    expect(g.roles.map((r) => r.role)).toEqual(['action']);
-    expect(groupMoments(moments, { scope: 'event', eventId: 2 }).roles.map((r) => r.role)).toEqual(['establishing']);
-  });
-  it('scene without event shows everything', () => {
-    expect(groupMoments(moments, { scope: 'event', eventId: null }).roles.length).toBe(2);
   });
 });
 

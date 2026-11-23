@@ -27,12 +27,12 @@ export function BoardToolbar(p: Props) {
     ? `Brief · ${fmtClock(p.brief.target_sec)} · ${p.brief.audience} · ${p.brief.mood}`
     : 'Brief · not set';
   return (
-    <div className="flex flex-none items-center gap-3 border-b border-bd-line px-4 py-2.5">
+    <div className="flex flex-none items-center gap-3 border-b border-bd-line px-4 py-2.5 max-[900px]:flex-wrap max-[900px]:gap-2">
       <span className="whitespace-nowrap text-bd-muted">{p.projectName} {'›'} {p.cutName}</span>
       <button
         onClick={p.onBrief}
         disabled={!p.onBrief}
-        className="flex max-w-[460px] items-center gap-2 rounded-full border border-bd-line bg-transparent py-1 pl-2 pr-3 hover:border-bd-line2 disabled:cursor-default"
+        className="flex max-w-[460px] items-center gap-2 rounded-full max-[900px]:order-9 max-[900px]:max-w-full max-[900px]:basis-full border border-bd-line bg-transparent py-1 pl-2 pr-3 hover:border-bd-line2 disabled:cursor-default"
       >
         <i className={`h-2 w-2 flex-none rounded-full ${dot}`} />
         <span className="truncate text-bd-muted">{briefText}</span>
