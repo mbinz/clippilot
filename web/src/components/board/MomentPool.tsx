@@ -20,7 +20,7 @@ export const GRID = 'grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-2'
 export function MomentPool({ moments, eventId, usage, currentSceneIndex, selectedId, onSelect, onSeen }: Props) {
   const [scope, setScope] = useState<'event' | 'all'>('event');
   const [showOut, setShowOut] = useState(false);
-  const view = poolView(moments, scope, eventId);
+  const view = poolView(moments, scope, eventId, new Set(Object.keys(usage).map(Number)));
   const nHeroes = view.heroes.reduce((n, g) => n + g.length, 0);
   const nRest = view.rest.reduce((n, g) => n + g.length, 0);
 
@@ -54,8 +54,7 @@ export function MomentPool({ moments, eventId, usage, currentSceneIndex, selecte
         </div>
         <div className="flex-1" />
         <div className="flex flex-wrap gap-3.5 text-[11px] text-bd-dim">
-          <span><i className="mr-[5px] inline-block h-[11px] w-[18px] rounded-[3px] border-[3px] border-solid border-bd-mine align-[-1px]" />yours</span>
-          <span><i className="mr-[5px] inline-block h-[11px] w-[18px] rounded-[3px] border-[3px] border-dashed border-bd-ai align-[-1px]" />AI{'’'}s pick</span>
+          <span>unused only {'·'} {view.inStory} in the story</span>
           <span><i className="mr-[5px] inline-block h-[11px] w-[18px] rounded-[3px] bg-[#555] align-[-1px]" />seen</span>
         </div>
       </div>

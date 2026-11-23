@@ -159,6 +159,13 @@ describe('poolView', () => {
   it('no event on the scene -> everything', () => {
     expect(poolView(ms, 'event', null).rest.flat()).toHaveLength(2);
   });
+  it('moments used in the cut leave the pool (heroes and rest); counted as inStory', () => {
+    const v = poolView(ms, 'all', 1, new Set([2, 3]));
+    expect(v.heroes.flat()).toHaveLength(0);
+    expect(v.rest.flat().map((m) => m.id)).toEqual([1]);
+    expect(v.out.map((m) => m.id)).toEqual([4]);
+    expect(v.inStory).toBe(2);
+  });
 });
 
 describe('isValidTrim', () => {

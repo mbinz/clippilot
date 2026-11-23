@@ -147,7 +147,11 @@ export function poolView<T extends PoolMoment>(
   moments: T[],
   scope: 'event' | 'all',
   eventId: number | null,
-): { heroes: T[][]; rest: T[][]; out: T[] } {
+  inCut: ReadonlySet<number> = new Set(),
+): { heroes: T[][]; rest: T[][]; out: T[]; inStory: number } {
   const scoped = moments.filter((m) => scope === 'all' || eventId === null || m.clip.event_id === eventId);
-  return poolOrder(scoped) as { heroes: T[][]; rest: T[][]; out: T[] };
+  // The pool lists what is still unused: moments in any panel of the cut leave it (the drawers still show them).
+  const unused = scoped.filter((m) => !inCut.has(m.id));
+  const order = poolOrder(unused) as { heroes: T[][]; rest: T[][]; out: T[] };
+  return { ...order, inStory: scoped.length - unused.length };
 }
