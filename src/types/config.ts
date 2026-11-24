@@ -12,6 +12,9 @@ export interface AppConfig {
   whisper_model: string;
   /** Silero VAD model (ggml) for whisper; when the file is missing transcription runs without VAD. */
   whisper_vad_model: string;
+  /** VAD speech threshold (whisper -vt) and padding in ms (-vp); low values keep speech in wind. */
+  whisper_vad_threshold: number;
+  whisper_vad_pad_ms: number;
   /** ISO codes of the languages spoken in the footage; clips detected as another language get an empty transcript. */
   languages: string[];
   /** IANA time zone of the footage (event names / time groups); unset = system zone. */

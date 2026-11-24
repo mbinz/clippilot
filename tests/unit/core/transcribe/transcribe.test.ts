@@ -126,11 +126,51 @@ describe('transcribeClips', () => {
       expect(transcripts.get(c.id)!.segments).toEqual([]);
     });
 
+    describe('language fallback', () => {
+      // A fake whisper that answers per forced language (undefined = auto-detect).
+      const fake = (byLang: Record<string, [string, number, string?]>): { runner: WhisperRunner; langs: (string | undefined)[] } => {
+        const langs: (string | undefined)[] = [];
+        return { langs, runner: async (_c, _m, o) => {
+          langs.push(o?.language);
+          const [text, p, detected] = byLang[o?.language ?? 'auto'];
+          return { result: { language: detected ?? o?.language ?? 'auto' }, transcription: [{ offsets: { from: 0, to: 3000 }, text: ` ${text}`,
+            tokens: [{ text: ` ${text}`, offsets: { from: 0, to: 3000 }, p }] }] };
+        } };
+      };
+
+      it('re-runs once per allowed language and keeps the best mean token p', async () => {
+        const c = clips.insert(clipInput(1));
+        const f = fake({ auto: ['Altyazı M.K. ve Türkçe sesler', 0.9, 'tr'], de: ['Das ist eine richtige Leuchtung hier', 0.8], en: ['The light is nice and clear today', 0.5], pt: ['Eu também não apanhei bem isso', 0.6] });
+        const r = await transcribeClips([c], deps(), { model: 'm', runner: f.runner, languages: ['de', 'en', 'pt'] });
+        expect(f.langs).toEqual([undefined, 'de', 'en', 'pt']);
+        expect(r).toMatchObject({ transcribed: 1, language_fallback: 1, dropped_language: 0 });
+        expect(transcripts.get(c.id)).toMatchObject({ language: 'de', text: 'Das ist eine richtige Leuchtung hier' });
+      });
+
+      it('candidates that are empty after filtering do not win; if all are empty the empty transcript is stored', async () => {
+        const c = clips.insert(clipInput(1));
+        const f = fake({ auto: ['ありがとう', 0.9, 'ja'], de: ['*Wind*', 0.9], en: ['Thank you.', 0.9] });
+        const r = await transcribeClips([c], deps(), { model: 'm', runner: f.runner, languages: ['de', 'en'] });
+        expect(r).toMatchObject({ transcribed: 0, language_fallback: 0, dropped_language: 1 });
+        expect(transcripts.get(c.id)).toMatchObject({ text: '', segments: [] });
+      });
+
+      it('no fallback when the detected language is allowed', async () => {
+        const c = clips.insert(clipInput(1));
+        const f = fake({ auto: ['Hallo zusammen, schön hier', 0.9, 'de'] });
+        const r = await transcribeClips([c], deps(), { model: 'm', runner: f.runner, languages: ['de', 'en'] });
+        expect(f.langs).toEqual([undefined]);
+        expect(r.language_fallback).toBe(0);
+      });
+    });
+
     it('passes the VAD model to the runner', async () => {
       const c = clips.insert(clipInput(1));
       let seen: string | undefined;
-      await transcribeClips([c], deps(), { model: 'm', vadModel: '/v/silero.bin', runner: async (_c, _m, o) => { seen = o?.vadModel; return dolphins; } });
+      let opts: any;
+      await transcribeClips([c], deps(), { model: 'm', vadModel: '/v/silero.bin', vadThreshold: 0.15, vadPadMs: 200, runner: async (_c, _m, o) => { seen = o?.vadModel; opts = o; return dolphins; } });
       expect(seen).toBe('/v/silero.bin');
+      expect(opts).toMatchObject({ vadThreshold: 0.15, vadPadMs: 200 });
     });
   });
 
@@ -230,6 +270,8 @@ describe('requireWhisperModel', () => {
   it('config defaults: VAD model path and allowed languages', () => {
     expect(DEFAULT_CONFIG.whisper_vad_model.endsWith(path.join('.clippilot', 'models', 'ggml-silero-v5.1.2.bin'))).toBe(true);
     expect(DEFAULT_CONFIG.languages).toEqual(['de', 'en']);
+    expect(DEFAULT_CONFIG.whisper_vad_threshold).toBe(0.15);
+    expect(DEFAULT_CONFIG.whisper_vad_pad_ms).toBe(200);
   });
 
   it('resolveVadModel returns the path only when the file exists', () => {

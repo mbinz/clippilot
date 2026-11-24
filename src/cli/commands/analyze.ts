@@ -91,7 +91,7 @@ export function registerAnalyzeCommand(parent: Command): void {
             const vadModel = resolveVadModel(config);
             if (!vadModel) console.error(chalk.yellow(vadMissingWarning(config)));
             const t = await transcribeClips(fresh, { transcripts: transcriptRepo, highlights: highlightRepo },
-              { model: expandHome(config.whisper_model), vadModel, languages: config.languages });
+              { model: expandHome(config.whisper_model), vadModel, vadThreshold: config.whisper_vad_threshold, vadPadMs: config.whisper_vad_pad_ms, languages: config.languages });
             console.log(`  Transcribed: ${t.transcribed}, errors: ${t.errors.length}, moments snapped to sentences: ${t.snapped}`);
           } else {
             console.log(chalk.yellow(`Hint: no whisper model at ${expandHome(config.whisper_model)}; run "clippilot transcribe" after downloading one (config key whisper_model).`));

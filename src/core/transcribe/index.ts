@@ -25,6 +25,8 @@ export interface TranscribeOptions {
   runner?: WhisperRunner;
   /** Silero VAD model path (must exist); see `resolveVadModel`. */
   vadModel?: string;
+  vadThreshold?: number;
+  vadPadMs?: number;
   /** Allowed ISO language codes; a clip detected as another language gets an empty transcript. Unset = all. */
   languages?: string[];
   onProgress?: (done: number, total: number, fileName: string) => void;
@@ -36,6 +38,8 @@ export interface TranscribeResult {
   skipped_no_audio: number;
   /** Clips whose detected language is not allowed (stored with an empty transcript). */
   dropped_language: number;
+  /** Clips whose detected language was not allowed but one of the allowed languages gave speech. */
+  language_fallback: number;
   /** Hallucinated segments dropped, by reason. */
   dropped_segments: Partial<Record<DropReason, number>>;
   /** Unprotected moments widened toward whole sentences (includes the clamped ones). */
@@ -94,7 +98,7 @@ export async function transcribeClips(
 ): Promise<TranscribeResult> {
   const runner = opts.runner ?? whisperCliRunner;
   const modelName = path.basename(opts.model);
-  const result: TranscribeResult = { transcribed: 0, skipped_existing: 0, skipped_no_audio: 0, dropped_language: 0, dropped_segments: {}, snapped: 0, snap_clamped: 0, snap_skipped_overlap: 0, errors: [] };
+  const result: TranscribeResult = { transcribed: 0, skipped_existing: 0, skipped_no_audio: 0, dropped_language: 0, language_fallback: 0, dropped_segments: {}, snapped: 0, snap_clamped: 0, snap_skipped_overlap: 0, errors: [] };
 
   let done = 0;
   for (const clip of clips) {
@@ -103,12 +107,27 @@ export async function transcribeClips(
     else if (!opts.force && deps.transcripts.has(clip.id)) result.skipped_existing++;
     else {
       try {
-        const parsed = parseWhisperJson(await runner(clip, opts.model, { vadModel: opts.vadModel }));
+        const ropts = { vadModel: opts.vadModel, vadThreshold: opts.vadThreshold, vadPadMs: opts.vadPadMs };
+        const parsed = parseWhisperJson(await runner(clip, opts.model, ropts));
         if (opts.languages && !opts.languages.some((l) => l.toLowerCase() === parsed.language.toLowerCase())) {
-          // Wrong language = hallucination on ambient sound. Stored empty so the clip is not retried.
-          deps.transcripts.save(clip.id, modelName, { language: parsed.language, segments: [], words: [] });
-          result.dropped_language++;
-        } else await storeAndSnap(clip, parsed);
+          // Detected a language the footage does not use (usually ambient sound). Try each allowed language and keep the best.
+          let best: { t: ReturnType<typeof filterHallucinationsWithStats>; p: number } | null = null;
+          for (const code of opts.languages) {
+            const t = filterHallucinationsWithStats(parseWhisperJson(await runner(clip, opts.model, { ...ropts, language: code })));
+            if (t.transcript.segments.length === 0) continue;
+            const ps = t.transcript.segments.map((x) => x.p ?? 0);
+            const p = ps.reduce((a, b) => a + b, 0) / ps.length;
+            if (!best || p > best.p) best = { t, p };
+          }
+          if (best) {
+            result.language_fallback++;
+            await storeAndSnap(clip, best.t);
+          } else {
+            // Stored empty so the clip is not retried.
+            deps.transcripts.save(clip.id, modelName, { language: parsed.language, segments: [], words: [] });
+            result.dropped_language++;
+          }
+        } else await storeAndSnap(clip, filterHallucinationsWithStats(parsed));
       } catch (err) {
         result.errors.push({ clip_id: clip.id, message: err instanceof Error ? err.message : String(err) });
       }
@@ -117,8 +136,8 @@ export async function transcribeClips(
   }
   return result;
 
-  async function storeAndSnap(clip: Clip, parsed: ReturnType<typeof parseWhisperJson>): Promise<void> {
-    const { transcript, dropped } = filterHallucinationsWithStats(parsed);
+  async function storeAndSnap(clip: Clip, filtered: ReturnType<typeof filterHallucinationsWithStats>): Promise<void> {
+    const { transcript, dropped } = filtered;
     for (const [reason, n] of Object.entries(dropped) as [DropReason, number][]) {
       result.dropped_segments[reason] = (result.dropped_segments[reason] ?? 0) + n;
     }

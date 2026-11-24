@@ -13,6 +13,11 @@ const execFileAsync = promisify(execFile);
 export interface RunnerOptions {
   /** Silero VAD model; speech detection runs before decoding when set. */
   vadModel?: string;
+  /** VAD speech probability threshold (-vt) and speech padding (-vp), used with `vadModel`. */
+  vadThreshold?: number;
+  vadPadMs?: number;
+  /** Force this language (ISO code) instead of auto-detection. */
+  language?: string;
 }
 
 export type WhisperRunner = (clip: Clip, model: string, opts?: RunnerOptions) => Promise<unknown>;
@@ -26,9 +31,13 @@ export function audioArgs(input: string, output: string): string[] {
  * whisper-cli arguments: language auto-detect, full JSON (segments + token timestamps) next to `outBase`.
  * `-sns` suppresses non-speech tokens, `-mc 0` drops the text context (fewer decoder loops); `--vad -vm` when a VAD model is given.
  */
-export function whisperArgs(model: string, wav: string, outBase: string, vadModel?: string): string[] {
-  return ['-m', model, '-f', wav, '-l', 'auto', '-ojf', '-of', outBase, '-np', '-sns', '-mc', '0',
-    ...(vadModel ? ['--vad', '-vm', vadModel] : [])];
+export function whisperArgs(model: string, wav: string, outBase: string, opts: RunnerOptions = {}): string[] {
+  return ['-m', model, '-f', wav, '-l', opts.language ?? 'auto', '-ojf', '-of', outBase, '-np', '-sns', '-mc', '0',
+    ...(opts.vadModel ? [
+      '--vad', '-vm', opts.vadModel,
+      ...(opts.vadThreshold !== undefined ? ['-vt', String(opts.vadThreshold)] : []),
+      ...(opts.vadPadMs !== undefined ? ['-vp', String(opts.vadPadMs)] : []),
+    ] : [])];
 }
 
 /** The original when it exists, else the proxy. */
@@ -51,7 +60,7 @@ export const whisperCliRunner: WhisperRunner = async (clip, model, opts) => {
     }
     const outBase = path.join(dir, 'out');
     try {
-      await execFileAsync('whisper-cli', whisperArgs(model, wav, outBase, opts?.vadModel), { timeout: 3600000, maxBuffer: 64 * 1024 * 1024 });
+      await execFileAsync('whisper-cli', whisperArgs(model, wav, outBase, opts), { timeout: 3600000, maxBuffer: 64 * 1024 * 1024 });
     } catch (err: any) {
       if (err.code === 'ENOENT') throw new Error('whisper-cli not found. Install whisper.cpp (brew install whisper-cpp).');
       throw new Error(`whisper-cli failed for ${path.basename(source)}: ${String(err.stderr ?? err.message).split('\n').slice(-3).join(' ').trim()}`);

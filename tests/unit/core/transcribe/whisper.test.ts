@@ -117,8 +117,14 @@ describe('T1b hallucination rules (real Arrifana junk)', () => {
     expect(reason('no no no no')).toBe('repetition');
   });
 
+  it('drops a segment where one n-gram repeated twice or more covers >= 80 % of the words', () => {
+    expect(reason('THE END OF THE END OF THE')).toBe('repetition');
+    expect(reason('Schau mal schau mal Delfine!')).toBe('repetition'); // 4 of 5 words
+    expect(reason('Wir fahren raus, wir fahren raus und sehen dann weiter was kommt')).toBeNull(); // 6 of 12 words
+  });
+
   it('keeps text with a phrase repeated only twice', () => {
-    expect(reason('Schau mal schau mal, Delfine!')).toBeNull();
+    expect(reason('Schau mal schau mal, da sind zwei Delfine!')).toBeNull();
   });
 
   it('drops very short segments (<= 2 words) with mean token p below 0.6', () => {
@@ -152,8 +158,22 @@ describe('whisperArgs', () => {
   });
 
   it('adds --vad -vm <path> when a VAD model is given', () => {
-    const a = whisperArgs('m.bin', 'a.wav', '/o', '/v/silero.bin');
+    const a = whisperArgs('m.bin', 'a.wav', '/o', { vadModel: '/v/silero.bin' });
     expect(a).toEqual(expect.arrayContaining(['--vad', '-vm', '/v/silero.bin']));
     expect(a[a.indexOf('-vm') + 1]).toBe('/v/silero.bin');
+  });
+
+  it('passes the VAD threshold and padding (-vt, -vp) only with VAD', () => {
+    const a = whisperArgs('m.bin', 'a.wav', '/o', { vadModel: '/v/s.bin', vadThreshold: 0.15, vadPadMs: 200 });
+    expect(a[a.indexOf('-vt') + 1]).toBe('0.15');
+    expect(a[a.indexOf('-vp') + 1]).toBe('200');
+    const b = whisperArgs('m.bin', 'a.wav', '/o', { vadThreshold: 0.15, vadPadMs: 200 });
+    expect(b).not.toContain('-vt');
+    expect(b).not.toContain('-vp');
+  });
+
+  it('a forced language replaces auto-detection', () => {
+    const a = whisperArgs('m.bin', 'a.wav', '/o', { language: 'pt' });
+    expect(a[a.indexOf('-l') + 1]).toBe('pt');
   });
 });

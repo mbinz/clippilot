@@ -43,13 +43,14 @@ export function registerTranscribeCommand(parent: Command): void {
         const result = await transcribeClips(
           clips,
           { transcripts: new TranscriptRepository(db), highlights: new HighlightRepository(db) },
-          { model, vadModel, languages: config.languages, force: options.force, onProgress: (done, total, name) => log(`[${done}/${total}] ${name}`) },
+          { model, vadModel, vadThreshold: config.whisper_vad_threshold, vadPadMs: config.whisper_vad_pad_ms, languages: config.languages, force: options.force, onProgress: (done, total, name) => log(`[${done}/${total}] ${name}`) },
         );
         if (options.json) {
           console.log(JSON.stringify({ project: project.name, model, ...result }, null, 2));
         } else {
           console.log(`Transcribed ${result.transcribed}, skipped ${result.skipped_existing} (already done) + ${result.skipped_no_audio} (no audio), `
             + `${result.errors.length} failed; ${result.snapped} moments snapped to sentences.`);
+          if (result.language_fallback > 0) console.log(`  ${result.language_fallback} clips transcribed via language fallback.`);
           if (result.dropped_language > 0) console.log(`  ${result.dropped_language} clips dropped (language not in ${config.languages.join(', ')}).`);
           const dropped = Object.entries(result.dropped_segments);
           if (dropped.length) console.log(`  Dropped segments: ${dropped.map(([r, n]) => `${r} ${n}`).join(', ')}.`);
