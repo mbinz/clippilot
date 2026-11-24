@@ -18,6 +18,7 @@ import { migration015 } from '../../../src/db/migrations/015_events.js';
 import { migration016 } from '../../../src/db/migrations/016_storyboard.js';
 import { migration017 } from '../../../src/db/migrations/017_operations.js';
 import { migration018 } from '../../../src/db/migrations/018_moment_edit.js';
+import { migration019 } from '../../../src/db/migrations/019_transcripts.js';
 import { runMigrations } from '../../../src/db/migrations/runner.js';
 import { StoryboardService } from '../../../src/core/storyboard/service.js';
 import { cutToSegments } from '../../../src/core/storyboard/export.js';
@@ -129,6 +130,7 @@ describe('migration 018 - the moment is the edit', () => {
     const before = db.prepare("SELECT clip_id, start_sec, end_sec, speed FROM story_segments WHERE state = 'filled' ORDER BY scene_id, position").all();
     const secs = (before as { start_sec: number; end_sec: number; speed: number }[]).reduce((s, p) => s + (p.end_sec - p.start_sec) / p.speed, 0);
     migration018(db);
+    migration019(db); // getCut reads transcripts
     const tree = new StoryboardService(db).getCut(1)!;
     expect(tree.totals).toMatchObject({ panels: 4, filled: 2, candidates: 1, gaps: 1, duration_sec: secs });
     const segs = cutToSegments(db, 1).segments.slice(0, 2).map((s) => ({ clip_id: s.clip_id, start_sec: s.start_sec, end_sec: s.end_sec, speed: s.speed }));

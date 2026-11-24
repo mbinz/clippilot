@@ -25,7 +25,7 @@ export function whisperArgs(model: string, wav: string, outBase: string): string
 /** The original when it exists, else the proxy. */
 export function audioSource(clip: Pick<Clip, 'file_path' | 'proxy_path'>): string {
   if (existsSync(clip.file_path)) return clip.file_path;
-  if (clip.proxy_path && existsSync(clip.proxy_path)) return clip.proxy_path;
+  if (clip.proxy_path && existsSync(path.resolve(clip.proxy_path))) return path.resolve(clip.proxy_path);
   throw new Error(`Neither the original nor the proxy of ${path.basename(clip.file_path)} is available`);
 }
 

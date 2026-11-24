@@ -19,6 +19,7 @@ import { registerEventsCommand } from './commands/events.js';
 import { registerCutCommands } from './commands/cut.js';
 import { registerBoardCommand } from './commands/board.js';
 import { registerProxiesCommand } from './commands/proxies.js';
+import { registerTranscribeCommand } from './commands/transcribe.js';
 import { setLogLevel } from '../utils/logger.js';
 
 export function createProgram(): Command {
@@ -55,6 +56,7 @@ export function createProgram(): Command {
   registerEventsCommand(program);
   registerCutCommands(program);
   registerProxiesCommand(program);
+  registerTranscribeCommand(program);
   registerBoardCommand(program);
 
   return program;

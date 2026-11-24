@@ -374,7 +374,7 @@ export function registerCutCommands(parent: Command): void {
       });
       if (o.json) return print(rows);
       for (const r of rows) {
-        console.log(`${String(r.id).padStart(4)}  clip ${r.clip_id}  ${r.start_sec}-${r.end_sec}  ${r.tier}  ${r.status}  ${r.description}`);
+        console.log(`${String(r.id).padStart(4)}  clip ${r.clip_id}  ${r.start_sec}-${r.end_sec}  ${r.tier}  ${r.status}  ${r.description}${r.speech ? `  "${r.speech}"${r.speech_cut ? ` [cuts ${r.speech_cut}]` : ''}` : ''}`);
       }
     }));
 

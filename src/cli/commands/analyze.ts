@@ -9,6 +9,8 @@ import { resolveDbPath } from '../../utils/fs.js';
 import { loadConfig } from '../../core/config/manager.js';
 import { recomputeDupGroups } from '../../core/similarity/dup-groups.js';
 import { ThumbnailRepository } from '../../db/repositories/thumbnail.repository.js';
+import { TranscriptRepository } from '../../db/repositories/transcript.repository.js';
+import { transcribeClips, whisperModelAvailable, expandHome } from '../../core/transcribe/index.js';
 import { analyzeClips } from '../../core/analyze/index.js';
 import { parseClipIds } from '../../core/calibration/sampling.js';
 import { createProgressBar } from '../formatters/progress.js';
@@ -42,6 +44,7 @@ export function registerAnalyzeCommand(parent: Command): void {
       runMigrations(db);
       const clipRepo = new ClipRepository(db);
       const highlightRepo = new HighlightRepository(db);
+      const transcriptRepo = new TranscriptRepository(db);
 
       if (options.force) {
         clipRepo.resetAnalysis(undefined, clipIds);
@@ -67,7 +70,7 @@ export function registerAnalyzeCommand(parent: Command): void {
       try {
         const result = await analyzeClips(pending, config, clipRepo, (current, filename) => {
           bar.update(current, { filename });
-        }, highlightRepo);
+        }, highlightRepo, undefined, transcriptRepo);
 
         const projectIds = new Set(pending.map((c) => c.project_id).filter((id): id is number => id !== null));
         for (const projectId of projectIds) {
@@ -79,6 +82,19 @@ export function registerAnalyzeCommand(parent: Command): void {
         console.log(chalk.green('Analysis complete'));
         console.log(`  Analyzed: ${result.success}`);
         console.log(`  Errors: ${result.errors}`);
+
+        // Spoken words: transcribe what has no transcript yet (needs the whisper model), else say how to enable it.
+        const fresh = clipRepo.findByIds(pending.map((c) => c.id)).filter((c) => !transcriptRepo.has(c.id) && c.has_audio);
+        if (fresh.length > 0) {
+          if (whisperModelAvailable(config)) {
+            console.log(`Transcribing ${fresh.length} clips...`);
+            const t = await transcribeClips(fresh, { transcripts: transcriptRepo, highlights: highlightRepo },
+              { model: expandHome(config.whisper_model) });
+            console.log(`  Transcribed: ${t.transcribed}, errors: ${t.errors.length}, moments snapped to sentences: ${t.snapped}`);
+          } else {
+            console.log(chalk.yellow(`Hint: no whisper model at ${expandHome(config.whisper_model)}; run "clippilot transcribe" after downloading one (config key whisper_model).`));
+          }
+        }
       } catch (err) {
         bar.stop();
         throw err;
