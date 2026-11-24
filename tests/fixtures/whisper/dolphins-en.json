@@ -1,0 +1,296 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | MTL : EMBED_LIBRARY = 1 | CPU : NEON = 1 | ARM_FMA = 1 | FP16_VA = 1 | MATMUL_INT8 = 1 | DOTPROD = 1 | SME = 1 | ACCELERATE = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "medium",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 1024,
+			"head": 16,
+			"layer": 24
+		},
+		"text": {
+			"ctx": 448,
+			"state": 1024,
+			"head": 16,
+			"layer": 24
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/models/ggml-medium.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:01,400"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 1400
+			},
+			"text": " Look at the dolphins.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.995174,
+					"t_dtw": -1
+				},
+				{
+					"text": " Look",
+					"timestamps": {
+						"from": "00:00:00,010",
+						"to": "00:00:00,280"
+					},
+					"offsets": {
+						"from": 10,
+						"to": 280
+					},
+					"id": 6803,
+					"p": 0.897503,
+					"t_dtw": -1
+				},
+				{
+					"text": " at",
+					"timestamps": {
+						"from": "00:00:00,280",
+						"to": "00:00:00,420"
+					},
+					"offsets": {
+						"from": 280,
+						"to": 420
+					},
+					"id": 379,
+					"p": 0.999249,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:00,420",
+						"to": "00:00:00,630"
+					},
+					"offsets": {
+						"from": 420,
+						"to": 630
+					},
+					"id": 262,
+					"p": 0.998601,
+					"t_dtw": -1
+				},
+				{
+					"text": " dolphins",
+					"timestamps": {
+						"from": "00:00:00,630",
+						"to": "00:00:00,990"
+					},
+					"offsets": {
+						"from": 630,
+						"to": 990
+					},
+					"id": 36798,
+					"p": 0.953695,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:01,360",
+						"to": "00:00:01,400"
+					},
+					"offsets": {
+						"from": 1360,
+						"to": 1400
+					},
+					"id": 13,
+					"p": 0.555476,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_70]",
+					"timestamps": {
+						"from": "00:00:01,400",
+						"to": "00:00:01,400"
+					},
+					"offsets": {
+						"from": 1400,
+						"to": 1400
+					},
+					"id": 50433,
+					"p": 0.159204,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:01,400",
+				"to": "00:00:03,200"
+			},
+			"offsets": {
+				"from": 1400,
+				"to": 3200
+			},
+			"text": " They are swimming right next to the boat.",
+			"tokens": [
+				{
+					"text": " They",
+					"timestamps": {
+						"from": "00:00:01,410",
+						"to": "00:00:01,540"
+					},
+					"offsets": {
+						"from": 1410,
+						"to": 1540
+					},
+					"id": 1119,
+					"p": 0.996253,
+					"t_dtw": -1
+				},
+				{
+					"text": " are",
+					"timestamps": {
+						"from": "00:00:01,610",
+						"to": "00:00:01,770"
+					},
+					"offsets": {
+						"from": 1610,
+						"to": 1770
+					},
+					"id": 389,
+					"p": 0.999207,
+					"t_dtw": -1
+				},
+				{
+					"text": " swimming",
+					"timestamps": {
+						"from": "00:00:01,770",
+						"to": "00:00:02,110"
+					},
+					"offsets": {
+						"from": 1770,
+						"to": 2110
+					},
+					"id": 14899,
+					"p": 0.998906,
+					"t_dtw": -1
+				},
+				{
+					"text": " right",
+					"timestamps": {
+						"from": "00:00:02,200",
+						"to": "00:00:02,400"
+					},
+					"offsets": {
+						"from": 2200,
+						"to": 2400
+					},
+					"id": 826,
+					"p": 0.997337,
+					"t_dtw": -1
+				},
+				{
+					"text": " next",
+					"timestamps": {
+						"from": "00:00:02,460",
+						"to": "00:00:02,480"
+					},
+					"offsets": {
+						"from": 2460,
+						"to": 2480
+					},
+					"id": 1306,
+					"p": 0.999064,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:02,760",
+						"to": "00:00:02,780"
+					},
+					"offsets": {
+						"from": 2760,
+						"to": 2780
+					},
+					"id": 284,
+					"p": 0.999119,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:02,780",
+						"to": "00:00:02,940"
+					},
+					"offsets": {
+						"from": 2780,
+						"to": 2940
+					},
+					"id": 262,
+					"p": 0.998308,
+					"t_dtw": -1
+				},
+				{
+					"text": " boat",
+					"timestamps": {
+						"from": "00:00:02,940",
+						"to": "00:00:03,200"
+					},
+					"offsets": {
+						"from": 2940,
+						"to": 3200
+					},
+					"id": 8848,
+					"p": 0.998776,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:03,200",
+						"to": "00:00:03,200"
+					},
+					"offsets": {
+						"from": 3200,
+						"to": 3200
+					},
+					"id": 13,
+					"p": 0.895121,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_160]",
+					"timestamps": {
+						"from": "00:00:03,200",
+						"to": "00:00:03,200"
+					},
+					"offsets": {
+						"from": 3200,
+						"to": 3200
+					},
+					"id": 50523,
+					"p": 0.236198,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}
