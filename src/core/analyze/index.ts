@@ -6,6 +6,8 @@ import type { ClipRepository } from '../../db/repositories/clip.repository.js';
 import { GeminiClient } from './gemini-client.js';
 import type { HighlightRepository } from '../../db/repositories/highlight.repository.js';
 import { normalizeHighlights } from './highlights.js';
+import { transcriptSentences } from '../transcribe/speech.js';
+import type { TranscriptSegment, TranscriptWord } from '../transcribe/whisper.js';
 import type { TranscriptRepository } from '../../db/repositories/transcript.repository.js';
 import type { ClipAnalysisResponse } from './schema.js';
 
@@ -54,7 +56,7 @@ export async function analyzeClips(
         clipRepo.updateAnalysis(clip.id, analysisToDbFields(analysis));
         highlightRepo?.replaceForClip(
           clip.id,
-          normalizeHighlights(analysis.highlights, clip.duration_sec, clip.fps, transcriptRepo?.get(clip.id)?.segments ?? []),
+          normalizeHighlights(analysis.highlights, clip.duration_sec, clip.fps, speechOf(transcriptRepo?.get(clip.id))),
         );
         success++;
       } catch (err) {
@@ -71,4 +73,8 @@ export async function analyzeClips(
   await Promise.all(tasks);
 
   return { success, errors };
+}
+
+function speechOf(t?: { segments: TranscriptSegment[]; words: TranscriptWord[] } | null) {
+  return t ? transcriptSentences(t.segments, t.words) : [];
 }

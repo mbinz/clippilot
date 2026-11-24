@@ -47,6 +47,14 @@ describe('Cut API routes', () => {
     expect(await ok('GET', `/clips/${clipA}/transcript`)).toEqual({
       language: 'de', segments: [{ start: 1, end: 2.5, text: 'Schau mal, ein Delfin.' }],
     });
+    // with words: one coarse segment becomes sentences
+    repo.save(clipA, 'm', {
+      language: 'de', segments: [{ start: 0, end: 44.6, text: 'Auf. Oh cool.' }],
+      words: [{ start: 0, end: 0.3, text: 'Auf.', p: 1 }, { start: 0.5, end: 0.8, text: 'Oh', p: 1 }, { start: 0.9, end: 1.4, text: 'cool.', p: 1 }],
+    });
+    expect(await ok('GET', `/clips/${clipA}/transcript`)).toEqual({
+      language: 'de', segments: [{ start: 0, end: 0.3, text: 'Auf.' }, { start: 0.5, end: 1.4, text: 'Oh cool.' }],
+    });
     repo.save(clipB, 'm', { language: 'de', segments: [], words: [] });
     expect(await ok('GET', `/clips/${clipB}/transcript`)).toEqual({ transcript: null });
     expect((await send('GET', '/clips/9999/transcript')).status).toBe(404);
