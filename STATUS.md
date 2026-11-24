@@ -1330,6 +1330,12 @@ real cases (two cases alone are too few). Gimbal footage only in "Farol" (calibr
   model file is absent.
 - Done when: typecheck + test:all green; planner downloads the model (after user OK), runs `transcribe` on Arrifana,
   spot-checks 5 speech moments, and reports how many moments were snapped.
+- **T1 implemented (2026-11-24, branch `t1-transcript`)**: `clippilot transcribe [--project] [--force] [--json]`; migration 019
+  (`transcripts` + `clips.transcript_text` mirrored into `clips_fts`); `src/core/transcribe/{whisper,speech,runner,index}.ts`;
+  `HighlightRepository.findUnprotected/snapUnprotected` (the protected definition, shared with `replaceForClip`);
+  `speech`/`speech_cut` on `moments list --json` and on `cut show --json` moments/candidates; `analyze` snaps with an existing
+  transcript and transcribes afterwards (or prints a hint). Deferred: board drawer (T2), SKILL.md mention, `transcript_text`
+  is also part of clip JSON (search/get-clip output).
 - T2 (next): board drawer shows the transcript (moment part highlighted); then the motion slice.
 
 ### Resolve capability test for post-production (2026-11-23, free Resolve, user import)
