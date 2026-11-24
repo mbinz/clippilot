@@ -21,11 +21,18 @@ export const UNDATED_NAME = 'Undated';
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-/** Local time, e.g. "Tue 27 May, 08:34". */
-export function formatEventTime(ms: number): string {
-  const d = new Date(ms);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${WEEKDAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+export interface EventOptions {
+  /** IANA time zone for event names; undefined = system zone. */
+  timeZone?: string;
+}
+
+/** Time in the given IANA zone (default: system), e.g. "Tue 27 May, 08:34". */
+export function formatEventTime(ms: number, timeZone?: string): string {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone, weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date(ms));
+  const get = (t: string) => parts.find((p) => p.type === t)!.value;
+  return `${get('weekday')} ${get('day')} ${get('month')}, ${get('hour')}:${get('minute')}`;
 }
 
 interface Item {
@@ -61,7 +68,7 @@ interface Draft {
 }
 
 /** Group clips into time-mode drafts (gap rule), plus one "Undated" draft. */
-export function timeGroups(items: Item[]): Draft[] {
+export function timeGroups(items: Item[], timeZone?: string): Draft[] {
   const dated = items.filter((i) => i.ms !== null).sort(byTimeThenPath);
   const undated = items.filter((i) => i.ms === null).sort(byTimeThenPath);
   const out: Draft[] = [];
@@ -69,7 +76,7 @@ export function timeGroups(items: Item[]): Draft[] {
   const flush = () => {
     if (cur.length === 0) return;
     out.push({
-      name: formatEventTime(cur[0].ms!),
+      name: formatEventTime(cur[0].ms!, timeZone),
       source: 'time',
       folder_path: null,
       items: cur,
@@ -111,21 +118,21 @@ function finish(drafts: Draft[]): DerivedEvent[] {
     }));
 }
 
-export function deriveEvents(clips: EventClipInput[]): DerivedEvent[] {
+export function deriveEvents(clips: EventClipInput[], opts: EventOptions = {}): DerivedEvent[] {
   if (clips.length === 0) return [];
   const items = clips.map(toItem);
   const folderOf = (i: Item) => path.dirname(i.file_path);
   const folders = new Set(items.map(folderOf));
 
   // 1. Flat: everything in one folder.
-  if (folders.size === 1) return finish(timeGroups(items));
+  if (folders.size === 1) return finish(timeGroups(items, opts.timeZone));
 
   // 2. Leaf folders become folder events.
   const leaves = [...folders].filter((f) => ![...folders].some((o) => isUnder(o, f)));
   const leafSet = new Set(leaves);
   const drafts = new Map<string, Draft>();
   for (const f of leaves) {
-    drafts.set(f, { name: path.basename(f), source: 'folder', folder_path: f, items: [], min: null, max: null });
+    drafts.set(f, { name: path.basename(f).trim(), source: 'folder', folder_path: f, items: [], min: null, max: null });
   }
   const loose: Item[] = [];
   for (const it of items) {
@@ -165,5 +172,5 @@ export function deriveEvents(clips: EventClipInput[]): DerivedEvent[] {
   }
 
   // 4. Remaining loose files: time mode.
-  return finish([...drafts.values(), ...timeGroups(unplaced)]);
+  return finish([...drafts.values(), ...timeGroups(unplaced, opts.timeZone)]);
 }

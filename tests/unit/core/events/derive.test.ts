@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { deriveEvents } from '../../../../src/core/events/derive.js';
+import { deriveEvents, formatEventTime } from '../../../../src/core/events/derive.js';
 
 beforeAll(() => {
   process.env.TZ = 'Europe/Lisbon';
@@ -126,5 +126,39 @@ describe('deriveEvents', () => {
 
   it('empty input -> no events', () => {
     expect(deriveEvents([])).toEqual([]);
+  });
+});
+
+describe('Q3a trimmed folder names', () => {
+  it('trims the leaf folder name but keeps the real folder_path', () => {
+    nextId = 1;
+    const ev = deriveEvents([
+      clip('/v/Praia do Odeceixe /a.mp4', at('07:00')),
+      clip('/v/Other/b.mp4', at('09:00')),
+    ]);
+    const e = ev.find((x) => x.source === 'folder' && x.name === 'Praia do Odeceixe');
+    expect(e).toBeDefined();
+    expect(e!.folder_path).toBe('/v/Praia do Odeceixe ');
+  });
+});
+
+describe('Q3b time zone', () => {
+  // 2025-05-27T23:30Z: Lisbon (UTC+1) -> 28 May 00:30, Tokyo (UTC+9) -> 28 May 08:30, UTC -> 27 May 23:30
+  const ms = Date.parse('2025-05-27T23:30:00Z');
+
+  it('formats the same instant per zone, incl. day rollover', () => {
+    expect(formatEventTime(ms, 'Europe/Lisbon')).toBe('Wed 28 May, 00:30');
+    expect(formatEventTime(ms, 'Asia/Tokyo')).toBe('Wed 28 May, 08:30');
+    expect(formatEventTime(ms, 'UTC')).toBe('Tue 27 May, 23:30');
+  });
+
+  it('undefined zone uses the system zone', () => {
+    expect(formatEventTime(ms)).toBe('Wed 28 May, 00:30'); // TZ=Europe/Lisbon in this file
+  });
+
+  it('names time groups in the given zone', () => {
+    nextId = 1;
+    const ev = deriveEvents([clip('/v/a.mp4', '2025-05-27T23:30:00Z')], { timeZone: 'Asia/Tokyo' });
+    expect(ev[0].name).toBe('Wed 28 May, 08:30');
   });
 });

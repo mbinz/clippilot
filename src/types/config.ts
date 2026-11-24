@@ -8,6 +8,8 @@ export interface AppConfig {
   quality_weights: QualityWeights;
   auto_skip_threshold: number;
   web_ui_port: number;
+  /** IANA time zone of the footage (event names / time groups); unset = system zone. */
+  timezone?: string;
 }
 
 export interface ProxyConfig {

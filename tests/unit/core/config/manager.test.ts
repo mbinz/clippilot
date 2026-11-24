@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, mkdir, writeFile, rm, stat, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { loadConfig, saveGlobalConfigValue, globalConfigPath } from '../../../../src/core/config/manager.js';
+import { loadConfig, saveGlobalConfigValue, globalConfigPath, validateTimeZone } from '../../../../src/core/config/manager.js';
 import { CONFIG_PATH } from '../../../../src/constants.js';
 import { DEFAULT_CONFIG } from '../../../../src/core/config/defaults.js';
 
@@ -113,5 +113,12 @@ describe('global config', () => {
     expect(st.mode & 0o777).toBe(0o600);
     const saved = JSON.parse(await readFile(globalFile, 'utf-8'));
     expect(saved).toEqual({ gemini_api_key: 'k1', gemini_model: 'm1' });
+  });
+});
+
+describe('validateTimeZone', () => {
+  it('accepts IANA zones and rejects unknown ones', () => {
+    expect(() => validateTimeZone('Europe/Lisbon')).not.toThrow();
+    expect(() => validateTimeZone('Mars/Olympus')).toThrow(/Mars\/Olympus/);
   });
 });

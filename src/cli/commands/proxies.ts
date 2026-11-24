@@ -16,7 +16,7 @@ export function registerProxiesCommand(parent: Command): void {
     .command('rebuild')
     .description('Re-encode proxies (yuv420p, 1 s keyframes) for smooth browser playback and seeking')
     .option('--project <name>', 'Project name (default: the only project)')
-    .option('--only-bad', 'Skip proxies that are already yuv420p', false)
+    .option('--only-bad', 'Skip proxies that are already yuv420p with keyframes at most 2 s apart', false)
     .option('--json', 'Emit JSON (progress lines go to stderr)')
     .action(async (options) => {
       const basePath = process.cwd();

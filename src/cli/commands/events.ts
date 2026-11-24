@@ -7,6 +7,7 @@ import { ProjectRepository } from '../../db/repositories/project.repository.js';
 import { EventRepository, type EventSummary } from '../../db/repositories/event.repository.js';
 import { resolveDbPath } from '../../utils/fs.js';
 import { assignEvents, eventJson } from '../../core/events/index.js';
+import { loadConfig } from '../../core/config/manager.js';
 import { resolveProject } from './resolve-project.js';
 
 function summaryOf(repo: EventRepository, id: number): EventSummary {
@@ -100,12 +101,15 @@ export function registerEventsCommand(parent: Command): void {
     .description('Assign events to clips that have none (--reset: delete and re-derive all)')
     .option('--project <name>', 'Project name (default: the only project)')
     .option('--reset', 'Delete the project\'s events first', false)
-    .action((options) => withDb((db) => {
+    .action(async (options) => {
+      const { timezone } = await loadConfig(process.cwd());
+      withDb((db) => {
       const project = resolveProject(new ProjectRepository(db), options.project);
       if (!project) return;
       const repo = new EventRepository(db);
       if (options.reset) repo.deleteByProject(project.id);
-      assignEvents(db, project.id);
+      assignEvents(db, project.id, { timeZone: timezone });
       console.log(JSON.stringify(repo.listByProject(project.id).map(eventJson), null, 2));
-    }));
+    });
+    });
 }

@@ -107,4 +107,10 @@ describe('assignEvents', () => {
     assignEvents(db, other);
     expect(events.listByProject(projectId)).toHaveLength(0);
   });
+
+  it('names time events in the given time zone', () => {
+    add('/v/a.mp4', '2025-05-27T23:30:00Z');
+    assignEvents(db, projectId, { timeZone: 'Asia/Tokyo' });
+    expect(events.listByProject(projectId)[0].name).toBe('Wed 28 May, 08:30');
+  });
 });

@@ -3,7 +3,7 @@ import type Database from 'better-sqlite3';
 import { ClipRepository } from '../../db/repositories/clip.repository.js';
 import { EventRepository, type EventSummary } from '../../db/repositories/event.repository.js';
 import type { Clip } from '../../types/clip.js';
-import { deriveEvents, rangeDistance, timeGroups, TIME_GAP_MS } from './derive.js';
+import { deriveEvents, type EventOptions, rangeDistance, timeGroups, TIME_GAP_MS } from './derive.js';
 
 /** JSON projection of an event, shared by the CLI and the server. */
 export function eventJson(e: EventSummary) {
@@ -40,14 +40,14 @@ function persist(events: EventRepository, projectId: number, derived: ReturnType
  * Give every clip of the project an event. First run derives all events; later runs only place clips
  * with no event and never rename, merge or split existing events.
  */
-export function assignEvents(db: Database.Database, projectId: number): void {
+export function assignEvents(db: Database.Database, projectId: number, opts: EventOptions = {}): void {
   const clipRepo = new ClipRepository(db);
   const events = new EventRepository(db);
   const clips = clipRepo.listByProject(projectId);
 
   db.transaction(() => {
     if (events.listByProject(projectId).length === 0) {
-      persist(events, projectId, deriveEvents(clips));
+      persist(events, projectId, deriveEvents(clips, opts));
       events.resort(projectId);
       return;
     }
@@ -111,13 +111,13 @@ export function assignEvents(db: Database.Database, projectId: number): void {
           if (event && dist <= TIME_GAP_MS) events.assignClips(event.id, [c.id]);
           else fresh.push(c);
         }
-        const drafts = timeGroups(fresh.map((c) => ({ id: c.id, file_path: c.file_path, ms: ms(c.recorded_at) })));
+        const drafts = timeGroups(fresh.map((c) => ({ id: c.id, file_path: c.file_path, ms: ms(c.recorded_at) })), opts.timeZone);
         persist(events, projectId, drafts.map((d) => ({
           name: d.name, source: 'time' as const, folder_path: null, clip_ids: d.items.map((i) => i.id),
         })));
       } else {
         const e = events.create({
-          project_id: projectId, name: path.basename(folder), source: 'folder', folder_path: folder,
+          project_id: projectId, name: path.basename(folder).trim(), source: 'folder', folder_path: folder,
         });
         events.assignClips(e.id, group.map((c) => c.id));
       }

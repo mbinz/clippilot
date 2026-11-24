@@ -70,3 +70,12 @@ export async function saveConfig(basePath: string, config: Partial<AppConfig>): 
   await ensureDir(path.dirname(configPath));
   await writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
 }
+
+/** Throw a clear error unless `tz` is a valid IANA time zone. */
+export function validateTimeZone(tz: string): void {
+  try {
+    new Intl.DateTimeFormat('en-GB', { timeZone: tz });
+  } catch {
+    throw new Error(`Invalid time zone "${tz}" (use an IANA name such as Europe/Lisbon)`);
+  }
+}

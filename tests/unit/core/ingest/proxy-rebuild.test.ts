@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { rebuildProxy, rebuildProxies } from '../../../../src/core/ingest/proxy.js';
+import { rebuildProxy, rebuildProxies, maxKeyframeGap } from '../../../../src/core/ingest/proxy.js';
 
 let dir: string;
 beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-proxy-')); });
@@ -63,7 +63,7 @@ describe('rebuildProxies', () => {
         { id: 1, file_path: o1, proxy_path: p1 },
         { id: 2, file_path: o2, proxy_path: p2 },
       ],
-      { resolution: 720, onlyBad: true, encode, probePixFmt: async (p) => (p === p1 ? 'yuv420p' : 'yuv422p10le') },
+      { resolution: 720, onlyBad: true, encode, probeKeyframeGap: async () => 1, probePixFmt: async (p) => (p === p1 ? 'yuv420p' : 'yuv422p10le') },
     );
     expect(res.results.map((r) => r.status)).toEqual(['skipped', 'ok']);
     expect(fs.readFileSync(p1, 'utf8')).toBe('old1');
@@ -90,5 +90,36 @@ describe('rebuildProxies', () => {
     expect(lines[0]).toBe('[1/2] a.MP4 failed: bad');
     expect(lines[1]).toBe('[2/2] b.MP4 ok');
     expect(fs.readFileSync(p1, 'utf8')).toBe('old1');
+  });
+});
+
+describe('maxKeyframeGap', () => {
+  it('1 s grid -> 1', () => { expect(maxKeyframeGap([0, 1, 2, 3], 4)).toBe(1); });
+  it('finds a 10 s gap', () => { expect(maxKeyframeGap([0, 1, 11, 12], 13)).toBe(10); });
+  it('includes the last keyframe to the end', () => { expect(maxKeyframeGap([0, 1], 9)).toBe(8); });
+  it('single keyframe -> duration - t', () => { expect(maxKeyframeGap([0], 7)).toBe(7); });
+  it('clip shorter than 1 s', () => { expect(maxKeyframeGap([0], 0.5)).toBe(0.5); });
+  it('no keyframes -> whole duration', () => { expect(maxKeyframeGap([], 5)).toBe(5); });
+});
+
+describe('rebuildProxies --only-bad keyframe gap', () => {
+  const encode = async (_i: string, out: string) => { fs.writeFileSync(out, 'new'); };
+  it('rebuilds a yuv420p proxy with a 10 s gap, skips a good one (yuvj420p fine)', async () => {
+    const o1 = write('a.MP4', 'x'); const p1 = write('a.mp4', 'old1');
+    const o2 = write('b.MP4', 'x'); const p2 = write('b.mp4', 'old2');
+    const res = await rebuildProxies(
+      [
+        { id: 1, file_path: o1, proxy_path: p1 },
+        { id: 2, file_path: o2, proxy_path: p2 },
+      ],
+      {
+        resolution: 720, onlyBad: true, encode,
+        probePixFmt: async (p) => (p === p1 ? 'yuv420p' : 'yuvj420p'),
+        probeKeyframeGap: async (p) => (p === p1 ? 10 : 1),
+      },
+    );
+    expect(res.results.map((r) => r.status)).toEqual(['ok', 'skipped']);
+    expect(fs.readFileSync(p1, 'utf8')).toBe('new');
+    expect(fs.readFileSync(p2, 'utf8')).toBe('old2');
   });
 });

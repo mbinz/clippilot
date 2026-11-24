@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { loadConfig, saveConfig, saveGlobalConfigValue } from '../../core/config/manager.js';
+import { loadConfig, saveConfig, saveGlobalConfigValue, validateTimeZone } from '../../core/config/manager.js';
 
 export function registerConfigCommand(parent: Command): void {
   parent
@@ -24,6 +24,15 @@ export function registerConfigCommand(parent: Command): void {
         if (!key || value === undefined) {
           console.error(chalk.red('Usage: clippilot config set <key> <value>'));
           process.exit(1);
+        }
+
+        if (key === 'timezone') {
+          try {
+            validateTimeZone(value);
+          } catch (err) {
+            console.error(chalk.red((err as Error).message));
+            process.exit(1);
+          }
         }
 
         if (opts?.global) {

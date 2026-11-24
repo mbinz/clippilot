@@ -66,6 +66,30 @@ export async function probePixFmt(filePath: string): Promise<string | null> {
   return stdout.trim() || null;
 }
 
+/** Largest gap between consecutive keyframes, including the last keyframe to the end of the clip. */
+export function maxKeyframeGap(keyframeTimes: number[], duration: number): number {
+  if (keyframeTimes.length === 0) return duration;
+  const t = [...keyframeTimes].sort((a, b) => a - b);
+  let max = Math.max(0, duration - t[t.length - 1]);
+  for (let i = 1; i < t.length; i++) max = Math.max(max, t[i] - t[i - 1]);
+  return max;
+}
+
+/** Max keyframe gap (s) of a file's first video stream, via ffprobe. */
+export async function probeKeyframeGap(filePath: string): Promise<number> {
+  const { stdout } = await execFileAsync('ffprobe', [
+    '-v', 'error', '-select_streams', 'v:0', '-skip_frame', 'nokey', '-show_entries', 'frame=pts_time',
+    '-of', 'csv=p=0', filePath,
+  ], { maxBuffer: 64 * 1024 * 1024 });
+  const times = stdout.split('\n').map((l) => parseFloat(l.split(',')[0])).filter((n) => Number.isFinite(n));
+  const { stdout: dur } = await execFileAsync('ffprobe', [
+    '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', filePath,
+  ]);
+  return maxKeyframeGap(times, parseFloat(dur) || 0);
+}
+
+export const MAX_GOOD_KEYFRAME_GAP_SEC = 2;
+
 export interface RebuildClip { id: number; file_path: string; proxy_path: string | null }
 export interface RebuildResult { clip_id: number; file: string; status: 'ok' | 'skipped' | 'failed'; reason?: string }
 export interface RebuildOptions {
@@ -73,12 +97,16 @@ export interface RebuildOptions {
   onlyBad?: boolean;
   encode?: ProxyEncoder;
   probePixFmt?: (proxyPath: string) => Promise<string | null>;
+  probeKeyframeGap?: (proxyPath: string) => Promise<number>;
   onProgress?: (line: string) => void;
 }
 
 /** Sequentially rebuild the proxies of the given clips; never throws for a single clip. */
 export async function rebuildProxies(clips: RebuildClip[], opts: RebuildOptions) {
-  const probe = opts.probePixFmt ?? probePixFmt;
+  const probe: Probes = {
+    pixFmt: opts.probePixFmt ?? probePixFmt,
+    keyframeGap: opts.probeKeyframeGap ?? probeKeyframeGap,
+  };
   const results: RebuildResult[] = [];
   const todo = clips.filter((c) => c.proxy_path);
   for (const [i, clip] of todo.entries()) {
@@ -94,16 +122,24 @@ export async function rebuildProxies(clips: RebuildClip[], opts: RebuildOptions)
   };
 }
 
+interface Probes {
+  pixFmt: (p: string) => Promise<string | null>;
+  keyframeGap: (p: string) => Promise<number>;
+}
+
 async function rebuildOne(
   clip: RebuildClip,
   opts: RebuildOptions,
-  probe: (p: string) => Promise<string | null>,
+  probe: Probes,
 ): Promise<{ status: RebuildResult['status']; reason?: string }> {
   const proxyPath = clip.proxy_path!;
   if (!existsSync(clip.file_path)) return { status: 'skipped', reason: 'original missing' };
   try {
-    if (opts.onlyBad && existsSync(proxyPath) && (await probe(proxyPath)) === 'yuv420p') {
-      return { status: 'skipped', reason: 'already yuv420p' };
+    if (opts.onlyBad && existsSync(proxyPath)) {
+      const pix = await probe.pixFmt(proxyPath);
+      if ((pix === 'yuv420p' || pix === 'yuvj420p') && (await probe.keyframeGap(proxyPath)) <= MAX_GOOD_KEYFRAME_GAP_SEC) {
+        return { status: 'skipped', reason: 'already yuv420p with dense keyframes' };
+      }
     }
     await rebuildProxy(clip.file_path, proxyPath, opts.resolution, opts.encode);
     return { status: 'ok' };
