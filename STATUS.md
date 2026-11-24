@@ -1253,6 +1253,23 @@ you" (fix b2d6560: an AI draft's range is the AI range). ★ at 16 % is above th
   `timezone` (IANA, default = system) used by `deriveEvents` and time-group names; set `Europe/Lisbon` for Portugal.
 - `proxies rebuild --only-bad` also rebuilds proxies whose keyframes are > 2 s apart.
 
+**Q3 implementation spec (planner, 2026-11-24)** — test-first, three behaviours:
+- **Q3a trimmed folder names:** `deriveEvents` names a folder event `path.basename(f).trim()`. Test: a leaf folder
+  `"…/Praia do Odeceixe "` yields the event name `"Praia do Odeceixe"`; `folder_path` keeps the real path (with space).
+- **Q3b time zone:** `formatEventTime(ms, timeZone?)` formats weekday/day/month/hh:mm in the given IANA zone via `Intl`
+  (undefined = system zone, today's behaviour). `deriveEvents(clips, { timeZone })` / `timeGroups` pass it on. Project
+  config key `timezone` (IANA string, unset = system); invalid zones are rejected when set (`config set`) with a clear
+  error. Wherever events are derived (events index / CLI) the project's `timezone` is used. Tests: the same instant
+  formats differently for `Europe/Lisbon` and `Asia/Tokyo` (incl. a day rollover); a time group is named in the given
+  zone; config rejects `Mars/Olympus`.
+- **Q3c `--only-bad` keyframe gap:** pure `maxKeyframeGap(keyframeTimes: number[], duration: number): number` (largest gap
+  between consecutive keyframes, incl. the last keyframe → end); `rebuildProxies` with `onlyBad` skips a proxy only when
+  it is yuv420p (yuvj420p counts as fine too) **and** its max keyframe gap ≤ 2 s. Keyframe times from ffprobe
+  (`-skip_frame nokey -select_streams v:0 -show_entries frame=pts_time`). Tests: `maxKeyframeGap` cases (1 s grid, a 10 s
+  gap, a single keyframe, a clip shorter than 1 s); `rebuildProxies` with an injected probe rebuilds a yuv420p proxy with
+  a 10 s gap and skips a good one. Update the CLI option help text.
+- Done when: `npm run typecheck && npm run test:all` green; no change to Arrifana data (planner re-derives events).
+
 **Q4 — full Portugal** (after Q1–Q3; user OK on the Gemini cost estimate first)
 - `~/Video/ClipPilot Portugal/`: ingest `~/Video/Portugal` (508 clips, 123 GB; resumable, overnight), analyze with
   prompt v3, events, then Claude proposes a brief per user wish.
