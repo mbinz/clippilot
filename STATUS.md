@@ -1402,6 +1402,15 @@ downloads): `~/.clippilot/models/ggml-large-v3-turbo.bin` (1.62 GB, sha1 4af2b29
 Deferred: `cut`/`moments` CLI and the web routes use the default band thresholds (the `StoryboardService` takes an optional
 config; `withSvc` is sync and does not load config yet); `motion` itself honours `shake_locked_max`/`shake_shaky_min`.
 
+**T2 + T1e + S1 results (planner, 2026-11-24)** — merged (1043 tests). T1e: whisper+VAD returned coarse segments (C0599:
+one 0–44.6 s segment) → sentences are now derived from word timings (split at . ? ! … or pauses ≥ 0.7 s) for speech cut,
+snap and the drawer. T2 checked in the browser on Arrifana: the moment drawer shows "Spoken" per sentence, the moment's
+sentences highlighted, "Sentence cut at …" when it applies. Final Arrifana run (from `clippilot.pre-019.db`): transcribe
+24 moments snapped (3 clamped, 2 skipped), 47 moments carry speech, 8 cut a sentence (all protected → left for the
+critic/user, e.g. house panel 1 inside "2, 3, 4, 5, 9."); motion 167 measured, 0 failed: locked 19 / stabilize 75 /
+shaky 73 — the 37 cut panels match resolve-prep exactly (5 / 19 / 13). Deferred: band thresholds from config only in the
+`motion` command (cut show / web use defaults); SKILL.md lacks `motion`; `skill:install` not run.
+
 Open: precision on the ≈ 8 leftovers (idea: cross-check with Gemini's per-moment `audio_type` or a second VAD pass);
 SKILL.md mention of `transcribe`/`speech`; T2 drawer.
 
