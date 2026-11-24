@@ -9,6 +9,8 @@ import { applyDraft as applyDraftImpl } from './draft.js';
 import * as ops from './history.js';
 import { defaultSpeed } from './range.js';
 import { isTier, tierRankSql, type Tier } from '../tiers.js';
+import { speechForRange, type SpeechCut } from '../transcribe/speech.js';
+import type { TranscriptSegment, TranscriptWord } from '../transcribe/whisper.js';
 
 export const MAIN_CUT_NAME = 'Main';
 export const MIN_PANEL_SEC = 0.5;
@@ -16,14 +18,22 @@ const SPEEDS = [1, 0.5, 0.25];
 
 export type PanelClip = Pick<Clip, 'id' | 'file_path' | 'proxy_path' | 'duration_sec' | 'fps' | 'resolution' | 'hidden'>;
 
+/** What is said inside a moment (null when its clip has no transcript) and whether the moment cuts a sentence. */
+export interface MomentSpeech {
+  speech: string | null;
+  speech_cut: SpeechCut;
+}
+
+export type MomentWithSpeech = HighlightRecord & MomentSpeech;
+
 export interface PanelNode extends Panel {
   /** Range and speed of the panel's moment (a panel stores none of its own); null / 1 unless the panel is filled. */
   start_sec: number | null;
   end_sec: number | null;
   speed: number;
   clip: PanelClip | null;
-  moment: HighlightRecord | null;
-  candidates: HighlightRecord[];
+  moment: MomentWithSpeech | null;
+  candidates: MomentWithSpeech[];
 }
 
 export interface SceneNode extends Scene {
@@ -77,6 +87,9 @@ export interface MomentRow {
   dup_group: number | null;
   status: string;
   description: string;
+  /** Spoken words inside the range (null = clip not transcribed) and which boundary cuts a sentence. */
+  speech: string | null;
+  speech_cut: SpeechCut;
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -86,6 +99,22 @@ export class StoryboardService {
   constructor(private db: Database.Database) {}
 
   // ---------- helpers ----------
+
+  /** Speech of a moment's range from the clip's transcript; `cache` holds one transcript per clip. */
+  private speechOf(
+    m: { clip_id: number; start_sec: number; end_sec: number },
+    cache: Map<number, { segments: TranscriptSegment[]; words: TranscriptWord[] } | null>,
+  ): MomentSpeech {
+    if (!cache.has(m.clip_id)) {
+      const r = this.db.prepare('SELECT segments_json, words_json FROM transcripts WHERE clip_id = ?').get(m.clip_id) as
+        { segments_json: string; words_json: string } | undefined;
+      cache.set(m.clip_id, r ? { segments: JSON.parse(r.segments_json), words: JSON.parse(r.words_json) } : null);
+    }
+    const t = cache.get(m.clip_id)!;
+    if (!t) return { speech: null, speech_cut: null };
+    const { text, cut } = speechForRange(t.segments, t.words, m.start_sec, m.end_sec);
+    return { speech: text, speech_cut: cut };
+  }
 
   private tx<T>(fn: () => T): T {
     return this.db.transaction(fn)();
@@ -276,7 +305,12 @@ export class StoryboardService {
       return clipCache.get(cid)!;
     };
     const momentStmt = this.db.prepare('SELECT * FROM highlights WHERE id = ?');
-    const momentOf = (mid: number | null) => (mid === null ? null : ((momentStmt.get(mid) as HighlightRecord) ?? null));
+    const transcripts = new Map<number, { segments: TranscriptSegment[]; words: TranscriptWord[] } | null>();
+    const momentOf = (mid: number | null): MomentWithSpeech | null => {
+      if (mid === null) return null;
+      const m = momentStmt.get(mid) as HighlightRecord | undefined;
+      return m ? { ...m, ...this.speechOf(m, transcripts) } : null;
+    };
 
     const totals = { panels: 0, filled: 0, candidates: 0, gaps: 0, duration_sec: 0 };
     const nodes: SceneNode[] = scenes.map((s) => {
@@ -517,7 +551,9 @@ export class StoryboardService {
       SELECT h.*, c.event_id FROM highlights h JOIN clips c ON c.id = h.clip_id
       WHERE ${where.join(' AND ')} ORDER BY h.clip_id, h.start_sec, h.id
     `).all(...params) as (HighlightRecord & { event_id: number | null })[];
+    const transcripts = new Map<number, { segments: TranscriptSegment[]; words: TranscriptWord[] } | null>();
     return rows.map((h) => ({
+      ...this.speechOf(h, transcripts),
       id: h.id, clip_id: h.clip_id, event_id: h.event_id, start_sec: h.start_sec, end_sec: h.end_sec,
       speed: h.speed, ai_start_sec: h.ai_start_sec, ai_end_sec: h.ai_end_sec,
       tier: h.user_tier ?? h.tier, ai_tier: h.tier, user_tier: h.user_tier, seen: h.seen_at !== null, shot: h.shot, role: h.role, issues: JSON.parse(h.issues || '[]') as string[],
