@@ -4,6 +4,8 @@ import path from 'node:path';
 import { Hono, type Context } from 'hono';
 import type Database from 'better-sqlite3';
 import { ProjectRepository } from '../../../db/repositories/project.repository.js';
+import { transcriptSentences } from '../../transcribe/speech.js';
+import { TranscriptRepository } from '../../../db/repositories/transcript.repository.js';
 import { ThumbnailRepository } from '../../../db/repositories/thumbnail.repository.js';
 import { StoryboardService, type PanelNode } from '../../storyboard/service.js';
 import { labels } from '../../storyboard/labels.js';
@@ -33,6 +35,7 @@ export function createCutRoutes(db: Database.Database, options: CutRoutesOptions
   const svc = new StoryboardService(db);
   const projects = new ProjectRepository(db);
   const thumbs = new ThumbnailRepository(db);
+  const transcripts = new TranscriptRepository(db);
   const opener = options.opener ?? defaultOpener;
 
   const media = (clipId: number, proxyPath: string | null) => {
@@ -363,6 +366,15 @@ export function createCutRoutes(db: Database.Database, options: CutRoutesOptions
     if (typeof body.seen !== 'boolean') return c.json({ error: 'seen must be a boolean' }, 400);
     svc.setMomentSeen(momentId, body.seen);
     return c.json({ data: { id: momentId, seen: body.seen } });
+  });
+
+  /** Spoken words of a clip for the moment drawer; `{ transcript: null }` when there is none (or an empty one). */
+  app.get('/clips/:id/transcript', (c) => {
+    const clipId = id(c);
+    if (!db.prepare('SELECT 1 FROM clips WHERE id = ?').get(clipId)) return c.json({ error: 'Clip not found' }, 404);
+    const t = transcripts.get(clipId);
+    if (!t || t.segments.length === 0) return c.json({ data: { transcript: null } });
+    return c.json({ data: { language: t.language, segments: transcriptSentences(t.segments, t.words).map((s) => ({ start: s.start, end: s.end, text: s.text })) } });
   });
 
   /** "Show in Finder": `open -R <file>`. */

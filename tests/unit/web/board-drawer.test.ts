@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   decisionFor, storyLink, optionList, starTarget, starLabel, rangeLabel, playLabel, storyMark, poolView,
-  panelPosition, isValidTrim, type DrawerTree,
+  panelPosition, isValidTrim, transcriptView, type DrawerTree,
 } from '../../../web/src/board/drawer.js';
 import type { PoolMoment } from '../../../web/src/board/pool.js';
 
@@ -172,5 +172,36 @@ describe('isValidTrim', () => {
   it('needs at least 0.5 s', () => {
     expect(isValidTrim(1, 1.5)).toBe(true);
     expect(isValidTrim(1, 1.4)).toBe(false);
+  });
+});
+
+describe('transcriptView (the "Spoken" block of the moment drawer)', () => {
+  const segs = [
+    { start: 1, end: 3, text: 'Eins.' },
+    { start: 5, end: 8, text: 'Zwei.' },
+    { start: 10, end: 12, text: 'Drei.' },
+  ];
+  it('marks the segments overlapping the moment; no cut when the boundaries fall in silence', () => {
+    expect(transcriptView(segs, 4, 9)).toEqual({
+      parts: [
+        { text: 'Eins.', start: 1, inMoment: false },
+        { text: 'Zwei.', start: 5, inMoment: true },
+        { text: 'Drei.', start: 10, inMoment: false },
+      ],
+      cut: null,
+    });
+  });
+  it('a segment crossing the start / end / both boundaries is a cut', () => {
+    expect(transcriptView(segs, 6, 9.5).cut).toBe('start');
+    expect(transcriptView(segs, 4, 6).cut).toBe('end');
+    expect(transcriptView(segs, 6, 7).cut).toBe('both');
+  });
+  it('a moment without speech: nothing in the moment, no cut', () => {
+    const v = transcriptView(segs, 13, 20);
+    expect(v.parts.every((p) => !p.inMoment)).toBe(true);
+    expect(v.cut).toBeNull();
+  });
+  it('empty segments -> no parts', () => {
+    expect(transcriptView([], 0, 5)).toEqual({ parts: [], cut: null });
   });
 });

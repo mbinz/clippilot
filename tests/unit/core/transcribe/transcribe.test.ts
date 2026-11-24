@@ -242,7 +242,7 @@ describe('transcribeClips', () => {
       const r = await transcribeClips([c], deps(), { model: 'm', runner });
       expect(r.snapped).toBe(1);
       const [a, b] = highlights.findByClip(c.id);
-      expect(a).toMatchObject({ start_sec: 0, end_sec: 3.2, ai_start_sec: 0, ai_end_sec: 3.2 });
+      expect(a).toMatchObject({ start_sec: 0.01, end_sec: 3.2, ai_start_sec: 0.01, ai_end_sec: 3.2 });
       expect(b).toMatchObject({ start_sec: 10, end_sec: 12 });
     });
 
@@ -262,18 +262,18 @@ describe('transcribeClips', () => {
         const now = after.find((h) => h.description === name)!;
         expect([now.start_sec, now.end_sec, now.ai_start_sec, now.ai_end_sec]).toEqual([was.start_sec, was.end_sec, was.ai_start_sec, was.ai_end_sec]);
       }
-      expect(after.find((h) => h.description === 'plain')).toMatchObject({ start_sec: 0, end_sec: 3.2 });
+      expect(after.find((h) => h.description === 'plain')).toMatchObject({ start_sec: 0.01, end_sec: 3.2 });
     });
 
     describe('no overlaps with neighbours', () => {
-      // The fixture sentences are 0-1.4 and 1.4-3.2.
+      // The fixture sentences (from words) are 0.01-0.99 and 1.41-3.2.
       const ranges = (id: number) => highlights.findByClip(id).map((h) => [h.description, h.start_sec, h.end_sec]);
 
       it('widening into an unprotected neighbour is clamped to its boundary', async () => {
         const c = clips.insert(clipInput(1));
         highlights.replaceForClip(c.id, [m(0.9, 3, 'mine'), m(3.1, 6, 'next')]);
         const r = await transcribeClips([c], deps(), { model: 'm', runner });
-        expect(ranges(c.id)).toContainEqual(['mine', 0, 3.1]);
+        expect(ranges(c.id)).toContainEqual(['mine', 0.01, 3.1]);
         expect(r).toMatchObject({ snapped: 1, snap_clamped: 1, snap_skipped_overlap: 1 }); // 'next' has no room left
       });
 
@@ -282,7 +282,7 @@ describe('transcribeClips', () => {
         highlights.replaceForClip(c.id, [m(0.9, 3, 'mine'), m(3.1, 6, 'next')]);
         db.prepare("UPDATE highlights SET status = 'confirmed' WHERE description = 'next'").run();
         const r = await transcribeClips([c], deps(), { model: 'm', runner });
-        expect(ranges(c.id)).toEqual([['mine', 0, 3.1], ['next', 3.1, 6]]);
+        expect(ranges(c.id)).toEqual([['mine', 0.01, 3.1], ['next', 3.1, 6]]);
         expect(r.snap_clamped).toBe(1);
       });
 
@@ -309,7 +309,7 @@ describe('transcribeClips', () => {
       const c = clips.insert(clipInput(1, { duration_sec: 3 }));
       highlights.replaceForClip(c.id, [m(0.5, 2.5, 'x')]);
       await transcribeClips([c], deps(), { model: 'm', runner });
-      expect(highlights.findByClip(c.id)[0]).toMatchObject({ start_sec: 0, end_sec: 3 });
+      expect(highlights.findByClip(c.id)[0]).toMatchObject({ start_sec: 0.01, end_sec: 3 });
     });
   });
 });

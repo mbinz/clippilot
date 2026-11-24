@@ -110,6 +110,21 @@ export function starTarget(m: TierLike & { ai_tier: string }): 'hero' | 'solid' 
 export const starLabel = (m: TierLike): string =>
   `${m.tier === 'hero' || m.user_tier === 'hero' ? '★ Starred' : '☆ Star'}${m.user_tier ? ' · yours' : ''}`;
 
+/* ---------- transcript ("Spoken" block) ---------- */
+
+export interface SpokenSegment { start: number; end: number; text: string }
+export interface TranscriptPart { text: string; start: number; inMoment: boolean }
+
+/** The clip's segments as running text parts; those overlapping [start, end] are in the moment. `cut` = a segment crosses a boundary. */
+export function transcriptView(
+  segments: SpokenSegment[], start: number, end: number,
+): { parts: TranscriptPart[]; cut: null | 'start' | 'end' | 'both' } {
+  const parts = segments.map((s) => ({ text: s.text, start: s.start, inMoment: s.end > start && s.start < end }));
+  const atStart = segments.some((s) => s.start < start && s.end > start);
+  const atEnd = segments.some((s) => s.start < end && s.end > end);
+  return { parts, cut: atStart && atEnd ? 'both' : atStart ? 'start' : atEnd ? 'end' : null };
+}
+
 /* ---------- timeline / player labels ---------- */
 
 const f1 = (s: number): string => `${s.toFixed(1)} s`;

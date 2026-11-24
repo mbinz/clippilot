@@ -49,6 +49,7 @@ on success. Always pass `--json` so output is parseable.
 | `clippilot stats --json` | **Always run first.** See "Cold-start flow" above. |
 | `clippilot ingest <path> [--project <name>] [--location <l>] [--no-proxy] [--skip-analysis]` | Import a folder of video files. Confirm the path with the user first. |
 | `clippilot analyze [--project <name>] [--force] [--retry-errors]` | Run Gemini analysis on pending clips. Requires a Gemini key. `--retry-errors` re-queues clips that previously failed. |
+| `clippilot transcribe [--project <name>] [--force] [--json]` | Speech-to-text (whisper.cpp) per clip; resumable, skips clips with a transcript. `analyze` runs it afterwards when the model is configured. Search then finds spoken words. |
 | `clippilot config show` / `clippilot config set gemini_api_key <key>` | Inspect or set the Gemini API key. |
 | `clippilot search "<query>" --json [--min-tier hero|solid|filler] [--limit N]` | User asks "find me clips about X". FTS over scenes, summary, keywords, location, people. `--min-tier` keeps clips with at least one moment at or above that tier. |
 | `clippilot get-clip <id>` | User asks about one specific clip in detail (you already have its ID). |
@@ -91,7 +92,9 @@ Commands without a cut id work on the project's cut "Main" (created on first use
 
 Workflow:
 1. `clippilot moments list --json [--event <id>] [--min-tier solid]` for compact drafting rows (hidden clips and rejected
-   moments are left out).
+   moments are left out). Rows carry `speech` (what is said inside the moment) and `speech_cut` (`null | start | end | both`:
+   a spoken sentence crosses that boundary). Read `speech` to judge what a moment is about; **avoid moments with
+   `speech_cut`** unless nothing better exists. Kids' speech is transcribed only approximately: never quote it as exact.
 2. **Brief first.** Write `{target_sec, audience, mood, must_have:[{moment_id?, text}], ending, notes?}` to a file and run
    `clippilot cut brief --set-file brief.json` (state `proposed`). Show it to the user and **wait for their ok**; only then
    `clippilot cut brief --confirm`. Do not draft before the brief is confirmed.

@@ -38,6 +38,10 @@ export const fetchHistory = (cutId: number) =>
 export const fetchMoments = (projectId: number) =>
   call<BoardMoment[]>('GET', `/projects/${projectId}/moments?include_rejected=1&include_hidden=1`);
 
+/** Spoken words of a clip (whisper); `{ transcript: null }` when it has none. */
+export type ClipTranscript = { transcript: null } | { language: string; segments: { start: number; end: number; text: string }[] };
+export const fetchTranscript = (clipId: number) => call<ClipTranscript>('GET', `/clips/${clipId}/transcript`);
+
 /** Board state, not an edit: not logged, not undoable. */
 export const markSeen = (momentId: number, seen: boolean) =>
   call<{ id: number; seen: boolean }>('POST', `/moments/${momentId}/seen`, { seen });

@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createCutRoutes } from '../../../../../src/core/server/routes/cuts.js';
+import { TranscriptRepository } from '../../../../../src/db/repositories/transcript.repository.js';
 import { createApp } from '../../../../../src/core/server/index.js';
 
 describe('Cut API routes', () => {
@@ -37,6 +38,26 @@ describe('Cut API routes', () => {
     new ThumbnailRepository(t.db).insert({ clip_id: clipA, file_path: '/t/a_0.jpg', timestamp_sec: 0 });
     ma = t.addMoments(clipA, [{ start_sec: 2, end_sec: 6 }, { start_sec: 10, end_sec: 14 }]);
     mb = t.addMoments(clipB, [{ start_sec: 1, end_sec: 4 }]);
+  });
+
+  it('GET /clips/:id/transcript: language + segments, or { transcript: null } without / with an empty transcript', async () => {
+    expect(await ok('GET', `/clips/${clipA}/transcript`)).toEqual({ transcript: null });
+    const repo = new TranscriptRepository(t.db);
+    repo.save(clipA, 'm', { language: 'de', segments: [{ start: 1, end: 2.5, text: 'Schau mal, ein Delfin.' }], words: [] });
+    expect(await ok('GET', `/clips/${clipA}/transcript`)).toEqual({
+      language: 'de', segments: [{ start: 1, end: 2.5, text: 'Schau mal, ein Delfin.' }],
+    });
+    // with words: one coarse segment becomes sentences
+    repo.save(clipA, 'm', {
+      language: 'de', segments: [{ start: 0, end: 44.6, text: 'Auf. Oh cool.' }],
+      words: [{ start: 0, end: 0.3, text: 'Auf.', p: 1 }, { start: 0.5, end: 0.8, text: 'Oh', p: 1 }, { start: 0.9, end: 1.4, text: 'cool.', p: 1 }],
+    });
+    expect(await ok('GET', `/clips/${clipA}/transcript`)).toEqual({
+      language: 'de', segments: [{ start: 0, end: 0.3, text: 'Auf.' }, { start: 0.5, end: 1.4, text: 'Oh cool.' }],
+    });
+    repo.save(clipB, 'm', { language: 'de', segments: [], words: [] });
+    expect(await ok('GET', `/clips/${clipB}/transcript`)).toEqual({ transcript: null });
+    expect((await send('GET', '/clips/9999/transcript')).status).toBe(404);
   });
 
   it('project cuts: list, create; unknown project is 404', async () => {

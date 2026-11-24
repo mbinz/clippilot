@@ -54,7 +54,7 @@ describe.skipIf(!ready)('transcribe integration (real whisper-cli)', () => {
       resolution: '160x90', fps: 25, nb_frames: null, has_video: 1, has_audio: 1, codec: null,
       recorded_at: null, start_timecode: null, location: null, manual_tags: null, people: null,
     });
-    highlights.replaceForClip(clip.id, [{ start_sec: 0.8, end_sec: 3, description: 'dolphins', tier: 'hero' }]);
+    highlights.replaceForClip(clip.id, [{ start_sec: 0.4, end_sec: 3, description: 'dolphins', tier: 'hero' }]);
 
     const r = await transcribeClips([clip], { transcripts, highlights }, { model });
     expect(r.errors).toEqual([]);
@@ -66,6 +66,6 @@ describe.skipIf(!ready)('transcribe integration (real whisper-cli)', () => {
     expect(t.words.length).toBeGreaterThan(8);
     expect(t.segments[0].start).toBeLessThan(0.5);
     // The moment started inside the first sentence: it now starts at the sentence start.
-    expect(highlights.findByClip(clip.id)[0].start_sec).toBeLessThan(0.5);
+    expect(highlights.findByClip(clip.id)[0].start_sec).toBeLessThan(0.1);
   }, 600000);
 });

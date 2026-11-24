@@ -1355,6 +1355,22 @@ downloads): `~/.clippilot/models/ggml-large-v3-turbo.bin` (1.62 GB, sha1 4af2b29
    mouse.", "A CIDADE NO BRASIL", "Shhh. Sss."); 4 language fallbacks; 32 unprotected moments snapped (13 clamped at a
    neighbour, 2 skipped). Panels/protected moments untouched. Whisper text of kids' speech is approximate ("Bier und
    Blut") — fine for drafting context, not for subtitles.
+**T2 — transcript in the moment drawer + skill (planner spec, 2026-11-24)** — test-first where logic.
+- API: `GET /api/clips/:id/transcript` → `{ language, segments: [{start, end, text}] }`, or `{ transcript: null }` when the
+  clip has none / an empty one. Route test.
+- Pure `transcriptView(segments, start, end)` in `web/src/board/drawer.ts` → `[{ text, start, inMoment }]` (inMoment = the
+  segment overlaps [start, end]) plus `cut: null | 'start' | 'end' | 'both'` for the focused moment; unit tests (inside,
+  crossing, none, empty).
+- MomentDrawer: a quiet "Spoken" block under the description, only when there is text: the clip's segments as running
+  text, segments inside the focused moment in normal text colour, the rest dimmed; if the focused moment cuts a sentence,
+  one small line "Sentence cut at the start/end". Fetched once per clip, cached like the other clip info. Nothing on the
+  tiles (calm board). No new colours (one meaning per colour).
+- Skill (`.claude/skills/clippilot/SKILL.md`): `clippilot transcribe` in the verb table; `moments list` rows carry
+  `speech` / `speech_cut`; drafting rules: read `speech` to judge what a moment is about; avoid moments with
+  `speech_cut` unless nothing better; kids' speech is transcribed only approximately — never quote it as exact.
+  Run `npm run skill:install` is the user's call (don't run it).
+- Done when typecheck + test:all green; planner checks the drawer in the browser on Arrifana (e.g. C0567, C0548).
+
 Open: precision on the ≈ 8 leftovers (idea: cross-check with Gemini's per-moment `audio_type` or a second VAD pass);
 SKILL.md mention of `transcribe`/`speech`; T2 drawer.
 

@@ -7,7 +7,7 @@ import type { HighlightRepository } from '../../db/repositories/highlight.reposi
 import type { TranscriptRepository } from '../../db/repositories/transcript.repository.js';
 import { parseWhisperJson, filterHallucinationsWithStats, crossClipTexts, dropCrossClip, type DropReason } from './whisper.js';
 import { MIN_MOMENT_SEC } from '../analyze/highlights.js';
-import { snapToSpeech } from './speech.js';
+import { snapToSpeech, transcriptSentences } from './speech.js';
 import { whisperCliRunner, type WhisperRunner } from './runner.js';
 
 export type { WhisperRunner } from './runner.js';
@@ -148,7 +148,10 @@ export async function transcribeClips(
   }
   if (result.dropped_segments.cross_clip === 0) delete result.dropped_segments.cross_clip;
 
-  for (const clip of fresh) snapMoments(clip, deps.transcripts.get(clip.id)?.segments ?? []);
+  for (const clip of fresh) {
+    const t = deps.transcripts.get(clip.id);
+    snapMoments(clip, t ? transcriptSentences(t.segments, t.words) : []);
+  }
   return result;
 
   function store(clip: Clip, filtered: ReturnType<typeof filterHallucinationsWithStats>, into: Clip[]): void {

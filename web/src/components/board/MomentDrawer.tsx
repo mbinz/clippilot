@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { PM } from '../../board/types';
-import { starLabel, type StoryLink } from '../../board/drawer';
+import { starLabel, transcriptView, type SpokenSegment, type StoryLink } from '../../board/drawer';
+import { fetchTranscript } from '../../board/api';
 import { effectiveTier, isHero, isOut, type UsageEntry } from '../../board/pool';
 import { btn, btnGhost, kbd, tagAi, tagMine } from './ui';
 import { ClipPlayer } from './ClipPlayer';
@@ -43,6 +44,26 @@ interface Props {
 
 const f1 = (s: number) => `${s.toFixed(1)} s`;
 
+// Fetched once per clip (the drawer re-mounts per moment, so cache by clip id for the session).
+const transcriptCache = new Map<number, SpokenSegment[]>();
+
+function useTranscript(clipId: number): SpokenSegment[] {
+  const [segs, setSegs] = useState<SpokenSegment[]>(transcriptCache.get(clipId) ?? []);
+  useEffect(() => {
+    if (transcriptCache.has(clipId)) { setSegs(transcriptCache.get(clipId)!); return; }
+    let live = true;
+    fetchTranscript(clipId)
+      .then((t) => {
+        const s = 'segments' in t ? t.segments : [];
+        transcriptCache.set(clipId, s);
+        if (live) setSegs(s);
+      })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [clipId]);
+  return segs;
+}
+
 /** "Review this clip": the whole clip, all its moments, ★ / 👎 / hide, one link into the story. Neutral. */
 export function MomentDrawer(p: Props) {
   const m = p.moment;
@@ -54,6 +75,7 @@ export function MomentDrawer(p: Props) {
   const whenText = when && !isNaN(when.getTime())
     ? when.toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
     : '';
+  const spoken = transcriptView(useTranscript(clip.id), m.start_sec, m.end_sec);
   const inClip = [...p.clipMoments].sort((a, b) => a.start_sec - b.start_sec);
 
   return (
@@ -123,6 +145,21 @@ export function MomentDrawer(p: Props) {
           </span>
         </div>
         <p className="m-0 mb-2 text-[12.5px] text-[#cfd3db]">{m.description}</p>
+        {spoken.parts.length > 0 && (
+          <div className="mb-2">
+            <div className={`${boxHead} mb-0.5`}>Spoken</div>
+            <p className="m-0 text-[12.5px] leading-snug">
+              {spoken.parts.map((x, i) => (
+                <span key={i} className={x.inMoment ? 'text-[#cfd3db]' : 'text-bd-muted opacity-60'}>{i ? ' ' : ''}{x.text}</span>
+              ))}
+            </p>
+            {spoken.cut && (
+              <div className="mt-0.5 text-[11px] text-bd-muted">
+                Sentence cut at the {spoken.cut === 'both' ? 'start and end' : spoken.cut}
+              </div>
+            )}
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-1.5">
           {out ? (
             <button className={btn} onClick={p.onRestore}>{rejected ? 'Undo \u{1F44E}' : 'Unhide clip'}</button>
