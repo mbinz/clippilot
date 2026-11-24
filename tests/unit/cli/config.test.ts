@@ -42,4 +42,9 @@ describe('config set --global', () => {
     expect(fs.existsSync(path.join(dir, 'work', '.clippilot', 'config.json'))).toBe(true);
     expect(fs.existsSync(path.join(dir, 'home', 'config.json'))).toBe(false);
   });
+
+  it('languages is stored as a list', async () => {
+    await createProgram().parseAsync(['node', 'clippilot', 'config', 'set', 'languages', 'de, en,pt', '--global']);
+    expect(JSON.parse(fs.readFileSync(path.join(dir, 'home', 'config.json'), 'utf-8'))).toEqual({ languages: ['de', 'en', 'pt'] });
+  });
 });

@@ -5,7 +5,7 @@ import type { Clip } from '../../types/clip.js';
 import type { AppConfig } from '../../types/config.js';
 import type { HighlightRepository } from '../../db/repositories/highlight.repository.js';
 import type { TranscriptRepository } from '../../db/repositories/transcript.repository.js';
-import { parseWhisperJson, filterHallucinations } from './whisper.js';
+import { parseWhisperJson, filterHallucinationsWithStats, type DropReason } from './whisper.js';
 import { MIN_MOMENT_SEC } from '../analyze/highlights.js';
 import { snapToSpeech } from './speech.js';
 import { whisperCliRunner, type WhisperRunner } from './runner.js';
@@ -23,6 +23,10 @@ export interface TranscribeOptions {
   /** Redo clips that already have a transcript. */
   force?: boolean;
   runner?: WhisperRunner;
+  /** Silero VAD model path (must exist); see `resolveVadModel`. */
+  vadModel?: string;
+  /** Allowed ISO language codes; a clip detected as another language gets an empty transcript. Unset = all. */
+  languages?: string[];
   onProgress?: (done: number, total: number, fileName: string) => void;
 }
 
@@ -30,6 +34,10 @@ export interface TranscribeResult {
   transcribed: number;
   skipped_existing: number;
   skipped_no_audio: number;
+  /** Clips whose detected language is not allowed (stored with an empty transcript). */
+  dropped_language: number;
+  /** Hallucinated segments dropped, by reason. */
+  dropped_segments: Partial<Record<DropReason, number>>;
   /** Unprotected moments widened toward whole sentences (includes the clamped ones). */
   snapped: number;
   /** Of `snapped`: widened only up to a neighbouring moment. */
@@ -58,6 +66,17 @@ export function requireWhisperModel(config: Pick<AppConfig, 'whisper_model'>): s
   return model;
 }
 
+/** The VAD model path when the file exists, else undefined (the caller warns once and goes on without VAD). */
+export function resolveVadModel(config: Pick<AppConfig, 'whisper_vad_model'>): string | undefined {
+  const p = expandHome(config.whisper_vad_model);
+  return existsSync(p) ? p : undefined;
+}
+
+/** The one-line warning for a missing VAD model. */
+export function vadMissingWarning(config: Pick<AppConfig, 'whisper_vad_model'>): string {
+  return `Warning: VAD model not found at ${expandHome(config.whisper_vad_model)}; transcribing without VAD (more hallucinations on wind/sea). Config key: whisper_vad_model.`;
+}
+
 /** Whether a whisper model is configured and present (for hints, no throw). */
 export function whisperModelAvailable(config: Pick<AppConfig, 'whisper_model'>): boolean {
   return existsSync(expandHome(config.whisper_model));
@@ -75,7 +94,7 @@ export async function transcribeClips(
 ): Promise<TranscribeResult> {
   const runner = opts.runner ?? whisperCliRunner;
   const modelName = path.basename(opts.model);
-  const result: TranscribeResult = { transcribed: 0, skipped_existing: 0, skipped_no_audio: 0, snapped: 0, snap_clamped: 0, snap_skipped_overlap: 0, errors: [] };
+  const result: TranscribeResult = { transcribed: 0, skipped_existing: 0, skipped_no_audio: 0, dropped_language: 0, dropped_segments: {}, snapped: 0, snap_clamped: 0, snap_skipped_overlap: 0, errors: [] };
 
   let done = 0;
   for (const clip of clips) {
@@ -84,30 +103,12 @@ export async function transcribeClips(
     else if (!opts.force && deps.transcripts.has(clip.id)) result.skipped_existing++;
     else {
       try {
-        const transcript = filterHallucinations(parseWhisperJson(await runner(clip, opts.model)));
-        deps.transcripts.save(clip.id, modelName, transcript);
-        result.transcribed++;
-        for (const m of deps.highlights.findUnprotected(clip.id)) {
-          const want = snapToSpeech({ start: m.start_sec, end: m.end_sec }, transcript.segments, clip.duration_sec);
-          if (!want.extended || (want.start === m.start_sec && want.end === m.end_sec)) continue;
-          // Never overlap another moment of the clip (protected or not, current ranges): stop at its boundary.
-          const others = deps.highlights.findByClip(clip.id).filter((o) => o.id !== m.id);
-          let start = want.start;
-          let end = want.end;
-          for (const o of others) {
-            if (o.end_sec <= m.start_sec && o.end_sec > start) start = o.end_sec;
-            if (o.start_sec >= m.end_sec && o.start_sec < end) end = o.start_sec;
-          }
-          start = round2(start);
-          end = round2(end);
-          if (end - start < MIN_MOMENT_SEC || (start === m.start_sec && end === m.end_sec)) {
-            result.snap_skipped_overlap++;
-            continue;
-          }
-          deps.highlights.snapUnprotected(m.id, start, end);
-          result.snapped++;
-          if (start !== round2(want.start) || end !== round2(want.end)) result.snap_clamped++;
-        }
+        const parsed = parseWhisperJson(await runner(clip, opts.model, { vadModel: opts.vadModel }));
+        if (opts.languages && !opts.languages.some((l) => l.toLowerCase() === parsed.language.toLowerCase())) {
+          // Wrong language = hallucination on ambient sound. Stored empty so the clip is not retried.
+          deps.transcripts.save(clip.id, modelName, { language: parsed.language, segments: [], words: [] });
+          result.dropped_language++;
+        } else await storeAndSnap(clip, parsed);
       } catch (err) {
         result.errors.push({ clip_id: clip.id, message: err instanceof Error ? err.message : String(err) });
       }
@@ -115,4 +116,34 @@ export async function transcribeClips(
     opts.onProgress?.(++done, clips.length, name);
   }
   return result;
+
+  async function storeAndSnap(clip: Clip, parsed: ReturnType<typeof parseWhisperJson>): Promise<void> {
+    const { transcript, dropped } = filterHallucinationsWithStats(parsed);
+    for (const [reason, n] of Object.entries(dropped) as [DropReason, number][]) {
+      result.dropped_segments[reason] = (result.dropped_segments[reason] ?? 0) + n;
+    }
+    deps.transcripts.save(clip.id, modelName, transcript);
+    result.transcribed++;
+    for (const m of deps.highlights.findUnprotected(clip.id)) {
+      const want = snapToSpeech({ start: m.start_sec, end: m.end_sec }, transcript.segments, clip.duration_sec);
+      if (!want.extended || (want.start === m.start_sec && want.end === m.end_sec)) continue;
+      // Never overlap another moment of the clip (protected or not, current ranges): stop at its boundary.
+      const others = deps.highlights.findByClip(clip.id).filter((o) => o.id !== m.id);
+      let start = want.start;
+      let end = want.end;
+      for (const o of others) {
+        if (o.end_sec <= m.start_sec && o.end_sec > start) start = o.end_sec;
+        if (o.start_sec >= m.end_sec && o.start_sec < end) end = o.start_sec;
+      }
+      start = round2(start);
+      end = round2(end);
+      if (end - start < MIN_MOMENT_SEC || (start === m.start_sec && end === m.end_sec)) {
+        result.snap_skipped_overlap++;
+        continue;
+      }
+      deps.highlights.snapUnprotected(m.id, start, end);
+      result.snapped++;
+      if (start !== round2(want.start) || end !== round2(want.end)) result.snap_clamped++;
+    }
+  }
 }

@@ -10,16 +10,25 @@ import { FfmpegNotFoundError } from '../../utils/errors.js';
 const execFileAsync = promisify(execFile);
 
 /** Runs speech recognition for one clip and returns whisper.cpp's full JSON. Injected in tests. */
-export type WhisperRunner = (clip: Clip, model: string) => Promise<unknown>;
+export interface RunnerOptions {
+  /** Silero VAD model; speech detection runs before decoding when set. */
+  vadModel?: string;
+}
+
+export type WhisperRunner = (clip: Clip, model: string, opts?: RunnerOptions) => Promise<unknown>;
 
 /** ffmpeg arguments: 16 kHz mono 16-bit WAV, the format whisper.cpp reads. */
 export function audioArgs(input: string, output: string): string[] {
   return ['-i', input, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'pcm_s16le', '-y', output];
 }
 
-/** whisper-cli arguments: language auto-detect, full JSON (segments + token timestamps) next to `outBase`. */
-export function whisperArgs(model: string, wav: string, outBase: string): string[] {
-  return ['-m', model, '-f', wav, '-l', 'auto', '-ojf', '-of', outBase, '-np'];
+/**
+ * whisper-cli arguments: language auto-detect, full JSON (segments + token timestamps) next to `outBase`.
+ * `-sns` suppresses non-speech tokens, `-mc 0` drops the text context (fewer decoder loops); `--vad -vm` when a VAD model is given.
+ */
+export function whisperArgs(model: string, wav: string, outBase: string, vadModel?: string): string[] {
+  return ['-m', model, '-f', wav, '-l', 'auto', '-ojf', '-of', outBase, '-np', '-sns', '-mc', '0',
+    ...(vadModel ? ['--vad', '-vm', vadModel] : [])];
 }
 
 /** The original when it exists, else the proxy. */
@@ -29,7 +38,7 @@ export function audioSource(clip: Pick<Clip, 'file_path' | 'proxy_path'>): strin
   throw new Error(`Neither the original nor the proxy of ${path.basename(clip.file_path)} is available`);
 }
 
-export const whisperCliRunner: WhisperRunner = async (clip, model) => {
+export const whisperCliRunner: WhisperRunner = async (clip, model, opts) => {
   const source = audioSource(clip);
   const dir = await mkdtemp(path.join(os.tmpdir(), 'clippilot-whisper-'));
   try {
@@ -42,7 +51,7 @@ export const whisperCliRunner: WhisperRunner = async (clip, model) => {
     }
     const outBase = path.join(dir, 'out');
     try {
-      await execFileAsync('whisper-cli', whisperArgs(model, wav, outBase), { timeout: 3600000, maxBuffer: 64 * 1024 * 1024 });
+      await execFileAsync('whisper-cli', whisperArgs(model, wav, outBase, opts?.vadModel), { timeout: 3600000, maxBuffer: 64 * 1024 * 1024 });
     } catch (err: any) {
       if (err.code === 'ENOENT') throw new Error('whisper-cli not found. Install whisper.cpp (brew install whisper-cpp).');
       throw new Error(`whisper-cli failed for ${path.basename(source)}: ${String(err.stderr ?? err.message).split('\n').slice(-3).join(' ').trim()}`);

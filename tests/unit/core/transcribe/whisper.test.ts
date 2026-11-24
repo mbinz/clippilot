@@ -58,7 +58,7 @@ describe('filterHallucinations', () => {
   });
 
   it('drops segments with very low mean token probability', () => {
-    const t = base([seg(0, 2, 'Brabbel', MIN_MEAN_TOKEN_P - 0.01), seg(2, 4, 'Delfine', MIN_MEAN_TOKEN_P + 0.2)]);
+    const t = base([seg(0, 2, 'Brabbel', MIN_MEAN_TOKEN_P - 0.01), seg(2, 4, 'Delfine', 0.7)]);
     expect(filterHallucinations(t).segments.map((s) => s.text)).toEqual(['Delfine']);
   });
 
@@ -84,5 +84,76 @@ describe('filterHallucinations', () => {
   it('segments without p are kept (p is optional)', () => {
     const t = base([{ start: 0, end: 1, text: 'Hallo' }]);
     expect(filterHallucinations(t).segments).toHaveLength(1);
+  });
+});
+
+import { classifySegment, filterHallucinationsWithStats } from '../../../../src/core/transcribe/whisper.js';
+import { whisperArgs } from '../../../../src/core/transcribe/runner.js';
+
+describe('T1b hallucination rules (real Arrifana junk)', () => {
+  const seg = (text: string, p = 0.9) => ({ start: 0, end: 3, text, p });
+  const reason = (text: string, p = 0.9) => classifySegment(seg(text, p));
+
+  it('keeps genuine speech', () => {
+    expect(reason('Schau mal, da sind zwei Delfine direkt neben dem Boot.')).toBeNull();
+    expect(reason('Vielen Dank, das war ein schöner Tag am Strand.')).toBeNull();
+    expect(reason('Ja, genau.', 0.9)).toBeNull();
+  });
+
+  it('drops sound descriptions in *…*, […], (…) and ♪', () => {
+    for (const t of ['*sad music*', '*Loud noise*', '*Burrish noise*', '*Klärgeräusche*', '[Music]', '(wind blowing)', '♪ la la ♪', '♪'])
+      expect(reason(t), t).not.toBeNull();
+    expect(reason('*sad music*')).toBe('sound_description');
+  });
+
+  it('does not drop speech that merely contains brackets', () => {
+    expect(reason('Das ist (glaube ich) der Hafen von Sagres.')).toBeNull();
+  });
+
+  it('drops n-grams repeated three or more times in a row (words and CJK characters)', () => {
+    expect(reason('The first time I was in the middle of the road, I was in the middle of the road, I was in the middle of the road, I was in the middle of the road')).toBe('repetition');
+    expect(reason('東京都道府 東京都道府 東京都道府 東京都道府')).toBe('repetition');
+    expect(reason('ja ja ja')).toBe('repetition');
+    expect(reason('no no no no')).toBe('repetition');
+  });
+
+  it('keeps text with a phrase repeated only twice', () => {
+    expect(reason('Schau mal schau mal, Delfine!')).toBeNull();
+  });
+
+  it('drops very short segments (<= 2 words) with mean token p below 0.6', () => {
+    expect(reason('- Okay.', 0.5)).toBe('short_low_p');
+    expect(reason('Please.', 0.55)).not.toBeNull();
+    expect(reason('Okay.', 0.8)).toBeNull();
+    expect(reason('Wir fahren raus aufs Meer.', 0.5)).toBeNull();
+  });
+
+  it('drops the added filler phrases, normalised', () => {
+    for (const t of ['ご視聴ありがとうございました', 'Продолжение следует...', 'Altyazı M.K.', 'Să vă mulțumim pentru vizionare.',
+      "I'll see you next time.", 'Vielen Dank.', 'Please.'])
+      expect(reason(t), t).not.toBeNull();
+    expect(reason('Vielen Dank.')).toBe('phrase');
+  });
+
+  it('filterHallucinationsWithStats counts dropped segments by reason', () => {
+    const t = { language: 'de', words: [], segments: [seg('*sad music*'), seg('Vielen Dank.'), seg('Thanks for watching.'), seg('Schau mal, Delfine!')] };
+    const r = filterHallucinationsWithStats(t);
+    expect(r.transcript.segments.map((s) => s.text)).toEqual(['Schau mal, Delfine!']);
+    expect(r.dropped).toEqual({ sound_description: 1, phrase: 2 });
+  });
+});
+
+describe('whisperArgs', () => {
+  it('always suppresses non-speech tokens, drops text context, auto-detects language', () => {
+    const a = whisperArgs('m.bin', 'a.wav', '/o');
+    expect(a).toEqual(expect.arrayContaining(['-sns', '-l', 'auto', '-ojf']));
+    expect(a[a.indexOf('-mc') + 1]).toBe('0');
+    expect(a).not.toContain('--vad');
+  });
+
+  it('adds --vad -vm <path> when a VAD model is given', () => {
+    const a = whisperArgs('m.bin', 'a.wav', '/o', '/v/silero.bin');
+    expect(a).toEqual(expect.arrayContaining(['--vad', '-vm', '/v/silero.bin']));
+    expect(a[a.indexOf('-vm') + 1]).toBe('/v/silero.bin');
   });
 });

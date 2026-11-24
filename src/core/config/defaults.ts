@@ -27,4 +27,6 @@ export const DEFAULT_CONFIG: AppConfig = {
   auto_skip_threshold: 1.5,
   web_ui_port: 3847,
   whisper_model: path.join(clippilotHome, 'models', 'ggml-large-v3-turbo.bin'),
+  whisper_vad_model: path.join(clippilotHome, 'models', 'ggml-silero-v5.1.2.bin'),
+  languages: ['de', 'en'],
 };

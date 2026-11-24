@@ -10,7 +10,7 @@ import { loadConfig } from '../../core/config/manager.js';
 import { recomputeDupGroups } from '../../core/similarity/dup-groups.js';
 import { ThumbnailRepository } from '../../db/repositories/thumbnail.repository.js';
 import { TranscriptRepository } from '../../db/repositories/transcript.repository.js';
-import { transcribeClips, whisperModelAvailable, expandHome } from '../../core/transcribe/index.js';
+import { transcribeClips, whisperModelAvailable, expandHome, resolveVadModel, vadMissingWarning } from '../../core/transcribe/index.js';
 import { analyzeClips } from '../../core/analyze/index.js';
 import { parseClipIds } from '../../core/calibration/sampling.js';
 import { createProgressBar } from '../formatters/progress.js';
@@ -88,8 +88,10 @@ export function registerAnalyzeCommand(parent: Command): void {
         if (fresh.length > 0) {
           if (whisperModelAvailable(config)) {
             console.log(`Transcribing ${fresh.length} clips...`);
+            const vadModel = resolveVadModel(config);
+            if (!vadModel) console.error(chalk.yellow(vadMissingWarning(config)));
             const t = await transcribeClips(fresh, { transcripts: transcriptRepo, highlights: highlightRepo },
-              { model: expandHome(config.whisper_model) });
+              { model: expandHome(config.whisper_model), vadModel, languages: config.languages });
             console.log(`  Transcribed: ${t.transcribed}, errors: ${t.errors.length}, moments snapped to sentences: ${t.snapped}`);
           } else {
             console.log(chalk.yellow(`Hint: no whisper model at ${expandHome(config.whisper_model)}; run "clippilot transcribe" after downloading one (config key whisper_model).`));

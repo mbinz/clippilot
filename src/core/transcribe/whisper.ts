@@ -24,7 +24,18 @@ export interface Transcript {
 /** Segments with a lower mean token probability are treated as hallucinated. */
 export const MIN_MEAN_TOKEN_P = 0.3;
 
-/** Phrases whisper invents on silence / music (compared lower-case, without punctuation). Add new ones here. */
+/** Segments of at most this many words need a better mean token probability than long ones. */
+export const SHORT_SEGMENT_MAX_WORDS = 2;
+export const MIN_SHORT_SEGMENT_P = 0.6;
+
+/** An n-gram (n = 1..REPEAT_MAX_N words or CJK characters) repeated this many times in a row marks a decoder loop. */
+export const REPEAT_MIN_COUNT = 3;
+export const REPEAT_MAX_N = 8;
+
+/**
+ * Phrases whisper invents on silence / music / wind (lower-case, punctuation removed). A segment is dropped when it is
+ * exactly the phrase or starts with it followed by more text ("Thanks for watching, see you"). Add new ones here.
+ */
 export const HALLUCINATION_PHRASES: string[] = [
   'untertitel im auftrag des zdf',
   'untertitel der amara org community',
@@ -35,12 +46,22 @@ export const HALLUCINATION_PHRASES: string[] = [
   'bis zum nächsten mal',
   'thanks for watching',
   'thank you for watching',
-  'thank you',
   'please subscribe',
   'subtitles by the amara org community',
-  'musik',
-  'music',
+  'ご視聴ありがとうございました',
+  'продолжение следует',
+  'altyazı m k',
+  'să vă mulțumim pentru vizionare',
+  'i ll see you next time',
 ];
+
+/** Short generic phrases that are only hallucinations when they are the whole segment ("Vielen Dank, das war schön" is speech). */
+export const HALLUCINATION_EXACT_PHRASES: string[] = [
+  'thank you', 'thanks', 'vielen dank', 'danke', 'please', 'musik', 'music',
+];
+
+/** A segment that is entirely a sound description: *…*, […], (…) or ♪…. */
+export const SOUND_DESCRIPTION = /^\s*(?:\*[^*]+\*|\[[^\]]+\]|\([^)]+\)|♪.*)\s*$/u;
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 const ms = (n: unknown) => round3(Number(n) / 1000);
@@ -92,21 +113,61 @@ export function parseWhisperJson(raw: any): Transcript {
 
 const normalize = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 
-/** Whether a segment looks like whisper's silence / music hallucination. */
-export function isHallucination(seg: TranscriptSegment): boolean {
-  if (!hasLetterOrDigit(seg.text)) return true;
-  if (seg.p !== undefined && seg.p < MIN_MEAN_TOKEN_P) return true;
-  const n = normalize(seg.text);
-  return HALLUCINATION_PHRASES.some((ph) => n === ph || n.startsWith(`${ph} `));
+export type DropReason = 'empty' | 'low_p' | 'sound_description' | 'phrase' | 'repetition' | 'short_low_p';
+
+/** Words, or single CJK characters, of a text (lower-case). */
+function unitsOf(text: string): string[] {
+  return text.toLowerCase().match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]|[^\s\p{P}\p{S}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]+/gu) ?? [];
 }
 
-/** Drop hallucinated segments and the words that lie inside them. */
-export function filterHallucinations(t: Transcript): Transcript {
-  const dropped = t.segments.filter(isHallucination);
-  const segments = t.segments.filter((s) => !dropped.includes(s));
+function hasLoop(units: string[]): boolean {
+  for (let n = 1; n <= REPEAT_MAX_N; n++) {
+    for (let i = 0; i + n * REPEAT_MIN_COUNT <= units.length; i++) {
+      let reps = 1;
+      while (i + n * (reps + 1) <= units.length
+        && units.slice(i, i + n).every((u, k) => u === units[i + n * reps + k])) reps++;
+      if (reps >= REPEAT_MIN_COUNT) return true;
+    }
+  }
+  return false;
+}
+
+/** Why a segment looks like a silence / music / wind hallucination, or null for real speech. */
+export function classifySegment(seg: TranscriptSegment): DropReason | null {
+  if (!hasLetterOrDigit(seg.text)) return 'empty';
+  if (SOUND_DESCRIPTION.test(seg.text)) return 'sound_description';
+  if (seg.p !== undefined && seg.p < MIN_MEAN_TOKEN_P) return 'low_p';
+  const n = normalize(seg.text);
+  if (HALLUCINATION_EXACT_PHRASES.includes(n) || HALLUCINATION_PHRASES.some((ph) => n === ph || n.startsWith(`${ph} `))) return 'phrase';
+  const units = unitsOf(seg.text);
+  if (hasLoop(units)) return 'repetition';
+  if (seg.p !== undefined && seg.p < MIN_SHORT_SEGMENT_P && units.length <= SHORT_SEGMENT_MAX_WORDS) return 'short_low_p';
+  return null;
+}
+
+/** Whether a segment looks like whisper's silence / music hallucination. */
+export function isHallucination(seg: TranscriptSegment): boolean {
+  return classifySegment(seg) !== null;
+}
+
+/** Drop hallucinated segments and the words that lie inside them; also counts the drops by reason. */
+export function filterHallucinationsWithStats(t: Transcript): { transcript: Transcript; dropped: Partial<Record<DropReason, number>> } {
+  const dropped: Partial<Record<DropReason, number>> = {};
+  const gone: TranscriptSegment[] = [];
+  const segments = t.segments.filter((s) => {
+    const r = classifySegment(s);
+    if (r === null) return true;
+    dropped[r] = (dropped[r] ?? 0) + 1;
+    gone.push(s);
+    return false;
+  });
   const words = t.words.filter((w) => {
     const mid = (w.start + w.end) / 2;
-    return !dropped.some((d) => mid >= d.start && mid <= d.end);
+    return !gone.some((d) => mid >= d.start && mid <= d.end);
   });
-  return { ...t, segments, words };
+  return { transcript: { ...t, segments, words }, dropped };
+}
+
+export function filterHallucinations(t: Transcript): Transcript {
+  return filterHallucinationsWithStats(t).transcript;
 }

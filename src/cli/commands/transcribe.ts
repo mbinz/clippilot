@@ -8,7 +8,7 @@ import { HighlightRepository } from '../../db/repositories/highlight.repository.
 import { TranscriptRepository } from '../../db/repositories/transcript.repository.js';
 import { resolveDbPath } from '../../utils/fs.js';
 import { loadConfig } from '../../core/config/manager.js';
-import { transcribeClips, requireWhisperModel } from '../../core/transcribe/index.js';
+import { transcribeClips, requireWhisperModel, resolveVadModel, vadMissingWarning } from '../../core/transcribe/index.js';
 import { resolveProject } from './resolve-project.js';
 
 export function registerTranscribeCommand(parent: Command): void {
@@ -30,6 +30,9 @@ export function registerTranscribeCommand(parent: Command): void {
         return;
       }
 
+      const vadModel = resolveVadModel(config);
+      if (!vadModel) console.error(chalk.yellow(vadMissingWarning(config)));
+
       const db = createDb(resolveDbPath(basePath));
       try {
         runMigrations(db);
@@ -40,13 +43,16 @@ export function registerTranscribeCommand(parent: Command): void {
         const result = await transcribeClips(
           clips,
           { transcripts: new TranscriptRepository(db), highlights: new HighlightRepository(db) },
-          { model, force: options.force, onProgress: (done, total, name) => log(`[${done}/${total}] ${name}`) },
+          { model, vadModel, languages: config.languages, force: options.force, onProgress: (done, total, name) => log(`[${done}/${total}] ${name}`) },
         );
         if (options.json) {
           console.log(JSON.stringify({ project: project.name, model, ...result }, null, 2));
         } else {
           console.log(`Transcribed ${result.transcribed}, skipped ${result.skipped_existing} (already done) + ${result.skipped_no_audio} (no audio), `
             + `${result.errors.length} failed; ${result.snapped} moments snapped to sentences.`);
+          if (result.dropped_language > 0) console.log(`  ${result.dropped_language} clips dropped (language not in ${config.languages.join(', ')}).`);
+          const dropped = Object.entries(result.dropped_segments);
+          if (dropped.length) console.log(`  Dropped segments: ${dropped.map(([r, n]) => `${r} ${n}`).join(', ')}.`);
           for (const e of result.errors) console.error(chalk.red(`  clip ${e.clip_id}: ${e.message}`));
         }
         if (result.errors.length > 0) process.exitCode = 1;

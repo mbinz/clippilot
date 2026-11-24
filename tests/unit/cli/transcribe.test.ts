@@ -69,9 +69,11 @@ describe('clippilot transcribe', () => {
     const model = path.join(dir, 'ggml-test.bin');
     fs.writeFileSync(model, 'x');
     fs.mkdirSync(path.join(dir, 'home'), { recursive: true });
-    fs.writeFileSync(path.join(dir, 'home', 'config.json'), JSON.stringify({ whisper_model: model }));
+    fs.writeFileSync(path.join(dir, 'home', 'config.json'), JSON.stringify({ whisper_model: model, whisper_vad_model: path.join(dir, 'no-vad.bin') }));
     await run('transcribe', '--json');
     expect(process.exitCode).toBeUndefined();
-    expect(JSON.parse(out.join('\n'))).toMatchObject({ project: 'trip', transcribed: 0, skipped_no_audio: 1, skipped_existing: 0, snapped: 0, errors: [] });
+    expect(JSON.parse(out.join('\n'))).toMatchObject({ project: 'trip', transcribed: 0, skipped_no_audio: 1, skipped_existing: 0, snapped: 0, dropped_language: 0, dropped_segments: {}, errors: [] });
+    // one warning (not one per clip) that VAD is off
+    expect(errs.filter((e) => /VAD/.test(e))).toHaveLength(1);
   });
 });

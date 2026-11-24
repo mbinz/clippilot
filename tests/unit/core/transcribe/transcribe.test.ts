@@ -7,7 +7,7 @@ import { runMigrations } from '../../../../src/db/migrations/runner.js';
 import { ClipRepository } from '../../../../src/db/repositories/clip.repository.js';
 import { HighlightRepository } from '../../../../src/db/repositories/highlight.repository.js';
 import { TranscriptRepository } from '../../../../src/db/repositories/transcript.repository.js';
-import { transcribeClips, requireWhisperModel, type WhisperRunner } from '../../../../src/core/transcribe/index.js';
+import { transcribeClips, requireWhisperModel, resolveVadModel, type WhisperRunner } from '../../../../src/core/transcribe/index.js';
 import { DEFAULT_CONFIG } from '../../../../src/core/config/defaults.js';
 
 const dolphins = JSON.parse(readFileSync('tests/fixtures/whisper/dolphins-en.json', 'utf-8'));
@@ -90,6 +90,48 @@ describe('transcribeClips', () => {
     await transcribeClips([a, b], deps(), { model: 'm', runner: slow, onProgress: (i) => seen.push(i) });
     expect(maxRunning).toBe(1);
     expect(seen).toEqual([1, 2]);
+  });
+
+  describe('allowed languages and filter stats', () => {
+    const lang = (language: string, text: string) => ({ result: { language }, transcription: [{ offsets: { from: 0, to: 2000 }, text: ` ${text}`,
+      tokens: [{ text: ` ${text}`, offsets: { from: 0, to: 2000 }, p: 0.9 }] }] });
+
+    it('a clip in a language that is not allowed gets an empty stored transcript (not retried), counted as dropped_language', async () => {
+      const c = clips.insert(clipInput(1));
+      const ja: WhisperRunner = async () => lang('ja', 'ご視聴ありがとうございました');
+      const r = await transcribeClips([c], deps(), { model: 'm', runner: ja, languages: ['de', 'en'] });
+      expect(r).toMatchObject({ transcribed: 0, dropped_language: 1 });
+      expect(transcripts.get(c.id)).toMatchObject({ language: 'ja', text: '', segments: [], words: [] });
+      calls = [];
+      const again = await transcribeClips([c], deps(), { model: 'm', runner, languages: ['de', 'en'] });
+      expect(calls).toEqual([]);
+      expect(again.skipped_existing).toBe(1);
+    });
+
+    it('an allowed language is kept (case-insensitive); without a list every language is kept', async () => {
+      const a = clips.insert(clipInput(1));
+      const b = clips.insert(clipInput(2));
+      const pt: WhisperRunner = async () => lang('pt', 'Olá a todos');
+      await transcribeClips([a], deps(), { model: 'm', runner: pt, languages: ['DE', 'PT'] });
+      expect(transcripts.get(a.id)!.text).toBe('Olá a todos');
+      await transcribeClips([b], deps(), { model: 'm', runner: pt });
+      expect(transcripts.get(b.id)!.text).toBe('Olá a todos');
+    });
+
+    it('reports dropped segments by reason', async () => {
+      const c = clips.insert(clipInput(1));
+      const noisy: WhisperRunner = async () => lang('de', '*Loud noise*');
+      const r = await transcribeClips([c], deps(), { model: 'm', runner: noisy, languages: ['de'] });
+      expect(r.dropped_segments).toEqual({ sound_description: 1 });
+      expect(transcripts.get(c.id)!.segments).toEqual([]);
+    });
+
+    it('passes the VAD model to the runner', async () => {
+      const c = clips.insert(clipInput(1));
+      let seen: string | undefined;
+      await transcribeClips([c], deps(), { model: 'm', vadModel: '/v/silero.bin', runner: async (_c, _m, o) => { seen = o?.vadModel; return dolphins; } });
+      expect(seen).toBe('/v/silero.bin');
+    });
   });
 
   describe('speech snap on moments', () => {
@@ -183,6 +225,19 @@ describe('requireWhisperModel', () => {
     const f = path.join(dir, 'm.bin');
     writeFileSync(f, 'x');
     expect(requireWhisperModel({ ...DEFAULT_CONFIG, whisper_model: f })).toBe(f);
+  });
+
+  it('config defaults: VAD model path and allowed languages', () => {
+    expect(DEFAULT_CONFIG.whisper_vad_model.endsWith(path.join('.clippilot', 'models', 'ggml-silero-v5.1.2.bin'))).toBe(true);
+    expect(DEFAULT_CONFIG.languages).toEqual(['de', 'en']);
+  });
+
+  it('resolveVadModel returns the path only when the file exists', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'vad-'));
+    const f = path.join(dir, 'v.bin');
+    expect(resolveVadModel({ whisper_vad_model: f })).toBeUndefined();
+    writeFileSync(f, 'x');
+    expect(resolveVadModel({ whisper_vad_model: f })).toBe(f);
   });
 
   it('default model path is ~/.clippilot/models/ggml-large-v3-turbo.bin', () => {

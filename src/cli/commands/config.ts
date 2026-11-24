@@ -35,15 +35,18 @@ export function registerConfigCommand(parent: Command): void {
           }
         }
 
+        // `languages` is a list: "de,en,pt".
+        const stored: unknown = key === 'languages' ? value.split(',').map((l) => l.trim()).filter(Boolean) : value;
+
         if (opts?.global) {
-          await saveGlobalConfigValue(key, value);
+          await saveGlobalConfigValue(key, stored);
           console.log(chalk.green(`Set ${key} = ${key.includes('key') ? '***' : value} (global)`));
           return;
         }
 
         const config = await loadConfig(basePath);
         // Simple top-level key setting
-        (config as any)[key] = value;
+        (config as any)[key] = stored;
         await saveConfig(basePath, config);
         console.log(chalk.green(`Set ${key} = ${key.includes('key') ? '***' : value}`));
         return;
