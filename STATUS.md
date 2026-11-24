@@ -1355,6 +1355,33 @@ downloads): `~/.clippilot/models/ggml-large-v3-turbo.bin` (1.62 GB, sha1 4af2b29
    mouse.", "A CIDADE NO BRASIL", "Shhh. Sss."); 4 language fallbacks; 32 unprotected moments snapped (13 clamped at a
    neighbour, 2 skipped). Panels/protected moments untouched. Whisper text of kids' speech is approximate ("Bier und
    Blut") — fine for drafting context, not for subtitles.
+**S1 — motion measurement: shake + stillness per moment (planner spec, 2026-11-24)** — PRD 2b.2, test-first.
+- Port the pure motion code from resolve-prep (`~/dev/clippilot-post/src/stabilize/motion.ts`: `globalShift` SAD block
+  matching on the centre 60 %, `jitterScore` = RMS of path − centred 0.5 s moving average in % of width, `maxPx`;
+  `frames.ts`: ffmpeg decode of a range at native fps, 320 px wide gray8 rawvideo) into `src/core/motion/` with its tests.
+  Calibrated on Arrifana 2026-11-24: tripod = 0, handheld 0.04–0.35, too shaky ≥ 0.43 (user-judged in Resolve).
+- New pure measures from the same aligned frames: `cameraMotion` = mean |velocity| of the moving-average path in % of
+  width per second (smooth pan/tilt speed); `frameChange` = mean absolute luma difference (0–1) between consecutive frames
+  after compensating the global shift (people, waves, action). Both are raw numbers for the cut critic; no band.
+- Shake band (pure `shakeBand(score, cfg)`): `locked` < `shake_locked_max` (default 0.02), `stabilize`, `shaky` ≥
+  `shake_shaky_min` (default 0.4); keys in project/global config.
+- Storage: migration 021 on `highlights`: `shake_score REAL`, `shake_max_px REAL`, `camera_motion REAL`,
+  `frame_change REAL`, `motion_start_sec REAL`, `motion_end_sec REAL` (the range that was measured). A moment counts as
+  measured when its current start/end equal the measured range (±0.01 s); trimming makes it stale → re-measured next run.
+- CLI `clippilot motion [--project] [--force] [--json]`: measures every moment that is unmeasured or stale (all with
+  `--force`), sequential, resumable, decode from the original (proxy if missing) at the clip's native fps; reports
+  measured / skipped / failed and the band counts. `analyze` runs it after transcribe. Measuring is read-only for
+  edits: it never changes ranges, status or source (protected or not).
+- Output: `moments list --json` rows and `cut show --json` moments carry `shake: { score, band } | null` and
+  `motion: { camera, change } | null` (null = not measured / stale).
+- Tests first: ported motion tests; cameraMotion (static 0, constant pan = its speed); frameChange (identical frames 0,
+  shifted identical frames ≈ 0 after compensation, changed content > 0); shakeBand boundaries; staleness after a trim;
+  migration; CLI JSON counts with an injected frame source; one tiny generated-media integration test (decode → scores).
+- Done when typecheck + test:all green; planner runs `motion` on Arrifana (167 moments, ~10 min) and checks the band
+  counts against the resolve-prep numbers for the 37 cut panels (5 locked / 19 stabilize / 13 shaky).
+- Then (separate, resolve-prep R1): `stabilize` reads the band from cut.json (`moment.shake`) and only measures itself
+  when a panel has none.
+
 Open: precision on the ≈ 8 leftovers (idea: cross-check with Gemini's per-moment `audio_type` or a second VAD pass);
 SKILL.md mention of `transcribe`/`speech`; T2 drawer.
 
