@@ -15,6 +15,9 @@ export interface AppConfig {
   /** VAD speech threshold (whisper -vt) and padding in ms (-vp); low values keep speech in wind. */
   whisper_vad_threshold: number;
   whisper_vad_pad_ms: number;
+  /** Shake bands by jitter score (% of frame width): below `shake_locked_max` = locked, from `shake_shaky_min` = shaky. */
+  shake_locked_max: number;
+  shake_shaky_min: number;
   /** ISO codes of the languages spoken in the footage; clips detected as another language get an empty transcript. */
   languages: string[];
   /** IANA time zone of the footage (event names / time groups); unset = system zone. */
