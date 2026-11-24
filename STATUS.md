@@ -1338,6 +1338,26 @@ real cases (two cases alone are too few). Gimbal footage only in "Farol" (calibr
   is also part of clip JSON (search/get-clip output).
 - T2 (next): board drawer shows the transcript (moment part highlighted); then the motion slice.
 
+**T1 result (planner, 2026-11-24)** — ✅ T1 + T1b–T1d on branch t1-transcript (999 tests). Models (user-approved
+downloads): `~/.clippilot/models/ggml-large-v3-turbo.bin` (1.62 GB, sha1 4af2b29d…) and `ggml-silero-v5.1.2.bin`
+(VAD, 0.9 MB). Arrifana took four runs (each from the backup `clippilot.pre-019.db`; junk run kept as
+`clippilot.junk-019.db`):
+1. no VAD: whisper hallucinated on wind/sea in ~60 clips (Japanese/Russian subtitle credits, "*sad music*", loops),
+   79 moments snapped on junk → T1b: VAD, `-sns -mc 0`, project `languages` (Arrifana: de,en,pt), sound-description /
+   repetition / short-low-p filters, phrase list.
+2. VAD 0.5: junk gone but real speech in wind lost (pt guide → "Tchau, tchau.") → T1c: VAD threshold 0.15 + 200 ms pad
+   (measured on C0567/C0522/C0572 vs sea clips), fallback over allowed languages, 80 % repetition rule (≥ 6 words only,
+   so kids' "Mama, Mama!" / "Ja, ja, ja." survive).
+3. VAD 0.15: speech fully back, but classic English wind hallucinations with token p 0.8–0.9 ("I'm going to go to the
+   next one." in ~15 clips) — confidence can't separate them → T1d: project-level cross-clip filter (same normalised
+   text in ≥ 3 clips = dropped; raw segments kept in migration 020) + exact-phrase list.
+4. Final: 104 transcribed, 36 with text, ≈ 28 genuine (kids, adults, pt/en boat guides), ≈ 8 short leftovers ("He'll be
+   mouse.", "A CIDADE NO BRASIL", "Shhh. Sss."); 4 language fallbacks; 32 unprotected moments snapped (13 clamped at a
+   neighbour, 2 skipped). Panels/protected moments untouched. Whisper text of kids' speech is approximate ("Bier und
+   Blut") — fine for drafting context, not for subtitles.
+Open: precision on the ≈ 8 leftovers (idea: cross-check with Gemini's per-moment `audio_type` or a second VAD pass);
+SKILL.md mention of `transcribe`/`speech`; T2 drawer.
+
 ### Resolve capability test for post-production (2026-11-23, free Resolve, user import)
 
 Direction (user, 2026-11-23): ClipPilot stays sorting + storyboard + rough-cut export; post-production automation
