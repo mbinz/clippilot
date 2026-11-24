@@ -53,6 +53,7 @@ export interface InsertHighlight {
 export class HighlightRepository {
   private stmtReplaceable: Database.Statement;
   private stmtDelete: Database.Statement;
+  private stmtSnap: Database.Statement;
   private stmtInsert: Database.Statement;
   private stmtFindByClip: Database.Statement;
   private stmtListByProject: Database.Statement;
@@ -65,13 +66,14 @@ export class HighlightRepository {
     // Decisions survive re-analysis: confirmed/rejected moments, edited ones (range, speed, ★) and those a panel
     // or candidate list points at stay. This selects the proposed, unreferenced ones; edited ones are filtered in code.
     this.stmtReplaceable = db.prepare(`
-      SELECT id, start_sec, end_sec, ai_start_sec, ai_end_sec, speed, suggested_speed, user_tier FROM highlights
+      SELECT * FROM highlights
       WHERE clip_id = ? AND status = 'proposed'
         AND id NOT IN (SELECT moment_id FROM story_segments WHERE moment_id IS NOT NULL)
         AND id NOT IN (SELECT moment_id FROM panel_candidates)
     `);
     this.stmtRanges = db.prepare('SELECT start_sec, end_sec FROM highlights WHERE clip_id = ?');
     this.stmtDelete = db.prepare('DELETE FROM highlights WHERE id = ?');
+    this.stmtSnap = db.prepare('UPDATE highlights SET start_sec = ?, end_sec = ?, ai_start_sec = ?, ai_end_sec = ? WHERE id = ?');
     this.stmtInsert = db.prepare(
       'INSERT INTO highlights (clip_id, start_sec, end_sec, description, tier, shot, role, issues, slowmo, slowmo_reason, suggested_speed, audio_keep, audio_type, speed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     );
@@ -92,23 +94,37 @@ export class HighlightRepository {
   }
 
   /**
+   * Moments a re-analysis (or any normaliser such as the speech snap) may change: proposed, not used by a panel or
+   * candidate list, and untouched (range = analysis range, default speed, no ★). Everything else is protected
+   * (confirmed, rejected, edited, in use) and is never changed by a tool.
+   */
+  findUnprotected(clipId: number): HighlightRecord[] {
+    const fps = this.clipFps(clipId);
+    const rows = this.stmtReplaceable.all(clipId) as HighlightRecord[];
+    return rows.filter((r) => !(
+      r.start_sec !== (r.ai_start_sec ?? r.start_sec) || r.end_sec !== (r.ai_end_sec ?? r.end_sec)
+      || r.speed !== defaultSpeed(r.suggested_speed, fps) || r.user_tier !== null));
+  }
+
+  /** Set the range of an unprotected moment as the analysis' own range (ai range too), so it stays unprotected. */
+  snapUnprotected(id: number, startSec: number, endSec: number): void {
+    this.stmtSnap.run(startSec, endSec, startSec, endSec, id);
+  }
+
+  private clipFps(clipId: number): number | null | undefined {
+    return (this.db.prepare('SELECT fps FROM clips WHERE id = ?').get(clipId) as { fps: number | null } | undefined)?.fps;
+  }
+
+  /**
    * Store a fresh analysis: proposed, unreferenced moments are replaced by `items`; moments that are
    * confirmed, rejected, edited (range / speed / ★), or used by a panel/candidate list are kept (so decisions
    * and the timeline survive). A new moment overlapping a kept one by >= 50 % of its own length is dropped (no
    * near-duplicates of what the user already worked on). New moments start at the fps-gated default speed.
    */
   replaceForClip(clipId: number, items: InsertHighlight[]): void {
-    const fps = (this.db.prepare('SELECT fps FROM clips WHERE id = ?').get(clipId) as { fps: number | null } | undefined)?.fps;
+    const fps = this.clipFps(clipId);
     this.db.transaction(() => {
-      const rows = this.stmtReplaceable.all(clipId) as {
-        id: number; start_sec: number; end_sec: number; ai_start_sec: number | null; ai_end_sec: number | null;
-        speed: number; suggested_speed: number; user_tier: string | null;
-      }[];
-      for (const r of rows) {
-        const edited = r.start_sec !== (r.ai_start_sec ?? r.start_sec) || r.end_sec !== (r.ai_end_sec ?? r.end_sec)
-          || r.speed !== defaultSpeed(r.suggested_speed, fps) || r.user_tier !== null;
-        if (!edited) this.stmtDelete.run(r.id);
-      }
+      for (const r of this.findUnprotected(clipId)) this.stmtDelete.run(r.id);
       // Whatever is left now was kept (decided, edited or in use): do not re-propose the same stretch.
       const keptRanges = this.stmtRanges.all(clipId) as { start_sec: number; end_sec: number }[];
       for (const h of items) {

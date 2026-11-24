@@ -29,6 +29,8 @@ export interface Clip {
   analysis_profile_version: number | null;
   event_id: number | null;
   hidden: number;
+  /** Spoken words (whisper); mirrored from `transcripts` for the clip search. */
+  transcript_text: string | null;
 }
 
 export type AnalysisStatus = 'pending' | 'analyzing' | 'done' | 'error';

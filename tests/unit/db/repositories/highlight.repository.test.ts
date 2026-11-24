@@ -267,3 +267,51 @@ describe('HighlightRepository.replaceForClip: no duplicates of kept moments', ()
     expect(descs()).toEqual(['overlapping new', 'same range']);
   });
 });
+
+describe('HighlightRepository: unprotected moments (the definition shared with re-analysis)', () => {
+  let db: Database.Database;
+  let repo: HighlightRepository;
+  let clipId: number;
+
+  beforeEach(() => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    runMigrations(db);
+    const pid = new ProjectRepository(db).findOrCreate('p').id;
+    clipId = new ClipRepository(db).insert(makeClip({ project_id: pid, fps: 25 })).id;
+    repo = new HighlightRepository(db);
+    repo.replaceForClip(clipId, [
+      item(1, 3, 'plain'), item(4, 6, 'confirmed'), item(7, 9, 'rejected'), item(10, 12, 'trimmed'),
+      item(13, 15, 'starred'), item(16, 18, 'in panel'), item(19, 21, 'candidate'), item(22, 24, 'sped'),
+    ]);
+    const id = (d: string) => repo.findByClip(clipId).find((h) => h.description === d)!.id;
+    db.prepare("UPDATE highlights SET status = 'confirmed' WHERE id = ?").run(id('confirmed'));
+    db.prepare("UPDATE highlights SET status = 'rejected' WHERE id = ?").run(id('rejected'));
+    db.prepare('UPDATE highlights SET start_sec = 11 WHERE id = ?').run(id('trimmed'));
+    db.prepare("UPDATE highlights SET user_tier = 'hero' WHERE id = ?").run(id('starred'));
+    db.prepare('UPDATE highlights SET speed = 0.5 WHERE id = ?').run(id('sped'));
+    const pidx = new ProjectRepository(db).findOrCreate('p').id;
+    const cut = db.prepare("INSERT INTO stories (project_id, name) VALUES (?, 'Main')").run(pidx).lastInsertRowid;
+    const scene = db.prepare("INSERT INTO scenes (story_id, position, name) VALUES (?, 0, 's')").run(cut).lastInsertRowid;
+    db.prepare("INSERT INTO story_segments (story_id, scene_id, position, state, clip_id, moment_id) VALUES (?, ?, 0, 'filled', ?, ?)").run(cut, scene, clipId, id('in panel'));
+    const cand = db.prepare("INSERT INTO story_segments (story_id, scene_id, position, state) VALUES (?, ?, 1, 'candidates')").run(cut, scene).lastInsertRowid;
+    db.prepare('INSERT INTO panel_candidates (panel_id, moment_id, position) VALUES (?, ?, 0)').run(cand, id('candidate'));
+  });
+
+  it('findUnprotected returns only proposed, untouched, unreferenced moments', () => {
+    expect(repo.findUnprotected(clipId).map((h) => h.description)).toEqual(['plain']);
+  });
+
+  it('replaceForClip drops exactly those', () => {
+    repo.replaceForClip(clipId, []);
+    expect(repo.findByClip(clipId).map((h) => h.description).sort()).toEqual(
+      ['candidate', 'confirmed', 'in panel', 'rejected', 'sped', 'starred', 'trimmed']);
+  });
+
+  it('snapUnprotected sets range and ai range, so the moment stays unprotected (not "edited")', () => {
+    const [m] = repo.findUnprotected(clipId);
+    repo.snapUnprotected(m.id, 0.5, 4);
+    expect(repo.findByClip(clipId).find((h) => h.id === m.id)).toMatchObject({ start_sec: 0.5, end_sec: 4, ai_start_sec: 0.5, ai_end_sec: 4 });
+    expect(repo.findUnprotected(clipId).map((h) => h.id)).toEqual([m.id]);
+  });
+});
