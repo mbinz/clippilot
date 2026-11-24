@@ -1,4 +1,6 @@
 import type { HighlightResponse, SlowmoLevel } from './schema.js';
+import { snapToSpeech } from '../transcribe/speech.js';
+import type { TranscriptSegment } from '../transcribe/whisper.js';
 
 const MIN_LENGTH_SEC = 0.5;
 const MIN_MOMENT_SEC = 2;
@@ -66,6 +68,9 @@ function shorten(start: number, end: number): [number, number] {
  * Clamp to [0, duration], drop junk (< 0.5 s), widen to a 2 s minimum, shorten to an 8 s maximum (centred),
  * sort by start, resolve overlaps, round to 0.01 s, add suggested_speed.
  *
+ * With a transcript (`speech`), a range that cuts into a sentence is widened to the whole sentence and then keeps
+ * its length (no 8 s cap for ranges extended by speech); a capped range that ends up cutting speech is snapped too.
+ *
  * Overlap rule: walking the moments in start order, a moment that starts before the previous kept moment ends
  * is shifted to start at that end (its end stays); if less than MIN_MOMENT_SEC remains it is dropped.
  * Fully contained moments are therefore dropped. Moments are never merged, so the model's cut points survive.
@@ -74,6 +79,7 @@ export function normalizeHighlights(
   raw: HighlightResponse[],
   durationSec: number,
   fps?: number | null,
+  speech: TranscriptSegment[] = [],
 ): NormalizedHighlight[] {
   const sized = raw
     .map((h) => ({
@@ -84,8 +90,11 @@ export function normalizeHighlights(
     .filter((h) => h.end_sec - h.start_sec >= MIN_LENGTH_SEC)
     .map((h) => {
       const [ws, we] = widen(h.start_sec, h.end_sec, durationSec);
-      const [start_sec, end_sec] = shorten(ws, we);
-      return { ...h, start_sec, end_sec };
+      const snapped = snapToSpeech({ start: ws, end: we }, speech, durationSec);
+      if (snapped.extended) return { ...h, start_sec: snapped.start, end_sec: snapped.end };
+      const [ss, se] = shorten(ws, we);
+      const capped = snapToSpeech({ start: ss, end: se }, speech, durationSec);
+      return { ...h, start_sec: capped.start, end_sec: capped.end };
     })
     .sort((a, b) => a.start_sec - b.start_sec);
 

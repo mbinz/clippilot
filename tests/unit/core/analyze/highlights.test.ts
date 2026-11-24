@@ -178,3 +178,33 @@ describe('normalizeHighlights missing description', () => {
     expect(out[0].description).toBe('');
   });
 });
+
+describe('normalizeHighlights with a transcript', () => {
+  const speech = [{ start: 1, end: 20, text: 'Eine lange Erklärung.' }, { start: 30, end: 31, text: 'Hm.' }];
+
+  it('widens a range that cuts into a sentence to the whole sentence, skipping the 8 s cap', () => {
+    const out = normalizeHighlights([h(5, 9)], 60, 25, speech);
+    expect(out.map((x) => [x.start_sec, x.end_sec])).toEqual([[1, 20]]);
+  });
+
+  it('ranges that touch no speech are untouched and still capped at 8 s', () => {
+    const out = normalizeHighlights([h(40, 55)], 60, 25, speech);
+    expect(out.map((x) => [x.start_sec, x.end_sec])).toEqual([[43.5, 51.5]]);
+  });
+
+  it('a capped range that then cuts into speech is snapped to the sentence', () => {
+    // 22..38 is capped to 26..34, whose end cuts into the sentence 33..36
+    const out = normalizeHighlights([h(22, 38)], 60, 25, [{ start: 33, end: 36, text: 'x' }]);
+    expect(out.map((x) => [x.start_sec, x.end_sec])).toEqual([[26, 36]]);
+  });
+
+  it('is unchanged without segments', () => {
+    expect(normalizeHighlights([h(5, 9)], 60, 25, [])).toEqual(normalizeHighlights([h(5, 9)], 60, 25));
+  });
+
+  it('snapped moments that overlap are resolved by the normal overlap rule', () => {
+    const out = normalizeHighlights([h(2, 4), h(18, 22), h(19, 21)], 60, 25, speech);
+    // [2,4] -> [1,20]; [18,22] -> [1,22] starts at 20 (2 s left, kept); [19,21] -> [1,21] has < 2 s left, dropped
+    expect(out.map((x) => [x.start_sec, x.end_sec])).toEqual([[1, 20], [20, 22]]);
+  });
+});

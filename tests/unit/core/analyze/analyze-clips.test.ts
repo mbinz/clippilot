@@ -4,6 +4,7 @@ import { runMigrations } from '../../../../src/db/migrations/runner.js';
 import { ClipRepository } from '../../../../src/db/repositories/clip.repository.js';
 import { HighlightRepository } from '../../../../src/db/repositories/highlight.repository.js';
 import { analyzeClips } from '../../../../src/core/analyze/index.js';
+import { TranscriptRepository } from '../../../../src/db/repositories/transcript.repository.js';
 import { DEFAULT_CONFIG } from '../../../../src/core/config/defaults.js';
 import type { ClipAnalysisResponse } from '../../../../src/core/analyze/schema.js';
 
@@ -39,13 +40,14 @@ describe('analyzeClips with highlights', () => {
     hlRepo = new HighlightRepository(db);
   });
 
-  function insertClip() {
-    return clipRepo.insert({
+  function insertClipInput() {
+    return {
       project_id: null, file_path: '/v/a.mp4', proxy_path: null, file_hash: 'h1', file_size: 10,
       duration_sec: 4.3, resolution: null, fps: null, nb_frames: null, has_video: 1, has_audio: 1,
       codec: null, recorded_at: null, start_timecode: null, location: null, manual_tags: null, people: null,
-    });
+    };
   }
+  function insertClip() { return clipRepo.insert(insertClipInput()); }
 
   it('stores normalized highlights, sets status done, and replaces on re-run', async () => {
     const clip = insertClip();
@@ -82,6 +84,15 @@ describe('analyzeClips with highlights', () => {
       ['Fresh', 'proposed'], ['Keep', 'confirmed'],
     ]);
     expect(hlRepo.findByClip(clip.id).find((h) => h.description === 'Keep')!.id).toBe(keep.id);
+  });
+  it('uses an existing transcript: moments are snapped to whole sentences, no 8 s cap', async () => {
+    const clip = clipRepo.insert({ ...insertClipInput(), duration_sec: 60 });
+    new TranscriptRepository(db).save(clip.id, 'm', {
+      language: 'de', words: [], segments: [{ start: 1, end: 20, text: 'Eine lange Erklärung.' }],
+    });
+    const client = { analyzeVideo: async () => response([{ start_sec: 5, end_sec: 9, description: 'Rede', tier: 'hero', shot: 'medium', role: 'action' }]) };
+    await analyzeClips([clip], DEFAULT_CONFIG, clipRepo, () => {}, hlRepo, client, new TranscriptRepository(db));
+    expect(hlRepo.findByClip(clip.id).map((h) => [h.start_sec, h.end_sec])).toEqual([[1, 20]]);
   });
   it('leaves analysis_profile_version NULL (taste profiles are gone)', async () => {
     const a = insertClip();

@@ -6,6 +6,7 @@ import type { ClipRepository } from '../../db/repositories/clip.repository.js';
 import { GeminiClient } from './gemini-client.js';
 import type { HighlightRepository } from '../../db/repositories/highlight.repository.js';
 import { normalizeHighlights } from './highlights.js';
+import type { TranscriptRepository } from '../../db/repositories/transcript.repository.js';
 import type { ClipAnalysisResponse } from './schema.js';
 
 export interface AnalysisClient {
@@ -35,6 +36,7 @@ export async function analyzeClips(
   onProgress: (current: number, filename: string) => void,
   highlightRepo?: HighlightRepository,
   client: AnalysisClient = new GeminiClient(config),
+  transcriptRepo?: TranscriptRepository,
 ): Promise<AnalyzeResult> {
   const limiter = pLimit(config.analysis_parallelism);
   let success = 0;
@@ -52,7 +54,7 @@ export async function analyzeClips(
         clipRepo.updateAnalysis(clip.id, analysisToDbFields(analysis));
         highlightRepo?.replaceForClip(
           clip.id,
-          normalizeHighlights(analysis.highlights, clip.duration_sec, clip.fps),
+          normalizeHighlights(analysis.highlights, clip.duration_sec, clip.fps, transcriptRepo?.get(clip.id)?.segments ?? []),
         );
         success++;
       } catch (err) {
