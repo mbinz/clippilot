@@ -15,6 +15,11 @@ timeline; export seamless. v0.3 planned (board v3 + assistant link), roadmap re-
 approved after three rounds. **Next: M7 slices B1 → B4, then M8 (A1)** — specs under "v0.3" below.
 **2026-11-23 (later): v0.3 code-complete** — M7 board v3 + M8 assistant link merged (865 tests), in use on the real
 Arrifana cut in Safari. Next: roadmap item 2 (analysis polish + full Portugal) once the user has used v0.3 for real.
+**2026-11-24: Q3 done (907 tests); post-production tools v0.1 built in `~/dev/clippilot-post`** (separate repo, no
+remote yet; 100 tests): titles (style D, ProRes 4444 on V2), music + original sound split into keep/bed tracks,
+stabilization marking (orange), color groups (reference marker). Arrifana package ready for the user's Resolve import:
+`~/Video/ClipPilot Arrifana/exports/post/Main/` (`03 Arrifana – Main – post.otio` + `README – Resolve.md`). User decision:
+finish Arrifana end-to-end before full Portugal (Q4 waits; estimate 471 clips / 117 min, ~$5–10, ≤ $20).
 
 `v0.1.0` — ingest (resumable) / analyze with timestamped highlights / search / summary; OTIO + FCPXML export verified in free Resolve (M1). No story/storyboard workflow yet (M3).
 Solo project, MIT. Run via `tsx`, no compiled binary.
@@ -1177,7 +1182,8 @@ slide in staggered (~0.15 s), hold, slide out. Previews + renderers: `~/Video/Cl
 Archivo Black, Pacifico, Permanent Marker installed in the user's `~/Library/Fonts` (renderer = sharp/librsvg via CoreText
 needs them registered). Rejected: clean/editorial/journal (too restrained), red blocks.
 
-**Open next session:** create `~/dev/clippilot-post` + titles skill (render all chapter titles of the Arrifana cut with the
+**Done 2026-11-24 (see clippilot-post status.md):** titles, music/sound split, stabilization + camera marking, `post build`.
+Was open: create `~/dev/clippilot-post` + titles skill (render all chapter titles of the Arrifana cut with the
 animation, extended OTIO with V2), test import in Resolve; then music/sound placement; then stabilization + camera marking;
 then Q3 small fixes + full Portugal (Q4). ★ came out at 16 % on the Arrifana re-run (target ~10 %) — check on Portugal.
 
