@@ -24,6 +24,11 @@ finish Arrifana end-to-end before full Portugal (Q4 waits; estimate 471 clips / 
 **timeline markers** work. Feedback → resolve-prep P6 (orange = stabilize, red = SHAKY FOOTAGE, no edit decisions) and a
 grilling round on draft quality (Q1–Q23) → PRD roadmap item **2b** (transcript → motion → draft rules → cut critic →
 story critic → loop → Portugal). **Next: slice T1 (transcript)**, spec under "Roadmap item 2b" below.
+**2026-11-24 (end of session):** T1 transcript, T2 drawer, S1 motion merged (1043 tests); resolve-prep R1 reads ClipPilot's
+shake band. User review of shake values: "locked" (0.00) is wrong for Arrifana — integer-pixel measurement can't see
+light jitter; light-jitter calibration **deferred** by the user. Priority instead: finding single **Wackler** (jolts) per
+clip — prototype W0 judged by the user (141 verdicts, 71 % real). **Next session: start with "OPEN — needs the user"
+(section "W0 — Wackler prototype" below), then slice W1.**
 
 `v0.1.0` — ingest (resumable) / analyze with timestamped highlights / search / summary; OTIO + FCPXML export verified in free Resolve (M1). No story/storyboard workflow yet (M3).
 Solo project, MIT. Run via `tsx`, no compiled binary.
@@ -1412,7 +1417,55 @@ shaky 73 — the 37 cut panels match resolve-prep exactly (5 / 19 / 13). Deferre
 `motion` command (cut show / web use defaults); SKILL.md lacks `motion`; `skill:install` not run.
 
 Open: precision on the ≈ 8 leftovers (idea: cross-check with Gemini's per-moment `audio_type` or a second VAD pass);
-SKILL.md mention of `transcribe`/`speech`; T2 drawer.
+SKILL.md mention of `transcribe`/`speech` (done in T2); T2 drawer (done).
+
+**W0 — Wackler prototype (planner + user, 2026-11-24)** — decided in grilling Q24–Q29: shake work moves from one number
+per moment to a **per-clip camera-motion curve**; single jolts ("Wackler") are found per clip and only **marked**
+(Q26a: analysis marks; only AI-moment *boundaries* lying inside a Wackler move to its edge), the drafter (Claude) decides
+keep vs cut out (two panels), the cut critic checks, protected moments only get a hint (Q26b); covering with B-roll is a
+suggestion + resolve-prep marker only, no second track in ClipPilot yet (Q26c). Light-jitter calibration (subpixel,
+"locked" band) is **deferred**; Farol (gimbal) is **not** a good test set (user).
+- Prototype (throwaway, in `~/Video/ClipPilot Arrifana/exports/wackler-eval/`: `measure.mts`, `measure2.mts` (+ left/right
+  halves), `detect.py`, `shake_review.py`, `candidates.json`, user `verdicts.json`): ffmpeg gray 320 px, whole clip, native
+  fps; global shift per frame by SAD, coarse (160 px, ±8) → fine (320 px, ±1) = ±16 px range; ~12 min for 104 clips
+  (25 min footage) with 3 workers.
+- **Bug found:** `-hwaccel videotoolbox` silently drops frames on the Sony 10-bit H.264 files (C0589: 1506 of 2472
+  decoded) → the curve drifted against the video. Never use VideoToolbox for measuring; the prototype now checks decoded
+  frames = `nb_read_packets`. (ClipPilot S1 `decodeFrames` doesn't use hwaccel — unaffected.)
+- Curve that matched the user's perception: **shake speed** = |velocity smoothed over ~0.08 s − camera velocity averaged
+  over 0.5 s| in % of frame width per second (a position-based residual looked early/smeared). Candidate = above
+  max(3 × clip median, 12 %/s), grown while > half that, gaps < 0.25 s merged, ≤ 2 s long; clips with median > 8 %/s =
+  "continuously shaky" (16 clips, no Wackler search).
+- Result: 144 candidates in 51 clips; user judged 141: **100 real / 41 not (precision 0.71)**. Peak strength barely
+  separates (only > 60 %/s is 7/7). User: works very well for clear cases (flat line + clear spike); weaker in action
+  scenes (boat: everything shaky, extra spikes, "editor's choice"); birds clip C0561 (100 fps) 0/5; some moments have
+  several spikes but only one was marked, often not the disturbing one.
+- Rule experiments against the verdicts (`all3.json` measure with left/right halves):
+  - left/right halves disagree (ratio of half-disagreement to global motion ≥ 0.8) = subject motion (kid close to the
+    camera, birds), not camera → drop: precision 0.78, recall 0.88 (drops 16 no / 12 yes); ≥ 0.6: 0.82 / 0.85.
+  - judging speed at playback rate (×25/fps for 50/100 fps): 0.75 / 0.84 — but the user judged proxies at source speed,
+    so this can't be validated with these verdicts.
+  - both + "continuously shaky" stricter (median < 5): 0.89 / 0.63 — too many real ones lost.
+- **OPEN — needs the user (next session, before W1):**
+  1. Trade-off for the subject-motion rule: recommend ratio < 0.8 (precision 0.71 → 0.78, loses 12 of 100 real). OK?
+  2. Several spikes in one moment: recommend marking **every** spike separately (no merging) with strength **and** jump
+     distance (px) — the user said the marked one was often not the disturbing one. Is jump distance what makes a
+     Wackler disturbing, or something else (direction, duration)?
+  3. Slow motion (50/100 fps used at 0.5×/0.25×): judge Wackler at playback speed (they look softer slowed down)? The
+     user's verdicts were at source speed.
+  4. Action scenes (high base shake): keep their candidates but mark them "in moving scene" (lower confidence, editor's
+     choice) instead of dropping them?
+  5. Recall is unknown: the user still owes 3–5 Wackler they remember (file + time) to check that real ones are found.
+- **W1 (spec after the answers):** per-clip motion curve in ClipPilot (new table, ~10 values/s + Wackler events with
+  start/end/peak/jump/confidence), derived moment values (S1 columns computed from the curve, no re-decode after trims),
+  `moments list`/`cut show` carry `wacklers` inside the moment, AI-moment boundary nudge out of a Wackler, drawer marks on
+  the clip timeline, `motion` command measures whole clips; verdicts.json becomes a regression fixture (precision/recall
+  on Arrifana). Then roadmap 2b.3 (draft rules + board shake icon).
+- Also open (no decision needed): the "locked" band is misleading until light-jitter calibration — treat Arrifana as all
+  handheld (resolve-prep marks every non-shaky clip orange anyway in practice: 5 locked panels are really handheld);
+  `clippilot` skill changes (transcribe/speech) not installed globally (`npm run skill:install` = the user's call);
+  review pages `exports/shake-review.html` + `exports/wackler-review.html` open only in **Chrome** (Safari blocks local
+  video from file:// pages).
 
 ### Resolve capability test for post-production (2026-11-23, free Resolve, user import)
 
