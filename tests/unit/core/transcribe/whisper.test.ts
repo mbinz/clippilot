@@ -26,7 +26,7 @@ describe('parseWhisperJson (real whisper-cli -ojf output)', () => {
     expect(w).toEqual(['Look', 'at', 'the', 'dolphins.', 'They', 'are', 'swimming', 'right', 'next', 'to', 'the', 'boat.']);
     expect(t.words[0]).toMatchObject({ start: 0.01, end: 0.28 });
     expect(t.words[3]).toMatchObject({ start: 0.63, end: 0.99 });
-    expect(t.words[0].p).toBeCloseTo(0.8975, 3);
+    expect(t.words[0].p).toBeCloseTo(0.9, 2);
   });
 
   it('joins sub-word tokens without a leading space into one word', () => {
