@@ -28,6 +28,15 @@ function baseClip(overrides: Partial<Clip> = {}): Clip {
   };
 }
 
+describe('clipToJson transcript', () => {
+  it('never carries transcript_text, only an optional excerpt', () => {
+    const clip = baseClip({ transcript_text: 'x'.repeat(500) } as Partial<Clip>);
+    expect('transcript_text' in clipToJson(clip)).toBe(false);
+    expect((clipToJson(clip) as any).transcript_excerpt).toBeUndefined();
+    expect((clipToJson(clip, undefined, undefined, { excerpt: true }) as any).transcript_excerpt).toBe('x'.repeat(200));
+  });
+});
+
 describe('clipToJson', () => {
   it('parses JSON-encoded text fields', () => {
     const json = clipToJson(

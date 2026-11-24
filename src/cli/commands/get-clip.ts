@@ -40,7 +40,7 @@ export function registerGetClipCommand(parent: Command): void {
           JSON.stringify(
             {
               ok: true,
-              clip: clipToJson(clip, thumbs, highlightsToJson(highlightRepo.findByClip(id))),
+              clip: clipToJson(clip, thumbs, highlightsToJson(highlightRepo.findByClip(id)), { excerpt: true }),
               similarity_groups: groups,
             },
             null,

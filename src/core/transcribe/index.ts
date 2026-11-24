@@ -6,6 +6,7 @@ import type { AppConfig } from '../../types/config.js';
 import type { HighlightRepository } from '../../db/repositories/highlight.repository.js';
 import type { TranscriptRepository } from '../../db/repositories/transcript.repository.js';
 import { parseWhisperJson, filterHallucinations } from './whisper.js';
+import { MIN_MOMENT_SEC } from '../analyze/highlights.js';
 import { snapToSpeech } from './speech.js';
 import { whisperCliRunner, type WhisperRunner } from './runner.js';
 
@@ -29,8 +30,12 @@ export interface TranscribeResult {
   transcribed: number;
   skipped_existing: number;
   skipped_no_audio: number;
-  /** Unprotected moments widened to whole sentences. */
+  /** Unprotected moments widened toward whole sentences (includes the clamped ones). */
   snapped: number;
+  /** Of `snapped`: widened only up to a neighbouring moment. */
+  snap_clamped: number;
+  /** Left unchanged because a neighbouring moment left no room. */
+  snap_skipped_overlap: number;
   errors: { clip_id: number; message: string }[];
 }
 
@@ -70,7 +75,7 @@ export async function transcribeClips(
 ): Promise<TranscribeResult> {
   const runner = opts.runner ?? whisperCliRunner;
   const modelName = path.basename(opts.model);
-  const result: TranscribeResult = { transcribed: 0, skipped_existing: 0, skipped_no_audio: 0, snapped: 0, errors: [] };
+  const result: TranscribeResult = { transcribed: 0, skipped_existing: 0, skipped_no_audio: 0, snapped: 0, snap_clamped: 0, snap_skipped_overlap: 0, errors: [] };
 
   let done = 0;
   for (const clip of clips) {
@@ -83,11 +88,25 @@ export async function transcribeClips(
         deps.transcripts.save(clip.id, modelName, transcript);
         result.transcribed++;
         for (const m of deps.highlights.findUnprotected(clip.id)) {
-          const s = snapToSpeech({ start: m.start_sec, end: m.end_sec }, transcript.segments, clip.duration_sec);
-          if (s.extended && (s.start !== m.start_sec || s.end !== m.end_sec)) {
-            deps.highlights.snapUnprotected(m.id, round2(s.start), round2(s.end));
-            result.snapped++;
+          const want = snapToSpeech({ start: m.start_sec, end: m.end_sec }, transcript.segments, clip.duration_sec);
+          if (!want.extended || (want.start === m.start_sec && want.end === m.end_sec)) continue;
+          // Never overlap another moment of the clip (protected or not, current ranges): stop at its boundary.
+          const others = deps.highlights.findByClip(clip.id).filter((o) => o.id !== m.id);
+          let start = want.start;
+          let end = want.end;
+          for (const o of others) {
+            if (o.end_sec <= m.start_sec && o.end_sec > start) start = o.end_sec;
+            if (o.start_sec >= m.end_sec && o.start_sec < end) end = o.start_sec;
           }
+          start = round2(start);
+          end = round2(end);
+          if (end - start < MIN_MOMENT_SEC || (start === m.start_sec && end === m.end_sec)) {
+            result.snap_skipped_overlap++;
+            continue;
+          }
+          deps.highlights.snapUnprotected(m.id, start, end);
+          result.snapped++;
+          if (start !== round2(want.start) || end !== round2(want.end)) result.snap_clamped++;
         }
       } catch (err) {
         result.errors.push({ clip_id: clip.id, message: err instanceof Error ? err.message : String(err) });

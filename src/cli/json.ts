@@ -8,6 +8,7 @@ export type ClipJson = Omit<
   | 'people'
   | 'ai_scenes'
   | 'ai_visual_keywords'
+  | 'transcript_text'
 > & {
   manual_tags: unknown;
   people: unknown;
@@ -15,6 +16,8 @@ export type ClipJson = Omit<
   ai_visual_keywords: unknown;
   thumbnails?: string[];
   highlights?: HighlightJson[];
+  /** First 200 characters of the spoken words (only where asked for). */
+  transcript_excerpt?: string;
 };
 
 export interface HighlightJson {
@@ -50,9 +53,11 @@ export function clipToJson(
   clip: Clip,
   thumbnails?: string[],
   highlights?: HighlightJson[],
+  opts: { excerpt?: boolean } = {},
 ): ClipJson {
+  const { transcript_text, ...rest } = clip;
   const out: ClipJson = {
-    ...clip,
+    ...rest,
     manual_tags: parseJson(clip.manual_tags),
     people: parseJson(clip.people),
     ai_scenes: parseJson(clip.ai_scenes),
@@ -60,6 +65,7 @@ export function clipToJson(
   };
   if (thumbnails) out.thumbnails = thumbnails;
   if (highlights) out.highlights = highlights;
+  if (opts.excerpt && transcript_text) out.transcript_excerpt = transcript_text.slice(0, 200);
   return out;
 }
 

@@ -124,6 +124,46 @@ describe('transcribeClips', () => {
       expect(after.find((h) => h.description === 'plain')).toMatchObject({ start_sec: 0, end_sec: 3.2 });
     });
 
+    describe('no overlaps with neighbours', () => {
+      // The fixture sentences are 0-1.4 and 1.4-3.2.
+      const ranges = (id: number) => highlights.findByClip(id).map((h) => [h.description, h.start_sec, h.end_sec]);
+
+      it('widening into an unprotected neighbour is clamped to its boundary', async () => {
+        const c = clips.insert(clipInput(1));
+        highlights.replaceForClip(c.id, [m(0.9, 3, 'mine'), m(3.1, 6, 'next')]);
+        const r = await transcribeClips([c], deps(), { model: 'm', runner });
+        expect(ranges(c.id)).toContainEqual(['mine', 0, 3.1]);
+        expect(r).toMatchObject({ snapped: 1, snap_clamped: 1, snap_skipped_overlap: 1 }); // 'next' has no room left
+      });
+
+      it('widening into a protected neighbour is clamped and the neighbour is untouched', async () => {
+        const c = clips.insert(clipInput(1));
+        highlights.replaceForClip(c.id, [m(0.9, 3, 'mine'), m(3.1, 6, 'next')]);
+        db.prepare("UPDATE highlights SET status = 'confirmed' WHERE description = 'next'").run();
+        const r = await transcribeClips([c], deps(), { model: 'm', runner });
+        expect(ranges(c.id)).toEqual([['mine', 0, 3.1], ['next', 3.1, 6]]);
+        expect(r.snap_clamped).toBe(1);
+      });
+
+      it('no room: the moment stays unchanged', async () => {
+        const c = clips.insert(clipInput(1));
+        // left neighbour ends at 0.9, right neighbour starts at 3 -> nothing to gain / < 2 s anyway
+        highlights.replaceForClip(c.id, [m(0.2, 0.9, 'left'), m(0.9, 3, 'mine'), m(3, 6, 'right')]);
+        db.prepare("UPDATE highlights SET status = 'confirmed' WHERE description IN ('left', 'right')").run();
+        const r = await transcribeClips([c], deps(), { model: 'm', runner });
+        expect(ranges(c.id)).toContainEqual(['mine', 0.9, 3]);
+        expect(r).toMatchObject({ snapped: 0, snap_clamped: 0, snap_skipped_overlap: 1 });
+      });
+
+      it('later moments see the already snapped ranges of earlier ones', async () => {
+        const c = clips.insert(clipInput(1));
+        highlights.replaceForClip(c.id, [m(0.5, 2.5, 'a'), m(2.6, 5, 'b')]);
+        await transcribeClips([c], deps(), { model: 'm', runner });
+        const [a, b] = highlights.findByClip(c.id);
+        expect(a.end_sec).toBeLessThanOrEqual(b.start_sec);
+      });
+    });
+
     it('clamps to the clip duration', async () => {
       const c = clips.insert(clipInput(1, { duration_sec: 3 }));
       highlights.replaceForClip(c.id, [m(0.5, 2.5, 'x')]);

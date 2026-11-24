@@ -3,7 +3,7 @@ import { snapToSpeech } from '../transcribe/speech.js';
 import type { TranscriptSegment } from '../transcribe/whisper.js';
 
 const MIN_LENGTH_SEC = 0.5;
-const MIN_MOMENT_SEC = 2;
+export const MIN_MOMENT_SEC = 2;
 export const MAX_MOMENT_SEC = 8;
 
 /** Minimum source fps for 50 % / 25 % playback (assumes a 25 fps timeline). */
