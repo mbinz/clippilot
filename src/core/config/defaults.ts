@@ -1,4 +1,8 @@
+import os from 'node:os';
+import path from 'node:path';
 import type { AppConfig } from '../../types/config.js';
+
+const clippilotHome = process.env['CLIPPILOT_HOME'] ? path.resolve(process.env['CLIPPILOT_HOME']) : path.join(os.homedir(), '.clippilot');
 
 export const DEFAULT_CONFIG: AppConfig = {
   gemini_api_key: '',
@@ -22,4 +26,5 @@ export const DEFAULT_CONFIG: AppConfig = {
   },
   auto_skip_threshold: 1.5,
   web_ui_port: 3847,
+  whisper_model: path.join(clippilotHome, 'models', 'ggml-large-v3-turbo.bin'),
 };
