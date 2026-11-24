@@ -113,14 +113,18 @@ describe('T1b hallucination rules (real Arrifana junk)', () => {
   it('drops n-grams repeated three or more times in a row (words and CJK characters)', () => {
     expect(reason('The first time I was in the middle of the road, I was in the middle of the road, I was in the middle of the road, I was in the middle of the road')).toBe('repetition');
     expect(reason('東京都道府 東京都道府 東京都道府 東京都道府')).toBe('repetition');
-    expect(reason('ja ja ja')).toBe('repetition');
-    expect(reason('no no no no')).toBe('repetition');
+    expect(reason('ja ja ja ja ja ja')).toBe('repetition');
   });
 
   it('drops a segment where one n-gram repeated twice or more covers >= 80 % of the words', () => {
     expect(reason('THE END OF THE END OF THE')).toBe('repetition');
-    expect(reason('Schau mal schau mal Delfine!')).toBe('repetition'); // 4 of 5 words
+    expect(reason('Schau mal schau mal schau mal da sind Delfine')).toBe('repetition'); // 3x
     expect(reason('Wir fahren raus, wir fahren raus und sehen dann weiter was kommt')).toBeNull(); // 6 of 12 words
+  });
+
+  it('keeps short phrases kids repeat on purpose', () => {
+    for (const t of ['Mama, Mama!', 'Schau mal, schau mal, Delfine!', 'Ja, ja, ja.', 'no no no no', 'Schau mal schau mal Delfine!'])
+      expect(reason(t), t).toBeNull();
   });
 
   it('keeps text with a phrase repeated only twice', () => {

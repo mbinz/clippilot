@@ -33,6 +33,9 @@ export const REPEAT_MIN_COUNT = 3;
 export const REPEAT_MAX_N = 8;
 /** One n-gram repeated at least twice that covers this share of a segment's words also marks a loop ("THE END OF THE END OF THE"). */
 export const REPEAT_COVERAGE = 0.8;
+/** Kids repeat short phrases on purpose ("Ja, ja, ja"): segments up to this many words are exempt from the 3x rule; the coverage rule needs at least REPEAT_COVERAGE_MIN_WORDS. */
+export const REPEAT_EXEMPT_MAX_WORDS = 4;
+export const REPEAT_COVERAGE_MIN_WORDS = 6;
 
 /**
  * Phrases whisper invents on silence / music / wind (lower-case, punctuation removed). A segment is dropped when it is
@@ -123,12 +126,13 @@ function unitsOf(text: string): string[] {
 }
 
 function hasLoop(units: string[]): boolean {
+  if (units.length <= REPEAT_EXEMPT_MAX_WORDS) return false;
   for (let n = 1; n <= REPEAT_MAX_N; n++) {
     for (let i = 0; i + n * 2 <= units.length; i++) {
       let reps = 1;
       while (i + n * (reps + 1) <= units.length
         && units.slice(i, i + n).every((u, k) => u === units[i + n * reps + k])) reps++;
-      if (reps >= REPEAT_MIN_COUNT || (reps >= 2 && (reps * n) / units.length >= REPEAT_COVERAGE)) return true;
+      if (reps >= REPEAT_MIN_COUNT || (reps >= 2 && units.length >= REPEAT_COVERAGE_MIN_WORDS && (reps * n) / units.length >= REPEAT_COVERAGE)) return true;
     }
   }
   return false;
