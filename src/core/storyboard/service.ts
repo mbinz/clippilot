@@ -10,6 +10,9 @@ import * as ops from './history.js';
 import { defaultSpeed } from './range.js';
 import { isTier, tierRankSql, type Tier } from '../tiers.js';
 import { speechForRange, type SpeechCut } from '../transcribe/speech.js';
+import { shakeBand, type ShakeBand, type ShakeBandConfig } from '../motion/motion.js';
+import { isMeasured } from '../motion/index.js';
+import { DEFAULT_CONFIG } from '../config/defaults.js';
 import type { TranscriptSegment, TranscriptWord } from '../transcribe/whisper.js';
 
 export const MAIN_CUT_NAME = 'Main';
@@ -24,7 +27,13 @@ export interface MomentSpeech {
   speech_cut: SpeechCut;
 }
 
-export type MomentWithSpeech = HighlightRecord & MomentSpeech;
+/** Measured shake and stillness of a moment's current range; both null when not measured or stale (trimmed since). */
+export interface MomentMotion {
+  shake: { score: number; band: ShakeBand } | null;
+  motion: { camera: number; change: number } | null;
+}
+
+export type MomentWithSpeech = HighlightRecord & MomentSpeech & MomentMotion;
 
 export interface PanelNode extends Panel {
   /** Range and speed of the panel's moment (a panel stores none of its own); null / 1 unless the panel is filled. */
@@ -90,13 +99,26 @@ export interface MomentRow {
   /** Spoken words inside the range (null = clip not transcribed) and which boundary cuts a sentence. */
   speech: string | null;
   speech_cut: SpeechCut;
+  shake: MomentMotion['shake'];
+  motion: MomentMotion['motion'];
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /** Storyboard logic (Cut -> Scene -> Panel) over the database. CLI and server routes are thin wrappers. */
 export class StoryboardService {
-  constructor(private db: Database.Database) {}
+  constructor(
+    private db: Database.Database,
+    private shakeCfg: ShakeBandConfig = DEFAULT_CONFIG,
+  ) {}
+
+  private motionOf(m: HighlightRecord): MomentMotion {
+    if (!isMeasured(m)) return { shake: null, motion: null };
+    return {
+      shake: { score: m.shake_score!, band: shakeBand(m.shake_score!, this.shakeCfg) },
+      motion: { camera: m.camera_motion ?? 0, change: m.frame_change ?? 0 },
+    };
+  }
 
   // ---------- helpers ----------
 
@@ -309,7 +331,7 @@ export class StoryboardService {
     const momentOf = (mid: number | null): MomentWithSpeech | null => {
       if (mid === null) return null;
       const m = momentStmt.get(mid) as HighlightRecord | undefined;
-      return m ? { ...m, ...this.speechOf(m, transcripts) } : null;
+      return m ? { ...m, ...this.speechOf(m, transcripts), ...this.motionOf(m) } : null;
     };
 
     const totals = { panels: 0, filled: 0, candidates: 0, gaps: 0, duration_sec: 0 };
@@ -554,6 +576,7 @@ export class StoryboardService {
     const transcripts = new Map<number, { segments: TranscriptSegment[]; words: TranscriptWord[] } | null>();
     return rows.map((h) => ({
       ...this.speechOf(h, transcripts),
+      ...this.motionOf(h),
       id: h.id, clip_id: h.clip_id, event_id: h.event_id, start_sec: h.start_sec, end_sec: h.end_sec,
       speed: h.speed, ai_start_sec: h.ai_start_sec, ai_end_sec: h.ai_end_sec,
       tier: h.user_tier ?? h.tier, ai_tier: h.tier, user_tier: h.user_tier, seen: h.seen_at !== null, shot: h.shot, role: h.role, issues: JSON.parse(h.issues || '[]') as string[],
