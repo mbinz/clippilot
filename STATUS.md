@@ -1382,6 +1382,11 @@ downloads): `~/.clippilot/models/ggml-large-v3-turbo.bin` (1.62 GB, sha1 4af2b29
 - Then (separate, resolve-prep R1): `stabilize` reads the band from cut.json (`moment.shake`) and only measures itself
   when a panel has none.
 
+**S1 result (implementer, 2026-11-24):** `src/core/motion/{motion,frames,index}.ts`, migration 021, `clippilot motion`
+(also run by `analyze` after transcribe), `shake`/`motion` on `moments list --json` and `cut show --json`. Not run on real data.
+Deferred: `cut`/`moments` CLI and the web routes use the default band thresholds (the `StoryboardService` takes an optional
+config; `withSvc` is sync and does not load config yet); `motion` itself honours `shake_locked_max`/`shake_shaky_min`.
+
 Open: precision on the ≈ 8 leftovers (idea: cross-check with Gemini's per-moment `audio_type` or a second VAD pass);
 SKILL.md mention of `transcribe`/`speech`; T2 drawer.
 

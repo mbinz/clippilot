@@ -10,6 +10,7 @@ import { loadConfig } from '../../core/config/manager.js';
 import { recomputeDupGroups } from '../../core/similarity/dup-groups.js';
 import { ThumbnailRepository } from '../../db/repositories/thumbnail.repository.js';
 import { TranscriptRepository } from '../../db/repositories/transcript.repository.js';
+import { measureClips } from '../../core/motion/index.js';
 import { transcribeClips, whisperModelAvailable, expandHome, resolveVadModel, vadMissingWarning } from '../../core/transcribe/index.js';
 import { analyzeClips } from '../../core/analyze/index.js';
 import { parseClipIds } from '../../core/calibration/sampling.js';
@@ -97,6 +98,12 @@ export function registerAnalyzeCommand(parent: Command): void {
             console.log(chalk.yellow(`Hint: no whisper model at ${expandHome(config.whisper_model)}; run "clippilot transcribe" after downloading one (config key whisper_model).`));
           }
         }
+
+        // Shake and stillness of every moment that is not measured yet.
+        const analyzed = clipRepo.findByIds(pending.map((c) => c.id));
+        console.log('Measuring motion...');
+        const mo = await measureClips(analyzed, { highlights: highlightRepo }, { cfg: config });
+        console.log(`  Measured: ${mo.measured}, errors: ${mo.failed} (${mo.bands.locked} locked, ${mo.bands.stabilize} stabilize, ${mo.bands.shaky} shaky)`);
       } catch (err) {
         bar.stop();
         throw err;
