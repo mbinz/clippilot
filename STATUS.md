@@ -1270,6 +1270,12 @@ you" (fix b2d6560: an AI draft's range is the AI range). ★ at 16 % is above th
   a 10 s gap and skips a good one. Update the CLI option help text.
 - Done when: `npm run typecheck && npm run test:all` green; no change to Arrifana data (planner re-derives events).
 
+**Q3 result (2026-11-24)** — ✅ 7fb24d2 (907 tests). Implementer also trims names of incrementally created folder events.
+Planner checks: real ffprobe keyframe probe → rebuilt Arrifana proxies 1 s, an old M2-pilot proxy 5.02 s (would be
+rebuilt); Arrifana event 4 renamed to "Praia do Odeceixe" via `events rename` (no rebuild, scenes keep their event ids);
+Arrifana project config `timezone = Europe/Lisbon`; `Mars/Olympus` rejected. Deferred: `loadConfig` doesn't validate a
+hand-edited bad zone (Intl would throw at derive time); unset timezone isn't shown by `config show`.
+
 **Q4 — full Portugal** (after Q1–Q3; user OK on the Gemini cost estimate first)
 - `~/Video/ClipPilot Portugal/`: ingest `~/Video/Portugal` (508 clips, 123 GB; resumable, overnight), analyze with
   prompt v3, events, then Claude proposes a brief per user wish.
