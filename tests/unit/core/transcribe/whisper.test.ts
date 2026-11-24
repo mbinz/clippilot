@@ -138,6 +138,14 @@ describe('T1b hallucination rules (real Arrifana junk)', () => {
     expect(reason('Wir fahren raus aufs Meer.', 0.5)).toBeNull();
   });
 
+  it('drops the English wind hallucinations (whole segment only)', () => {
+    for (const t of ["I'm going to go to the next one.", "I'm going to go.", 'you', 'Oh', "I'm sorry.", 'Oh, my God.', 'Bye.',
+      "We'll be right back.", "We'll see you next time.", 'See you next time.'])
+      expect(reason(t, 0.92), t).toBe('phrase');
+    expect(reason("I'm going to go to the harbour now.")).toBeNull();
+    expect(reason('Oh, das Wasser ist kalt!')).toBeNull();
+  });
+
   it('drops the added filler phrases, normalised', () => {
     for (const t of ['ご視聴ありがとうございました', 'Продолжение следует...', 'Altyazı M.K.', 'Să vă mulțumim pentru vizionare.',
       "I'll see you next time.", 'Vielen Dank.', 'Please.'])

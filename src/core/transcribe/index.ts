@@ -5,7 +5,7 @@ import type { Clip } from '../../types/clip.js';
 import type { AppConfig } from '../../types/config.js';
 import type { HighlightRepository } from '../../db/repositories/highlight.repository.js';
 import type { TranscriptRepository } from '../../db/repositories/transcript.repository.js';
-import { parseWhisperJson, filterHallucinationsWithStats, type DropReason } from './whisper.js';
+import { parseWhisperJson, filterHallucinationsWithStats, crossClipTexts, dropCrossClip, type DropReason } from './whisper.js';
 import { MIN_MOMENT_SEC } from '../analyze/highlights.js';
 import { snapToSpeech } from './speech.js';
 import { whisperCliRunner, type WhisperRunner } from './runner.js';
@@ -101,6 +101,7 @@ export async function transcribeClips(
   const result: TranscribeResult = { transcribed: 0, skipped_existing: 0, skipped_no_audio: 0, dropped_language: 0, language_fallback: 0, dropped_segments: {}, snapped: 0, snap_clamped: 0, snap_skipped_overlap: 0, errors: [] };
 
   let done = 0;
+  const fresh: Clip[] = []; // newly transcribed clips: snapped after the cross-clip pass
   for (const clip of clips) {
     const name = path.basename(clip.file_path);
     if (!clip.has_audio) result.skipped_no_audio++;
@@ -121,30 +122,48 @@ export async function transcribeClips(
           }
           if (best) {
             result.language_fallback++;
-            await storeAndSnap(clip, best.t);
+            store(clip, best.t, fresh);
           } else {
             // Stored empty so the clip is not retried.
             deps.transcripts.save(clip.id, modelName, { language: parsed.language, segments: [], words: [] });
             result.dropped_language++;
           }
-        } else await storeAndSnap(clip, filterHallucinationsWithStats(parsed));
+        } else store(clip, filterHallucinationsWithStats(parsed), fresh);
       } catch (err) {
         result.errors.push({ clip_id: clip.id, message: err instanceof Error ? err.message : String(err) });
       }
     }
     opts.onProgress?.(++done, clips.length, name);
   }
+
+  // Project level: texts repeated across >= 3 clips are not speech. Recomputed from the raw transcripts of every clip of the project.
+  for (const projectId of new Set(clips.map((c) => c.project_id).filter((id): id is number => id !== null))) {
+    const all = deps.transcripts.listByProject(projectId);
+    const repeated = crossClipTexts(new Map(all.map((t) => [t.clip_id, t.raw_segments])));
+    for (const t of all) {
+      const kept = dropCrossClip({ segments: t.raw_segments, words: t.raw_words }, repeated);
+      result.dropped_segments.cross_clip = (result.dropped_segments.cross_clip ?? 0) + kept.dropped;
+      if (kept.segments.length !== t.segments.length) deps.transcripts.saveEffective(t.clip_id, kept.segments, kept.words);
+    }
+  }
+  if (result.dropped_segments.cross_clip === 0) delete result.dropped_segments.cross_clip;
+
+  for (const clip of fresh) snapMoments(clip, deps.transcripts.get(clip.id)?.segments ?? []);
   return result;
 
-  async function storeAndSnap(clip: Clip, filtered: ReturnType<typeof filterHallucinationsWithStats>): Promise<void> {
+  function store(clip: Clip, filtered: ReturnType<typeof filterHallucinationsWithStats>, into: Clip[]): void {
     const { transcript, dropped } = filtered;
     for (const [reason, n] of Object.entries(dropped) as [DropReason, number][]) {
       result.dropped_segments[reason] = (result.dropped_segments[reason] ?? 0) + n;
     }
     deps.transcripts.save(clip.id, modelName, transcript);
     result.transcribed++;
+    into.push(clip);
+  }
+
+  function snapMoments(clip: Clip, segments: { start: number; end: number; text: string }[]): void {
     for (const m of deps.highlights.findUnprotected(clip.id)) {
-      const want = snapToSpeech({ start: m.start_sec, end: m.end_sec }, transcript.segments, clip.duration_sec);
+      const want = snapToSpeech({ start: m.start_sec, end: m.end_sec }, segments, clip.duration_sec);
       if (!want.extended || (want.start === m.start_sec && want.end === m.end_sec)) continue;
       // Never overlap another moment of the clip (protected or not, current ranges): stop at its boundary.
       const others = deps.highlights.findByClip(clip.id).filter((o) => o.id !== m.id);

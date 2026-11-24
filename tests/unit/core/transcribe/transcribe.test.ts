@@ -92,6 +92,65 @@ describe('transcribeClips', () => {
     expect(seen).toEqual([1, 2]);
   });
 
+  describe('cross-clip repetition (project level)', () => {
+    const say = (text: string) => ({ result: { language: 'de' }, transcription: [{ offsets: { from: 0, to: 3000 }, text: ` ${text}`,
+      tokens: [{ text: ` ${text}`, offsets: { from: 0, to: 3000 }, p: 0.9 }] }] });
+    const byClip = (texts: Record<number, string>): WhisperRunner => async (c) => say(texts[c.id]);
+    const addTo = (project: number, n: number) => clips.insert({ ...clipInput(n), project_id: project });
+    beforeEach(() => { db.prepare("INSERT INTO projects (name) VALUES ('a'), ('b')").run(); });
+
+    it('a text in segments of >= 3 different clips is dropped from all of them (reason cross_clip), raw is kept', async () => {
+      const cs = [1, 2, 3].map((n) => addTo(1, n));
+      const r = await transcribeClips(cs, deps(), { model: 'm', languages: ['de'],
+        runner: byClip({ [cs[0].id]: 'Das war schön hier!', [cs[1].id]: 'das war schön, hier', [cs[2].id]: 'Das war schön hier.' }) });
+      for (const c of cs) {
+        expect(transcripts.get(c.id)).toMatchObject({ text: '', segments: [], words: [] });
+        expect(transcripts.get(c.id)!.raw_segments).toHaveLength(1);
+      }
+      expect(r.dropped_segments.cross_clip).toBe(3);
+    });
+
+    it('survivors: a text in one clip or in two clips is kept', async () => {
+      const cs = [1, 2, 3].map((n) => addTo(1, n));
+      await transcribeClips(cs, deps(), { model: 'm', languages: ['de'], runner: byClip({
+        [cs[0].id]: 'Ja, das ist auch eine Sackgasse, die geht nicht bis runter zum Strand.',
+        [cs[1].id]: 'Schaut sie mal kurz her.', [cs[2].id]: 'Schaut sie mal kurz her.' }) });
+      expect(transcripts.get(cs[0].id)!.text).toMatch(/Sackgasse/);
+      expect(transcripts.get(cs[1].id)!.text).toBe('Schaut sie mal kurz her.');
+      expect(transcripts.get(cs[2].id)!.text).toBe('Schaut sie mal kurz her.');
+    });
+
+    it('counts clips per project, not across projects', async () => {
+      const cs = [addTo(1, 1), addTo(1, 2), addTo(2, 3)];
+      await transcribeClips(cs, deps(), { model: 'm', languages: ['de'], runner: byClip(Object.fromEntries(cs.map((c) => [c.id, 'Das war schön hier!']))) });
+      expect(cs.map((c) => transcripts.get(c.id)!.text)).toEqual(['Das war schön hier!', 'Das war schön hier!', 'Das war schön hier!']);
+    });
+
+    it('a later run recomputes over all transcripts of the project (earlier clips lose the text too)', async () => {
+      const [a, b, c] = [1, 2, 3].map((n) => addTo(1, n));
+      const runner = byClip({ [a.id]: 'Das war schön hier!', [b.id]: 'Das war schön hier!', [c.id]: 'Das war schön hier!' });
+      await transcribeClips([a, b], deps(), { model: 'm', languages: ['de'], runner });
+      expect(transcripts.get(a.id)!.text).toBe('Das war schön hier!');
+      await transcribeClips([a, b, c], deps(), { model: 'm', languages: ['de'], runner });
+      expect([a, b, c].map((x) => transcripts.get(x.id)!.text)).toEqual(['', '', '']);
+    });
+
+    it('snapping happens after the pass: a moment is not widened to a segment that was dropped', async () => {
+      const cs = [1, 2, 3].map((n) => addTo(1, n));
+      highlights.replaceForClip(cs[0].id, [{ start_sec: 1, end_sec: 2.5, description: 'm', tier: 'solid' }]);
+      const r = await transcribeClips(cs, deps(), { model: 'm', languages: ['de'], runner: byClip({ [cs[0].id]: 'Das war schön hier!', [cs[1].id]: 'Das war schön hier!', [cs[2].id]: 'Das war schön hier!' }) });
+      expect(highlights.findByClip(cs[0].id)[0]).toMatchObject({ start_sec: 1, end_sec: 2.5 });
+      expect(r.snapped).toBe(0);
+    });
+
+    it('speech that survives the pass still snaps moments', async () => {
+      const cs = [1, 2].map((n) => addTo(1, n));
+      highlights.replaceForClip(cs[0].id, [{ start_sec: 1, end_sec: 2.5, description: 'm', tier: 'solid' }]);
+      await transcribeClips(cs, deps(), { model: 'm', languages: ['de'], runner: byClip({ [cs[0].id]: 'Schau mal, Delfine!', [cs[1].id]: 'Etwas ganz anderes.' }) });
+      expect(highlights.findByClip(cs[0].id)[0]).toMatchObject({ start_sec: 0, end_sec: 3 });
+    });
+  });
+
   describe('allowed languages and filter stats', () => {
     const lang = (language: string, text: string) => ({ result: { language }, transcription: [{ offsets: { from: 0, to: 2000 }, text: ` ${text}`,
       tokens: [{ text: ` ${text}`, offsets: { from: 0, to: 2000 }, p: 0.9 }] }] });

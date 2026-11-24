@@ -63,6 +63,9 @@ export const HALLUCINATION_PHRASES: string[] = [
 /** Short generic phrases that are only hallucinations when they are the whole segment ("Vielen Dank, das war schön" is speech). */
 export const HALLUCINATION_EXACT_PHRASES: string[] = [
   'thank you', 'thanks', 'vielen dank', 'danke', 'please', 'musik', 'music',
+  // Classic English hallucinations on wind; their token p is high, so only the text can catch them.
+  'i m going to go', 'i m going to go to the next one', 'you', 'oh', 'i m sorry', 'oh my god', 'bye',
+  'we ll be right back', 'we ll see you next time', 'see you next time',
 ];
 
 /** A segment that is entirely a sound description: *…*, […], (…) or ♪…. */
@@ -116,9 +119,9 @@ export function parseWhisperJson(raw: any): Transcript {
   return { language, segments, words };
 }
 
-const normalize = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+export const normalize = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 
-export type DropReason = 'empty' | 'low_p' | 'sound_description' | 'phrase' | 'repetition' | 'short_low_p';
+export type DropReason = 'cross_clip' | 'empty' | 'low_p' | 'sound_description' | 'phrase' | 'repetition' | 'short_low_p';
 
 /** Words, or single CJK characters, of a text (lower-case). */
 function unitsOf(text: string): string[] {
@@ -176,4 +179,32 @@ export function filterHallucinationsWithStats(t: Transcript): { transcript: Tran
 
 export function filterHallucinations(t: Transcript): Transcript {
   return filterHallucinationsWithStats(t).transcript;
+}
+
+/** A normalised text that occurs in segments of at least this many different clips of a project is not speech. */
+export const CROSS_CLIP_MIN_CLIPS = 3;
+
+/** Normalised texts that occur in >= CROSS_CLIP_MIN_CLIPS different clips (`byClip`: clip id -> its segments). */
+export function crossClipTexts(byClip: Map<number, TranscriptSegment[]>): Set<string> {
+  const clipsOf = new Map<string, Set<number>>();
+  for (const [clipId, segs] of byClip) {
+    for (const s of segs) {
+      const n = normalize(s.text);
+      if (n === '') continue;
+      (clipsOf.get(n) ?? clipsOf.set(n, new Set()).get(n)!).add(clipId);
+    }
+  }
+  return new Set([...clipsOf].filter(([, c]) => c.size >= CROSS_CLIP_MIN_CLIPS).map(([n]) => n));
+}
+
+/** Remove the segments with a repeated text (and their words); returns what is left and how many segments went. */
+export function dropCrossClip(t: { segments: TranscriptSegment[]; words: TranscriptWord[] }, texts: Set<string>):
+  { segments: TranscriptSegment[]; words: TranscriptWord[]; dropped: number } {
+  const gone = t.segments.filter((s) => texts.has(normalize(s.text)));
+  if (gone.length === 0) return { ...t, dropped: 0 };
+  return {
+    segments: t.segments.filter((s) => !gone.includes(s)),
+    words: t.words.filter((w) => { const m = (w.start + w.end) / 2; return !gone.some((g) => m >= g.start && m <= g.end); }),
+    dropped: gone.length,
+  };
 }
