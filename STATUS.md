@@ -20,6 +20,10 @@ remote yet; 100 tests): titles (style D, ProRes 4444 on V2), music + original so
 stabilization marking (orange), color groups (reference marker). Arrifana package ready for the user's Resolve import:
 `~/Video/ClipPilot Arrifana/exports/post/Main/` (`03 Arrifana – Main – post.otio` + `README – Resolve.md`). User decision:
 finish Arrifana end-to-end before full Portugal (Q4 waits; estimate 471 clips / 117 min, ~$5–10, ≤ $20).
+**2026-11-24 (later):** user imported the resolve-prep package in free Resolve: import, titles, sound split and chapter
+**timeline markers** work. Feedback → resolve-prep P6 (orange = stabilize, red = SHAKY FOOTAGE, no edit decisions) and a
+grilling round on draft quality (Q1–Q23) → PRD roadmap item **2b** (transcript → motion → draft rules → cut critic →
+story critic → loop → Portugal). **Next: slice T1 (transcript)**, spec under "Roadmap item 2b" below.
 
 `v0.1.0` — ingest (resumable) / analyze with timestamped highlights / search / summary; OTIO + FCPXML export verified in free Resolve (M1). No story/storyboard workflow yet (M3).
 Solo project, MIT. Run via `tsx`, no compiled binary.
@@ -1182,7 +1186,7 @@ slide in staggered (~0.15 s), hold, slide out. Previews + renderers: `~/Video/Cl
 Archivo Black, Pacifico, Permanent Marker installed in the user's `~/Library/Fonts` (renderer = sharp/librsvg via CoreText
 needs them registered). Rejected: clean/editorial/journal (too restrained), red blocks.
 
-**Done 2026-11-24 (see clippilot-post status.md):** titles, music/sound split, stabilization + camera marking, `post build`.
+**Done 2026-11-24 (see clippilot-post status.md):** titles, music/sound split, stabilization + camera marking, `post build` (CLI since renamed to `resolve-prep build`).
 Was open: create `~/dev/clippilot-post` + titles skill (render all chapter titles of the Arrifana cut with the
 animation, extended OTIO with V2), test import in Resolve; then music/sound placement; then stabilization + camera marking;
 then Q3 small fixes + full Portugal (Q4). ★ came out at 16 % on the Arrifana re-run (target ~10 %) — check on Portugal.
@@ -1285,6 +1289,48 @@ hand-edited bad zone (Intl would throw at derive time); unset timezone isn't sho
 **Q4 — full Portugal** (after Q1–Q3; user OK on the Gemini cost estimate first)
 - `~/Video/ClipPilot Portugal/`: ingest `~/Video/Portugal` (508 clips, 123 GB; resumable, overnight), analyze with
   prompt v3, events, then Claude proposes a brief per user wish.
+
+### Roadmap item 2b — Draft quality (grilling 2026-11-24)
+
+Why (user, after the Arrifana import): clips marked "stabilize" were really too shaky to use, while nearly every other
+handheld clip needs stabilizing; a clip at the start of chapter 2 belonged to chapter 1; the last clip of chapter 1
+holds a static image too long; and the drafter can't judge speech scenes without a transcript. Today Claude drafts in
+chat from `moments list` text only (Gemini descriptions + tags, no frames, no transcript; 51 of 167 Arrifana moments
+are `speech`). Decisions: PRD "Principles" (human changes protected, reviewers don't edit) + roadmap item 2b.
+Grilling notes not in the PRD: stills for the cut critic every 0.5 s + the last frame; critics may *mention* protected
+items (listed for the user) but Claude never changes them; story-critic preview has no music; acceptance set grows with
+real cases (two cases alone are too few). Gimbal footage only in "Farol" (calibrate the locked band there).
+
+**T1 — transcript (planner spec, test-first)**
+- Engine: `whisper-cli` (whisper.cpp, Homebrew, present) with a multilingual model; global config `whisper_model` (path,
+  default `~/.clippilot/models/ggml-large-v3-turbo.bin`). Model download is a separate, user-approved step (≈1.6 GB);
+  without the model `transcribe` exits with a clear message (no silent skip). Only `ggml-medium.en` exists today
+  (English-only, not usable).
+- Audio: ffmpeg → 16 kHz mono WAV in a temp dir from the original (proxy if the original is missing); clips with
+  `has_audio = 0` are skipped. whisper-cli with `-l auto` and JSON output incl. token/word timestamps; parse into
+  `segments [{start, end, text}]` and `words [{start, end, text, p}]` (seconds, clip time).
+- Hallucination guard (pure, tested): drop segments that are empty/punctuation-only, have very low mean token
+  probability, or match known whisper filler phrases ("Untertitel im Auftrag des ZDF", "Vielen Dank fürs Zuschauen",
+  "Thanks for watching", "♪"…); keep the list in one constant.
+- Storage: migration 019 `transcripts (clip_id PK → clips, language, model, text, segments_json, words_json,
+  created_at)`; transcript text added to the clip search (FTS) so `search "Delfin"` finds spoken words.
+- CLI: `clippilot transcribe [--project] [--force] [--json]` (sequential, resumable: skips clips that have a transcript
+  unless `--force`); `analyze` runs it afterwards for clips without one when the model is configured, else prints a hint.
+- Moments: pure `speechForRange(segments, words, start, end)` → `{ text, cut: null | 'start' | 'end' | 'both' }` (cut =
+  a segment crosses the boundary); `moments list --json` and `cut show --json` (moment) carry `speech` + `speech_cut`.
+- Snap (pure `snapToSpeech(range, segments)`): a range touching speech is widened to the start of the segment at its
+  start and the end of the segment at its end; **no upper length cap for speech moments**; clamped to the clip. Applied
+  by `transcribe` to **unprotected** moments only (protected = what `replaceForClip` keeps: confirmed, rejected, edited
+  range/speed/★, or used by a panel/candidate list) — sets start/end and ai_start/ai_end; and in the analyze normaliser
+  when a transcript exists (the 8 s cap is skipped for ranges extended by speech).
+- Tests first: whisper JSON parsing (fixture from a real run on a short generated German TTS clip or a hand-written
+  fixture in whisper.cpp's format), hallucination filter, speechForRange cases (inside, crossing start/end/both, none),
+  snapToSpeech (widen, no cap, clamp, untouched without speech), protected moments not snapped, migration + FTS hit,
+  transcribe resumability with an injected runner. One integration test with the real whisper-cli is skipped when the
+  model file is absent.
+- Done when: typecheck + test:all green; planner downloads the model (after user OK), runs `transcribe` on Arrifana,
+  spot-checks 5 speech moments, and reports how many moments were snapped.
+- T2 (next): board drawer shows the transcript (moment part highlighted); then the motion slice.
 
 ### Resolve capability test for post-production (2026-11-23, free Resolve, user import)
 

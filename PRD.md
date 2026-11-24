@@ -35,6 +35,8 @@ finishing.
 - **Vendor-neutral and free to run.** Works with free Resolve via file import (OTIO / FCPXML) — no Resolve scripting (moved to Studio in Resolve 21.1). Paid or vendor-specific integrations are optional plugins. Gemini stays the analysis model (no provider abstraction yet).
 - **Local-first; originals are never touched.** No moving, renaming or deleting source files — "hide" / "reject" are DB flags only. All derived assets live in `<project>/.clippilot/`.
 - **AI proposes, human confirms — and confirmation is optional.** Everything the AI proposes is usable as-is; human choices are marked as such. As AI gets better, approval can drop away without a redesign.
+- **Human changes are protected.** No tool (draft, critics, normalisers, resolve-prep) changes what the user touched: moments trimmed / sped / confirmed / ★'d / rejected, panels the user placed, scenes the user made or changed. Tools may *point at* them; the user decides. (2026-11-24)
+- **Reviewers don't edit.** Critics and resolve-prep only report or mark; only Claude (the drafter) changes the cut, and only what isn't protected. (2026-11-24)
 - **Categorical tags over absolute scores.** The model is asked for checkable categories (tier, shot, role, issues), not 1–5 numbers. What can be measured (shake, frame rate, duration) is computed in code, not asked of the model.
 - **One path into the timeline.** Everything on a timeline — own clips, generated cards, stock, AI video — is a real file that goes through normal ingest.
 - **v1: Claude drafts in chat, the UI shows and steers.** Long-term the UI becomes the main workspace and starts AI actions itself (roadmap, below).
@@ -142,15 +144,32 @@ imported cleanly into free Resolve, and the author prefers it over an empty time
 
 **Scope decision (2026-11-23):** ClipPilot = sorting + storyboard drafting + rough-cut export. Post-production
 automation (titles/animations, music + sound, stabilization, color) lives in **separate Claude skills/tools** next to
-ClipPilot (planned folder `~/dev/clippilot-post`), working on the OTIO/FCPXML export + originals. Resolve (free) stays the
+ClipPilot (`~/dev/clippilot-post`, CLI/skill `resolve-prep`, v0.1 built 2026-11-24), working on the OTIO/FCPXML export + originals. Resolve (free) stays the
 finishing tool; fine cut, timing, mix and grade taste stay manual. Full workflow map + who-does-what: STATUS.md
 "Post-production plan".
 
 1. **v0.3 — Board v3 + assistant link** (M7, M8) ✅.
 2. **Analysis polish** ✅ (prompt v3: 2–8 s moments, ★ ~10 %, strict audio; Q1/Q1b; Arrifana re-run). Small fixes (Q3)
    and **full Portugal** (Q4) follow after the first post-tools.
-2a. **Post-tools (Claude skills, outside ClipPilot):** titles first (style chosen), then music + sound track placement,
+2a. ✅ 2026-11-24 **Post-tools (Claude skills, outside ClipPilot):** titles first (style chosen), then music + sound track placement,
    stabilization + camera marking. Based on the Resolve capability test (STATUS.md).
+2b. **Draft quality (decided 2026-11-24, grilling Q1–Q23):** before full Portugal.
+   1. **Transcript** — local whisper.cpp (`large-v3-turbo`, word timestamps), all clips with audio; spoken text per moment
+      in `moments list`, cut-off sentences flagged; AI moments snap to sentence boundaries; **no length cap for speech
+      moments**; drawer shows it, search finds spoken words.
+   2. **Motion measurement** — per moment, local: shake (locked < 0.02 / stabilize / shaky ≥ 0.4 % of width, project
+      config) + stillness; `cut.json` carries the band; resolve-prep reads it instead of measuring.
+   3. **Draft rules + board** — shaky moments stay out of drafts unless must-have/★ without a calmer alternative in the
+      similar group (named in the draft summary); subtle tile icon, details in the drawer, no auto-reject. Continuous
+      action moments may run to ~20 s, silent/static ones keep the 8 s cap.
+   4. **Cut critic** (own agent + skill) — measurements, transcript, stills every 0.5 s + last frame; rule of thumb:
+      static ~2–3 s, speech/clear action much longer; proposes concrete trims, calmer alternatives, cut-off sentences.
+   5. **Story critic** (own agent + skill) — 480p preview of the cut from proxies (original sound: keep loud, bed low,
+      no music) watched by Gemini 2.5 Pro with the brief; cost shown before each run.
+   6. **Loop** — findings as validated JSON (must / should / nit) in `.clippilot/reviews/`; Claude applies must+should,
+      max 3 rounds; result on the board (undoable history) + short change list in chat.
+   7. **Acceptance** — ~10 seeded faults in a copy of the Arrifana cut + the user's 2 real cases (+ notes later); ≥ 8/10
+      found, few false alarms.
 3. **Mac app + ingest/analyze from the UI** — Electron shell around the server + web UI, project picker, CLI keeps
    working on the same DB; no terminal for a new trip. CI comes with packaging.
 4. **Assistant in the app** — chat panel in the board (Claude via the Agent SDK with the user's login, acting through
