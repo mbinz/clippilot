@@ -1826,6 +1826,20 @@ patches). Arrifana re-measured (backup `clippilot.pre-w2.db`, 100 clips, 11.5 mi
 C0611 7.06–8.26 s, high, disagreement 0.24); eval P 0.83 / R 0.92 (unchanged); shake fit re-run: 179 checked, 4 fixed,
 14 kept, 7 Gemini calls — scene 5 panel 1 (moment 325) now ends at 7.02 s, before the jolt.
 
+**P2 — frame-exact moment end in the board players (user report + planner spec, 2026-11-25).** Scene 5 panel 1 still showed
+the start of a jolt "at the very end" although the moment ends at 7.02 s and the shake starts at 7.06 s: the board players
+check the end only on `timeupdate` (every ~0.25 s), so playback overshoots the moment's end by up to ~0.25 s — exactly into
+the jolt that the shake fit trimmed away. Export (Resolve) is frame-exact; only the preview lies.
+- One shared mechanism for all board players that loop or advance at a moment's end — `VideoThumb` (tile hover),
+  `DrawerPlayer` (drawer loop, `loopSeekTarget`), `PreviewModal` (scene / cut preview, next panel): check the time on every
+  presented frame with `video.requestVideoFrameCallback` (Safari ≥ 15.4, Chrome), fallback `requestAnimationFrame`; act
+  when `mediaTime + one frame ≥ end` (frame duration from the clip fps, default 1/25) so the last shown frame is before the
+  end; keep the existing Safari rule "read currentTime once".
+- Pure helper (tested): `frameEndReached(mediaTime, end, frameSec)` and the loop/advance decision built on the existing
+  `loopStep` / `loopSeekTarget` semantics (free mode, a − 0.3 rule) unchanged.
+- Tests first for the pure parts; component wiring checked by the planner in the browser (sample `currentTime` at each
+  loop: max overshoot past the end ≤ 1 frame).
+
 **How to run the acceptance test (user)**
 1. Review the decisions [D-1]…[D-19] above (and the implementer decisions in the W1 / C1 / C1b / D1 results).
 2. `cd ~/dev/clippilot && npm run skill:install` (installs the clippilot, cut-critic, review-loop skills and the cut-critic
