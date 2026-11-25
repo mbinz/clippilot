@@ -188,7 +188,7 @@ function applyDecisions(
   let run = apply;
   for (const [cutId, n] of perCut) {
     const inner = run;
-    run = () => { svc.command(cutId, `Shake fix (${n} ${n === 1 ? 'moment' : 'moments'})`, inner); };
+    run = () => { svc.command(cutId, `Shake fix (${n} ${n === 1 ? 'moment' : 'moments'})`, inner, { actor: 'ai' }); };
   }
   run();
 }

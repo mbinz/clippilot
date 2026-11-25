@@ -361,6 +361,44 @@ describe('clippilot --ai edits and cut-out', () => {
     const res = await run('cut', 'apply', '--file', f);
     expect(res.warnings).toEqual([expect.objectContaining({ type: 'too_long', moment_id: 1, panel: { scene: 1, panel: 1 } })]);
   });
+
+  describe('actor (L1)', () => {
+    const actors = async () => (await run('cut', 'history', '--json')).map((h: any) => [h.label, h.actor]).reverse();
+
+    it('edit verbs log "user" without --ai and "ai" with it; apply is always "ai"', async () => {
+      await run('scene', 'add', 'Plain');
+      await run('scene', 'add', 'Robot', '--ai');
+      const tree = await run('cut', 'show', '--json');
+      const [s1, s2] = tree.scenes.map((s: any) => s.id);
+      await run('scene', 'rename', String(s1), 'Plain2');
+      await run('scene', 'rename', String(s1), 'Plain3', '--ai');
+      await run('scene', 'move', String(s2), '0', '--ai');
+      await run('scene', 'set-event', String(s2), '1', '--ai');
+      await run('panel', 'add', String(s2), '--intent', 'x', '--moment', '1');
+      await run('panel', 'add', String(s2), '--intent', 'y', '--ai');
+      const panels = (await run('cut', 'show', '--json')).scenes.flatMap((s: any) => s.panels).map((p: any) => p.id);
+      await run('panel', 'intent', String(panels[1]), 'z', '--ai');
+      await run('panel', 'move', String(panels[1]), String(s1), '0', '--ai');
+      await run('panel', 'delete', String(panels[1]), '--ai');
+      await run('scene', 'delete', String(s1), '--ai');
+      await run('moment', 'trim', '2', '10.5', '13', '--ai');
+      await run('moment', 'trim', '3', '2.5', '5');
+      const f = path.join(dir, 'draft.json');
+      fs.writeFileSync(f, JSON.stringify({ scenes: [{ name: 'D', panels: [{ intent: 'gap' }] }] }));
+      await run('cut', 'apply', '--file', f);
+      expect(process.exitCode).toBeUndefined();
+      expect((await actors()).map((a: string[]) => a[1])).toEqual([
+        'user', 'ai', 'user', 'ai', 'ai', 'ai', 'user', 'ai', 'ai', 'ai', 'ai', 'ai', 'ai', 'user', 'ai']);
+    });
+
+    it('undo and redo keep the actor of the entry', async () => {
+      await run('scene', 'add', 'Robot', '--ai');
+      await run('cut', 'undo');
+      expect((await run('cut', 'history', '--json'))[0]).toMatchObject({ actor: 'ai', undone: true });
+      await run('cut', 'redo');
+      expect((await run('cut', 'history', '--json'))[0]).toMatchObject({ actor: 'ai', undone: false });
+    });
+  });
 });
 
 describe('clippilot export --cut', () => {

@@ -27,6 +27,7 @@ import { migration025 } from './025_shake_fit.js';
 import { migration026 } from './026_ai_speed_backfill.js';
 import { migration027 } from './027_jolt_at_key_action.js';
 import { migration028 } from './028_look_fingerprints.js';
+import { migration029 } from './029_operation_actor.js';
 
 interface Migration {
   version: number;
@@ -63,6 +64,7 @@ const migrations: Migration[] = [
   { version: 26, name: 'ai_speed_backfill', up: migration026 },
   { version: 27, name: 'jolt_at_key_action', up: migration027 },
   { version: 28, name: 'look_fingerprints', up: migration028 },
+  { version: 29, name: 'operation_actor', up: migration029 },
 ];
 
 export function runMigrations(db: Database.Database): void {

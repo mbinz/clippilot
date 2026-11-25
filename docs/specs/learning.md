@@ -63,6 +63,7 @@ Recording (L1) must be in before the full Portugal run so Portugal produces data
 - `cut history --json` shows `actor`.
 - Tests first: actor stored per entry point (board route, CLI with/without `--ai`, apply, shakes fix); undo/redo keep
   it; backfill.
+- Result: done on `l1-actor` (migration 029; `command(..., { actor })`; `--ai` on all scene/panel verbs). Backfill = label `Apply draft (%` / `Shake fix (%` -> ai, else user (Arrifana: 6 ai / 39 user).
 
 **L2 — `clippilot learn context [--cut id] --json` (static).**
 - Baseline = the `after` snapshot of the last non-undone `ai` operation of the cut; final = current state. Pure diff

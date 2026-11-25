@@ -266,6 +266,12 @@ describe('Cut API routes', () => {
       expect(t.db.prepare('SELECT hidden FROM clips WHERE id = ?').get(clipA)).toEqual({ hidden: 0 });
     });
 
+    it('board edits are logged with actor "user"', async () => {
+      await ok('POST', `/cuts/${cutId}/scenes`, { name: 'B' });
+      await ok('PATCH', `/moments/${ma[0]}`, { cut_id: cutId, start_sec: 3, end_sec: 5 });
+      expect(t.svc.history(cutId).map((h) => h.actor)).toEqual(['user', 'user']);
+    });
+
     it('every mutating response carries history; GET history lists the labels', async () => {
       const scene2 = await ok('POST', `/cuts/${cutId}/scenes`, { name: 'B' });
       expect(scene2.history).toEqual({ can_undo: true, can_redo: false, undo_label: expect.any(String), redo_label: null });

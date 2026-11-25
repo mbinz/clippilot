@@ -249,9 +249,9 @@ export class StoryboardService {
 
   // ---------- undo / redo ----------
 
-  /** Run a mutation and log it as one undoable operation on `cutId`. Every route/CLI mutation goes through here. */
-  command<T>(cutId: number, label: string, fn: () => T): T {
-    return ops.command(this.db, cutId, label, fn);
+  /** Run a mutation and log it as one undoable operation on `cutId` (actor `user` unless `{ actor: 'ai' }`). Every route/CLI mutation goes through here. */
+  command<T>(cutId: number, label: string, fn: () => T, opts: { actor?: ops.Actor } = {}): T {
+    return ops.command(this.db, cutId, label, fn, opts);
   }
 
   undo(cutId: number): { label: string; can_undo: boolean; can_redo: boolean } {

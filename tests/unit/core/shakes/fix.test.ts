@@ -195,6 +195,7 @@ describe('fixShakes', () => {
     await run(fake('yes'));
     expect(t.svc.history(cut1).map((h) => h.label)).toEqual(['Shake fix (2 moments)']);
     expect(t.svc.history(cut2).map((h) => h.label)).toEqual(['Shake fix (1 moment)']);
+    expect([...t.svc.history(cut1), ...t.svc.history(cut2)].map((h) => h.actor)).toEqual(['ai', 'ai']);
     const after = {
       moments: t.db.prepare('SELECT id, start_sec, end_sec, ai_start_sec, ai_end_sec, status FROM highlights ORDER BY id').all(),
       panels: t.db.prepare('SELECT id, scene_id, position, moment_id FROM story_segments ORDER BY id').all(),

@@ -30,9 +30,13 @@ export interface MomentState {
   ai_speed?: number | null;
 }
 
+export type Actor = 'ai' | 'user';
+
 export interface OperationInfo {
   id: number;
   label: string;
+  /** Who made the edit: Claude (`--ai`, draft apply, shake fix) or the user. */
+  actor: Actor;
   undone: boolean;
   created_at: string;
 }
@@ -157,7 +161,7 @@ export function historyState(db: Database.Database, cutId: number): HistoryState
  * Moments the operation changed are part of both snapshots even when they look unedited afterwards (an AI edit moves
  * the AI range along), so undo restores them exactly.
  */
-export function command<T>(db: Database.Database, cutId: number, label: string, fn: () => T): T {
+export function command<T>(db: Database.Database, cutId: number, label: string, fn: () => T, opts: { actor?: Actor } = {}): T {
   return db.transaction(() => {
     const projectId = (db.prepare('SELECT project_id FROM stories WHERE id = ?').get(cutId) as { project_id: number } | undefined)?.project_id;
     const before = snapshot(db, cutId);
@@ -173,8 +177,8 @@ export function command<T>(db: Database.Database, cutId: number, label: string, 
       if (a && !after.moments.some((m) => m.id === id)) after.moments.push(a);
     }
     db.prepare('DELETE FROM operations WHERE story_id = ? AND undone = 1').run(cutId);
-    db.prepare('INSERT INTO operations (story_id, label, "before", "after") VALUES (?, ?, ?, ?)')
-      .run(cutId, label, JSON.stringify(before), JSON.stringify(after));
+    db.prepare('INSERT INTO operations (story_id, label, "before", "after", actor) VALUES (?, ?, ?, ?, ?)')
+      .run(cutId, label, JSON.stringify(before), JSON.stringify(after), opts.actor ?? 'user');
     return result;
   })();
 }
@@ -206,7 +210,7 @@ export function redo(db: Database.Database, cutId: number): StepResult {
 }
 
 export function history(db: Database.Database, cutId: number): OperationInfo[] {
-  const rows = db.prepare('SELECT id, label, undone, created_at FROM operations WHERE story_id = ? ORDER BY id DESC LIMIT 50')
-    .all(cutId) as { id: number; label: string; undone: number; created_at: string }[];
+  const rows = db.prepare('SELECT id, label, actor, undone, created_at FROM operations WHERE story_id = ? ORDER BY id DESC LIMIT 50')
+    .all(cutId) as { id: number; label: string; actor: Actor; undone: number; created_at: string }[];
   return rows.map((r) => ({ ...r, undone: r.undone === 1 }));
 }

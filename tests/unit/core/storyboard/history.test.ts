@@ -222,4 +222,22 @@ describe('undo / redo (operation log)', () => {
     svc().deleteCut(cutId);
     expect(t.db.prepare('SELECT COUNT(*) AS n FROM operations').get()).toEqual({ n: 0 });
   });
+  describe('actor (L1)', () => {
+    it('defaults to user; { actor: "ai" } is stored; undo and redo keep it', () => {
+      const scene = svc().addScene(cutId, 'A');
+      svc().command(cutId, 'By user', () => svc().addPanel(scene.id, { intent: 'a' }));
+      svc().command(cutId, 'By ai', () => svc().addPanel(scene.id, { intent: 'b' }), { actor: 'ai' });
+      const actors = () => svc().history(cutId).map((h) => [h.label, h.actor]);
+      expect(actors()).toEqual([['By ai', 'ai'], ['By user', 'user']]);
+      svc().undo(cutId);
+      expect(svc().history(cutId).map((h) => [h.label, h.actor, h.undone])).toEqual([['By ai', 'ai', true], ['By user', 'user', false]]);
+      svc().redo(cutId);
+      expect(actors()).toEqual([['By ai', 'ai'], ['By user', 'user']]);
+    });
+
+    it('the database rejects any other actor', () => {
+      expect(() => t.db.prepare("INSERT INTO operations (story_id, label, \"before\", \"after\", actor) VALUES (?, 'x', '{}', '{}', 'robot')").run(cutId))
+        .toThrow(/CHECK/);
+    });
+  });
 });
