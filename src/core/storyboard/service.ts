@@ -1,7 +1,8 @@
 import type Database from 'better-sqlite3';
 import type { BriefState, Cut, Panel, PanelSource, Scene } from '../../types/story.js';
 import type { Clip } from '../../types/clip.js';
-import type { HighlightRecord } from '../../db/repositories/highlight.repository.js';
+import type { HighlightRecord, ShakeStatus } from '../../db/repositories/highlight.repository.js';
+import { shakeStateOf } from '../shakes/state.js';
 import type { EventRecord } from '../../db/repositories/event.repository.js';
 import { speedAllowed } from '../analyze/highlights.js';
 import { HighlightRepository } from '../../db/repositories/highlight.repository.js';
@@ -43,6 +44,9 @@ export interface MomentMotion {
   jitter: { score: number; band: JitterBand } | null;
   motion: { camera: number; change: number } | null;
   shakes: ShakeView[] | null;
+  /** Shake fit (F1): clean | fixed | kept, or null = not checked for the current range; `shake_note` says why it was kept. */
+  shake_status: ShakeStatus | null;
+  shake_note: string | null;
 }
 
 /** One clip's stored motion data, loaded once per read. */
@@ -118,6 +122,8 @@ export interface MomentRow {
   jitter: MomentMotion['jitter'];
   motion: MomentMotion['motion'];
   shakes: MomentMotion['shakes'];
+  shake_status: MomentMotion['shake_status'];
+  shake_note: MomentMotion['shake_note'];
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -130,6 +136,10 @@ export class StoryboardService {
   ) {}
 
   private motionOf(m: HighlightRecord, cache: MotionCache): MomentMotion {
+    return { ...this.motionValues(m, cache), ...shakeStateOf(m) };
+  }
+
+  private motionValues(m: HighlightRecord, cache: MotionCache): Omit<MomentMotion, 'shake_status' | 'shake_note'> {
     if (!cache.has(m.clip_id)) {
       const repo = new MotionRepository(this.db);
       const curve = repo.getCurve(m.clip_id);
@@ -597,6 +607,54 @@ export class StoryboardService {
     });
   }
 
+  /** A new unprotected AI moment on the same clip with the same tags / speed, covering `startSec`..`endSec`, `split_of` = `m`. */
+  private insertSibling(m: HighlightRecord, startSec: number, endSec: number): number {
+    const fps = this.clip(m.clip_id).fps;
+    const r = this.db.prepare(`INSERT INTO highlights (clip_id, start_sec, end_sec, ai_start_sec, ai_end_sec, description, tier, shot, role,
+        issues, slowmo, slowmo_reason, suggested_speed, audio_keep, audio_type, speed, ai_speed, split_of)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(m.clip_id, startSec, endSec, startSec, endSec, m.description, m.tier, m.shot, m.role, m.issues, m.slowmo,
+        m.slowmo_reason, m.suggested_speed, m.audio_keep, m.audio_type, m.speed,
+        m.speed === defaultSpeed(m.suggested_speed, fps) ? null : m.speed, m.id);
+    return Number(r.lastInsertRowid);
+  }
+
+  /**
+   * Split an unprotected AI moment into `parts` (ordered, inside the moment, each >= 1 s; F1 shake fit): the moment keeps
+   * the first part, every other part becomes a sibling AI moment (`split_of`), and every panel that uses the moment, in
+   * every cut, gets one panel per sibling right behind it (a user's panel stays the user's). Nothing is confirmed.
+   */
+  splitMoment(id: number, parts: { start: number; end: number }[]): { sibling_ids: number[]; panels: number[] } {
+    const m = this.moment(id);
+    return this.tx(() => {
+      this.assertUsable(m);
+      this.assertUnprotected(m);
+      if (parts.length < 2) throw new Error('A split needs at least two parts');
+      parts.forEach((p, i) => {
+        if (p.start < m.start_sec - 1e-9 || p.end > m.end_sec + 1e-9) throw new Error(`Part ${p.start}-${p.end} must be inside the moment (${m.start_sec}-${m.end_sec})`);
+        if (p.end - p.start < MIN_CUT_PART_SEC - 1e-9) throw new Error(`Every part must be at least ${MIN_CUT_PART_SEC} s`);
+        if (i > 0 && p.start < parts[i - 1]!.end) throw new Error('Parts must be in order and must not overlap');
+      });
+      this.writeMomentRange(m, parts[0]!.start, parts[0]!.end);
+      this.adoptRangeAsAi(id);
+      const siblings = parts.slice(1).map((p) => this.insertSibling(m, p.start, p.end));
+
+      const using = this.db.prepare('SELECT id FROM story_segments WHERE moment_id = ? ORDER BY story_id, scene_id, position').all(id) as { id: number }[];
+      const panels: number[] = [];
+      for (const { id: panelId } of using) {
+        const p = this.panel(panelId);
+        let anchor = panelId;
+        for (const sib of siblings) {
+          const added = this.addPanel(p.scene_id, { intent: p.intent, momentId: sib, source: 'ai' }, this.panel(anchor).position + 1);
+          if (p.source === 'user') this.db.prepare("UPDATE story_segments SET source = 'user' WHERE id = ?").run(added.id);
+          panels.push(added.id);
+          anchor = added.id;
+        }
+      }
+      return { sibling_ids: siblings, panels };
+    });
+  }
+
   /**
    * Cut `[fromSec, toSec]` out of a moment (a shake): the moment keeps the part before, a new sibling moment (same
    * clip and tags, `split_of`) gets the part after and a panel of its own right behind every panel of `cutId` that
@@ -617,14 +675,7 @@ export class StoryboardService {
       if (opts.ai) this.adoptRangeAsAi(id);
       else this.touchMoment(m);
 
-      const fps = this.clip(m.clip_id).fps;
-      const r = this.db.prepare(`INSERT INTO highlights (clip_id, start_sec, end_sec, ai_start_sec, ai_end_sec, description, tier, shot, role,
-          issues, slowmo, slowmo_reason, suggested_speed, audio_keep, audio_type, speed, ai_speed, split_of)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .run(m.clip_id, toSec, m.end_sec, toSec, m.end_sec, m.description, m.tier, m.shot, m.role, m.issues, m.slowmo,
-          m.slowmo_reason, m.suggested_speed, m.audio_keep, m.audio_type, m.speed,
-          m.speed === defaultSpeed(m.suggested_speed, fps) ? null : m.speed, id);
-      const siblingId = Number(r.lastInsertRowid);
+      const siblingId = this.insertSibling(m, toSec, m.end_sec);
 
       const using = this.db.prepare('SELECT id FROM story_segments WHERE story_id = ? AND moment_id = ? ORDER BY scene_id, position')
         .all(opts.cutId, id) as { id: number }[];

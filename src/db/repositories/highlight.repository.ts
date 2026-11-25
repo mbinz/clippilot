@@ -4,6 +4,7 @@ import { defaultSpeed } from '../../core/storyboard/range.js';
 
 export type Shot = 'wide' | 'medium' | 'close' | 'detail';
 export type AudioType = 'ambient' | 'speech' | 'music' | 'noise';
+export type ShakeStatus = 'clean' | 'fixed' | 'kept';
 export type Role = 'establishing' | 'action' | 'reaction' | 'detail' | 'transition';
 
 export interface HighlightRecord {
@@ -35,6 +36,11 @@ export interface HighlightRecord {
   ai_speed: number | null;
   /** The moment this one was cut out of (a shake cut out of a good moment leaves this sibling after it). */
   split_of: number | null;
+  /** Shake fit (F1): null = not checked, else clean | fixed | kept; valid only while the range equals `shake_checked_*`. */
+  shake_status: ShakeStatus | null;
+  shake_note: string | null;
+  shake_checked_start: number | null;
+  shake_checked_end: number | null;
   seen_at: string | null;
   /** Motion measurement (null = never measured); valid only while the range equals `motion_start_sec`..`motion_end_sec`. */
   jitter_score: number | null;
@@ -156,6 +162,17 @@ export class HighlightRepository {
   setMotion(id: number, m: { score: number; maxPx: number; camera: number; change: number }, startSec: number, endSec: number): void {
     this.db.prepare(`UPDATE highlights SET jitter_score = ?, jitter_max_px = ?, camera_motion = ?, frame_change = ?,
       motion_start_sec = ?, motion_end_sec = ? WHERE id = ?`).run(m.score, m.maxPx, m.camera, m.change, startSec, endSec, id);
+  }
+
+  /** Store the shake fit result for the range it was decided on. Not an edit. */
+  setShakeStatus(id: number, status: ShakeStatus, note: string | null, startSec: number, endSec: number): void {
+    this.db.prepare('UPDATE highlights SET shake_status = ?, shake_note = ?, shake_checked_start = ?, shake_checked_end = ? WHERE id = ?')
+      .run(status, note, startSec, endSec, id);
+  }
+
+  /** Forget the shake fit results of a clip (its shakes were measured again). */
+  clearShakeStatus(clipId: number): void {
+    this.db.prepare('UPDATE highlights SET shake_status = NULL, shake_note = NULL, shake_checked_start = NULL, shake_checked_end = NULL WHERE clip_id = ?').run(clipId);
   }
 
   private clipFps(clipId: number): number | null | undefined {

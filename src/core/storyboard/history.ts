@@ -99,11 +99,16 @@ function insertRows(db: Database.Database, table: string, rows: Row[]): void {
   }
 }
 
-/** Moments cut out of another one: those that did not exist at the snapshot are deleted, missing ones are re-created. */
+/** Moments cut out of another one: those that did not exist at the snapshot are deleted (with panels still using them), missing ones are re-created. */
 function restoreSplits(db: Database.Database, projectId: number, splits: Row[]): void {
   const want = new Set(splits.map((r) => r.id as number));
   const have = new Set(splitRows(db, projectId).map((r) => r.id as number));
-  for (const id of have) if (!want.has(id)) db.prepare('DELETE FROM highlights WHERE id = ?').run(id);
+  for (const id of have) {
+    if (want.has(id)) continue;
+    // Another cut's panel may use the sibling (a shake fit splits a moment in every cut that uses it): it goes with it.
+    db.prepare('DELETE FROM story_segments WHERE moment_id = ?').run(id);
+    db.prepare('DELETE FROM highlights WHERE id = ?').run(id);
+  }
   insertRows(db, 'highlights', splits.filter((r) => !have.has(r.id as number)));
 }
 

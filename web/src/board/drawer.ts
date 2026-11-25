@@ -221,14 +221,24 @@ export function jitterLine(j: { score: number; band: string } | null | undefined
   return j ? `Jitter ${j.band} · ${j.score.toFixed(2)} %` : null;
 }
 
+/** Shake fit result of a moment as the drawer prints it ("Shake kept - note" / "Shake trimmed out"); null when clean or not checked. */
+export function shakeFitLine(m: { shake_status?: string | null; shake_note?: string | null }): string | null {
+  if (m.shake_status === 'fixed') return 'Shake trimmed out';
+  if (m.shake_status === 'kept') return m.shake_note ? `Shake kept \u2014 ${m.shake_note}` : 'Shake kept';
+  return null;
+}
+
 /**
- * Tooltip of the small neutral icon on a tile, or null when there is none: the moment's jitter band is `shaky` or it
- * contains a high-confidence shake (details live in the drawer).
+ * Tooltip of the small neutral icon on a tile, or null when there is none: the moment's jitter band is `shaky`, it
+ * contains a high-confidence shake, or the shake fit kept a shake in it (details live in the drawer).
  */
-export function shakeHint(m: { jitter?: { score: number; band: string } | null; shakes?: ShakeInfo[] | null }): string | null {
+export function shakeHint(m: {
+  jitter?: { score: number; band: string } | null; shakes?: ShakeInfo[] | null; shake_status?: string | null; shake_note?: string | null;
+}): string | null {
   const shaky = m.jitter?.band === 'shaky';
   const high = (m.shakes ?? []).filter((k) => k.confidence === 'high');
-  if (!shaky && high.length === 0) return null;
-  const lines = [shaky ? jitterLine(m.jitter) : null, ...high.map(shakeLine)].filter((l): l is string => l !== null);
+  const kept = m.shake_status === 'kept';
+  if (!shaky && high.length === 0 && !kept) return null;
+  const lines = [shaky ? jitterLine(m.jitter) : null, ...high.map(shakeLine), kept ? shakeFitLine(m) : null].filter((l): l is string => l !== null);
   return `${shaky ? 'Shaky' : 'Shake'} \u00b7 ${lines.join(' \u00b7 ')}`;
 }

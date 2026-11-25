@@ -22,6 +22,7 @@ import { registerProxiesCommand } from './commands/proxies.js';
 import { registerTranscribeCommand } from './commands/transcribe.js';
 import { registerMotionCommand } from './commands/motion.js';
 import { registerCriticCommands } from './commands/critic.js';
+import { registerShakesCommands } from './commands/shakes.js';
 import { setLogLevel } from '../utils/logger.js';
 
 export function createProgram(): Command {
@@ -62,6 +63,7 @@ export function createProgram(): Command {
   registerMotionCommand(program);
   registerBoardCommand(program);
   registerCriticCommands(program);
+  registerShakesCommands(program);
 
   return program;
 }

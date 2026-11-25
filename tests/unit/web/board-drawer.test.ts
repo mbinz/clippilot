@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   decisionFor, storyLink, optionList, starTarget, starLabel, rangeLabel, playLabel, storyMark, poolView,
-  panelPosition, isValidTrim, transcriptView, shakeMarks, shakeLine, jitterLine, shakeHint, type DrawerTree, type ShakeInfo,
+  panelPosition, isValidTrim, transcriptView, shakeMarks, shakeLine, shakeFitLine, jitterLine, shakeHint, type DrawerTree, type ShakeInfo,
 } from '../../../web/src/board/drawer.js';
 import type { PoolMoment } from '../../../web/src/board/pool.js';
 
@@ -259,5 +259,22 @@ describe('shakeHint (the small tile icon)', () => {
     const h = shakeHint({ jitter: { score: 3.2, band: 'shaky' }, shakes: [k('high')] })!;
     expect(h).toContain('Jitter shaky');
     expect(h).toContain('Shake 0:01.2');
+  });
+  it('a shake the fit kept shows the icon with the reason, even when only low-confidence shakes remain', () => {
+    expect(shakeHint({ jitter: { score: 0.5, band: 'locked' }, shakes: [k('low')], shake_status: 'kept', shake_note: 'the kiss is in the shake' }))
+      .toBe('Shake \u00b7 Shake kept \u2014 the kiss is in the shake');
+    expect(shakeHint({ jitter: { score: 0.5, band: 'locked' }, shakes: [], shake_status: 'fixed' })).toBeNull();
+    expect(shakeHint({ shakes: [], shake_status: 'clean' })).toBeNull();
+  });
+});
+
+describe('shakeFitLine (drawer)', () => {
+  it('kept with the reason, trimmed out, nothing for clean / not checked', () => {
+    expect(shakeFitLine({ shake_status: 'kept', shake_note: 'the kiss is in the shake' })).toBe('Shake kept \u2014 the kiss is in the shake');
+    expect(shakeFitLine({ shake_status: 'kept', shake_note: null })).toBe('Shake kept');
+    expect(shakeFitLine({ shake_status: 'fixed' })).toBe('Shake trimmed out');
+    expect(shakeFitLine({ shake_status: 'clean' })).toBeNull();
+    expect(shakeFitLine({ shake_status: null })).toBeNull();
+    expect(shakeFitLine({})).toBeNull();
   });
 });

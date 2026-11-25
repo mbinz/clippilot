@@ -53,6 +53,9 @@ export interface ContextMoment {
   jitter: MomentWithSpeech['jitter'];
   /** Passed through from the storyboard JSON when moments carry `shakes` (null until the motion slice lands). */
   shakes: unknown;
+  /** Shake fit (F1): clean | fixed | kept | null (not checked); `shake_note` = why it was kept. */
+  shake_status: string | null;
+  shake_note: string | null;
   motion: MomentWithSpeech['motion'];
   audio_keep: boolean;
   protected: boolean;
@@ -169,6 +172,7 @@ export async function buildContext(
           tier: m.user_tier ?? m.tier, shot: m.shot, role: m.role, description: m.description,
           speech: m.speech, speech_cut: m.speech_cut, jitter: m.jitter,
           shakes: (m as unknown as { shakes?: unknown }).shakes ?? null, motion: m.motion,
+          shake_status: m.shake_status, shake_note: m.shake_note,
           audio_keep: m.audio_keep === 1, protected: reasons.length > 0, protected_reasons: reasons,
           dup_group: m.dup_group, dup_alternatives: hl.dupGroupMembers(m.id),
           sentences: sentencesOf(m.clip_id)

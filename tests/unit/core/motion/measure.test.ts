@@ -2,8 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { ClipRepository } from '../../../../src/db/repositories/clip.repository.js';
 import { HighlightRepository } from '../../../../src/db/repositories/highlight.repository.js';
 import { MotionRepository } from '../../../../src/db/repositories/motion.repository.js';
-import { TranscriptRepository } from '../../../../src/db/repositories/transcript.repository.js';
-import { measureClips, isMeasured, nudgeRange, type ClipFrameSource, type CurveMeasurer } from '../../../../src/core/motion/index.js';
+import { measureClips, isMeasured, type ClipFrameSource, type CurveMeasurer } from '../../../../src/core/motion/index.js';
 import { PATCH_COUNT, momentMotion, type RawCurve } from '../../../../src/core/motion/curve.js';
 import type { Shift } from '../../../../src/core/motion/motion.js';
 import { DEFAULT_CONFIG } from '../../../../src/core/config/defaults.js';
@@ -50,8 +49,8 @@ describe('measureClips (per whole clip)', () => {
     decodes = [];
     shifts = joltShifts();
   });
-  const run = (over: { force?: boolean; source?: ClipFrameSource; exists?: (p: string) => boolean; transcripts?: TranscriptRepository } = {}) =>
-    measureClips(clips.listByProject(t.projectId), { highlights, motion, transcripts: over.transcripts }, {
+  const run = (over: { force?: boolean; source?: ClipFrameSource; exists?: (p: string) => boolean } = {}) =>
+    measureClips(clips.listByProject(t.projectId), { highlights, motion }, {
       cfg, source: over.source ?? source, measurer, force: over.force, exists: over.exists ?? (() => true),
     });
 
@@ -106,9 +105,8 @@ describe('measureClips (per whole clip)', () => {
     t.db.prepare("UPDATE highlights SET status = 'confirmed', user_tier = 'hero', speed = 0.5 WHERE id = ?").run(a);
     const cols = 'id, clip_id, start_sec, end_sec, status, tier, user_tier, speed, ai_start_sec, ai_end_sec';
     const before = t.db.prepare(`SELECT ${cols} FROM highlights`).all();
-    const r = await run();
+    await run();
     expect(t.db.prepare(`SELECT ${cols} FROM highlights`).all()).toEqual(before);
-    expect(r.nudged).toBe(0);
     expect(highlights.findByClip(c.id)[0].jitter_score).not.toBeNull();
   });
 
@@ -129,78 +127,14 @@ describe('measureClips (per whole clip)', () => {
     expect(r2.errors[0].message).toMatch(/frame count mismatch/);
   });
 
-  describe('boundary nudge [D-5]', () => {
-    const rng = (id: number) => { const r = t.db.prepare('SELECT start_sec, end_sec FROM highlights WHERE id = ?').get(id) as { start_sec: number; end_sec: number }; return [r.start_sec, r.end_sec]; };
-
-    it('an unprotected moment starting inside a shake starts where the shake ends; one ending inside ends where it starts', async () => {
-      const c = t.addClip();
-      const [a, b] = t.addMoments(c.id, [{ start_sec: 4.1, end_sec: 10 }, { start_sec: 0.5, end_sec: 4.1 }]);
-      const r = await run();
-      const k = motion.getShakes(c.id)[0];
-      expect(k.start_sec).toBeLessThan(4.1); expect(k.end_sec).toBeGreaterThan(4.1);
-      expect(rng(a)).toEqual([k.end_sec, 10]);
-      expect(rng(b)).toEqual([0.5, k.start_sec]);
-      expect(r.nudged).toBe(2);
-      // still unprotected (the ai range moved with it) and measured on the new range
-      expect(highlights.findUnprotected(c.id).map((h) => h.id).sort()).toEqual([a, b].sort());
-      expect(highlights.findByClip(c.id).every(isMeasured)).toBe(true);
-      expect((await run()).nudged).toBe(0);
-    });
-
-    it('is skipped when the moment would get shorter than 2 s', async () => {
-      const c = t.addClip();
-      const [a] = t.addMoments(c.id, [{ start_sec: 4.1, end_sec: 5.5 }]);
-      expect((await run()).nudged).toBe(0);
-      expect(rng(a)).toEqual([4.1, 5.5]);
-    });
-
-    it('protected moments (confirmed, edited speed or ★) are left alone', async () => {
-      const c = t.addClip();
-      const [a, b, d] = t.addMoments(c.id, [{ start_sec: 4.1, end_sec: 10 }, { start_sec: 4.1, end_sec: 12 }, { start_sec: 4.1, end_sec: 14 }]);
-      t.db.prepare("UPDATE highlights SET status = 'confirmed' WHERE id = ?").run(a);
-      t.db.prepare('UPDATE highlights SET speed = 0.5 WHERE id = ?').run(b);
-      t.db.prepare("UPDATE highlights SET user_tier = 'hero' WHERE id = ?").run(d);
-      expect((await run()).nudged).toBe(0);
-      expect([a, b, d].map(rng)).toEqual([[4.1, 10], [4.1, 12], [4.1, 14]]);
-    });
-
-    it('low-confidence shakes do not move boundaries', async () => {
-      const c = t.addClip();
-      const [a] = t.addMoments(c.id, [{ start_sec: 4.1, end_sec: 10 }]);
-      // a moving scene: constant wobble raises the clip's median, the jolt gets low confidence
-      shifts = shifts.map((s, i) => (i % 2 ? { dx: s.dx + 2, dy: 0 } : { dx: s.dx - 2, dy: 0 }));
-      const r = await run();
-      expect(motion.getShakes(c.id).every((k) => k.confidence === 'low')).toBe(true);
-      expect(r.nudged).toBe(0);
-      expect(rng(a)).toEqual([4.1, 10]);
-    });
-
-    it('is skipped when it would newly cut a sentence', async () => {
-      const c = t.addClip();
-      const [a] = t.addMoments(c.id, [{ start_sec: 4.1, end_sec: 10 }]);
-      const transcripts = new TranscriptRepository(t.db);
-      // the sentence starts at 4.2: the moment starts clean before it, the nudged start (4.3) would land inside it
-      transcripts.save(c.id, 'm', { language: 'en', text: 'x', segments: [{ start: 4.2, end: 5, text: 'Hello.' }], words: [] });
-      expect((await run({ transcripts })).nudged).toBe(0);
-      expect(rng(a)).toEqual([4.1, 10]);
-    });
-
-    it('a boundary that already cuts the sentence does not block the nudge', async () => {
-      const c = t.addClip();
-      const [a] = t.addMoments(c.id, [{ start_sec: 4.1, end_sec: 10 }]);
-      const transcripts = new TranscriptRepository(t.db);
-      transcripts.save(c.id, 'm', { language: 'en', text: 'x', segments: [{ start: 3.5, end: 6, text: 'Hello there.' }], words: [] });
-      expect((await run({ transcripts })).nudged).toBe(1);
-      expect(rng(a)[0]).toBe(4.3);
-    });
-  });
-});
-
-describe('nudgeRange (pure)', () => {
-  const shake = { start_sec: 4, end_sec: 4.6, confidence: 'high' as const };
-  it('moves a start inside to the shake end, an end inside to the shake start, outside untouched', () => {
-    expect(nudgeRange(4.2, 10, [shake])).toEqual({ start: 4.6, end: 10 });
-    expect(nudgeRange(0.5, 4.3, [shake])).toEqual({ start: 0.5, end: 4 });
-    expect(nudgeRange(1, 9, [shake])).toEqual({ start: 1, end: 9 });
+  it('a fresh measurement (--force) forgets the shake fit results of the clip', async () => {
+    const c = t.addClip();
+    const [a] = t.addMoments(c.id, [{ start_sec: 1, end_sec: 3 }]);
+    await run();
+    highlights.setShakeStatus(a, 'kept', 'because', 1, 3);
+    await run();
+    expect(highlights.findById(a)!.shake_status).toBe('kept');
+    await run({ force: true });
+    expect(highlights.findById(a)).toMatchObject({ shake_status: null, shake_note: null, shake_checked_start: null });
   });
 });

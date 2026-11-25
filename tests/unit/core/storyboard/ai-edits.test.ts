@@ -205,4 +205,34 @@ describe('AI edits (--ai): trim / speed / place keep the moment unprotected', ()
       expect(hl.protectionReasons(m[0]!)).toEqual([]);
     });
   });
+
+  describe('splitMoment (shake fit)', () => {
+    it('keeps the first part, makes siblings of the others, one panel per sibling behind every panel of every cut', () => {
+      const cut2 = t.svc.createCut(t.projectId, 'Alt').id;
+      const scene2 = t.svc.addScene(cut2, 'S').id;
+      const p = t.svc.addPanel(sceneId, { intent: 'a', momentId: m[0]!, source: 'ai' });
+      t.db.prepare("UPDATE story_segments SET source = 'user' WHERE id = ?").run(p.id);
+      const q = t.svc.addPanel(scene2, { intent: 'b', momentId: m[0]!, source: 'ai' });
+      const res = t.svc.splitMoment(m[0]!, [{ start: 2, end: 4 }, { start: 5, end: 7 }, { start: 8, end: 12 }]);
+      expect(row(m[0]!)).toMatchObject({ start_sec: 2, end_sec: 4, ai_end_sec: 4, status: 'proposed' });
+      expect(res.sibling_ids.map((id) => [row(id).start_sec, row(id).end_sec, row(id).split_of])).toEqual([[5, 7, m[0]], [8, 12, m[0]]]);
+      const seq = (scene: number) => (t.db.prepare('SELECT id, moment_id, source FROM story_segments WHERE scene_id = ? ORDER BY position').all(scene) as any[]);
+      expect(seq(sceneId).map((x) => x.moment_id)).toEqual([m[0], ...res.sibling_ids]);
+      expect(seq(sceneId).map((x) => x.source)).toEqual(['user', 'user', 'user']);
+      expect(seq(scene2).map((x) => x.moment_id)).toEqual([m[0], ...res.sibling_ids]);
+      expect(seq(scene2)[0].id).toBe(q.id);
+      expect(seq(sceneId)[0].id).toBe(p.id);
+      for (const id of [m[0]!, ...res.sibling_ids]) expect(hl.protectionReasons(id)).toEqual([]);
+    });
+
+    it('validates the parts and refuses protected moments', () => {
+      expect(() => t.svc.splitMoment(m[0]!, [{ start: 2, end: 4 }])).toThrow(/two parts/);
+      expect(() => t.svc.splitMoment(m[0]!, [{ start: 1, end: 4 }, { start: 5, end: 7 }])).toThrow(/inside/);
+      expect(() => t.svc.splitMoment(m[0]!, [{ start: 2, end: 2.5 }, { start: 5, end: 7 }])).toThrow(/at least 1/);
+      expect(() => t.svc.splitMoment(m[0]!, [{ start: 2, end: 6 }, { start: 5, end: 7 }])).toThrow(/order/);
+      t.svc.starMoment(m[0]!, true);
+      expect(() => t.svc.splitMoment(m[0]!, [{ start: 2, end: 4 }, { start: 5, end: 7 }])).toThrow(/protected/);
+      expect(t.db.prepare('SELECT COUNT(*) AS n FROM highlights').get()).toEqual({ n: 2 });
+    });
+  });
 });

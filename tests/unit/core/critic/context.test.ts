@@ -64,6 +64,17 @@ describe('buildContext', () => {
     expect(p3).toMatchObject({ state: 'gap', next_panel_id: null, label: 'S2·P2' });
   });
 
+  it('carries the shake fit status and note of the moment (null when not checked for the current range)', async () => {
+    const f = fixture();
+    const hl = new HighlightRepository(f.db);
+    hl.setShakeStatus(f.a1, 'kept', 'the kiss is in the shake', 2, 6);
+    let ctx = await buildContext(f.svc, hl, f.cut.id, out, { grab });
+    expect(ctx.panels[0]!.moment).toMatchObject({ shake_status: 'kept', shake_note: 'the kiss is in the shake' });
+    f.db.prepare('UPDATE highlights SET end_sec = 5 WHERE id = ?').run(f.a1);
+    ctx = await buildContext(f.svc, hl, f.cut.id, out, { grab });
+    expect(ctx.panels[0]!.moment).toMatchObject({ shake_status: null, shake_note: null });
+  });
+
   it('passes a moment\'s shakes through when the storyboard JSON has them', async () => {
     const f = fixture();
     const svc = Object.create(f.svc);

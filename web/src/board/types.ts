@@ -52,6 +52,9 @@ export interface BoardMoment {
   /** Measured jitter of the current range (null = not measured) and the shakes inside it (null = clip not measured). */
   jitter?: { score: number; band: 'locked' | 'stabilize' | 'shaky' } | null;
   shakes?: ShakeInfo[] | null;
+  /** Shake fit: clean | fixed | kept (null = not checked for the current range) and why a shake was kept. */
+  shake_status?: 'clean' | 'fixed' | 'kept' | null;
+  shake_note?: string | null;
   thumbnail: string | null;
   clip: ClipInfo | null;
 }

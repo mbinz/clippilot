@@ -72,12 +72,12 @@ afterEach(async () => {
 });
 
 describe('clippilot motion', () => {
-  it('--json reports clips measured / skipped / failed, shakes, nudged moments and the band counts', async () => {
+  it('--json reports clips measured / skipped / failed, shakes, shake fit totals and the band counts', async () => {
     seed();
     await run('motion', '--json');
     expect(process.exitCode).toBeUndefined();
     expect(JSON.parse(out.join('\n'))).toMatchObject({
-      project: 'trip', measured: 1, skipped: 0, failed: 0, shakes: { high: 0, low: 0 }, nudged: 0,
+      project: 'trip', measured: 1, skipped: 0, failed: 0, shakes: { high: 0, low: 0 }, shake_fit: { checked: 2, clean: 2, fixed: 0 },
       bands: { locked: 2, stabilize: 0, shaky: 0 }, errors: [],
     });
   });

@@ -56,6 +56,7 @@ on success. Always pass `--json` so output is parseable.
 | `clippilot summary [--project <name>] [--top N] --json` | Overview of a project: scene hints, places, moments, best highlights. Run after analyze, before storyboarding. |
 | `clippilot events list [--project <name>] --json` | Events: clips grouped by folder (deepest folder) or by recording time (gap > 45 min). See "Events" below. |
 | `clippilot cut show --json` / `cut brief` / `cut apply --file f.json` / `moments list --json` | The storyboard: brief, draft, read back. See "Storyboard" below. |
+| `clippilot shakes fix [--project <name>] [--cut <id>] [--dry-run] --json` | Shake fit: for every unprotected AI moment (also those placed in a cut) cut the shakes out: trim, or split into sibling moments with their own panels; Gemini Flash checks the key action survives, else the moment is marked `kept` with a note. One undo step per cut. Run it after `cut apply` and after every review-loop round. Needs a Gemini key (without one it only plans and applies nothing). Re-runs skip checked moments. `--dry-run` shows plans only. `motion` / `analyze` run it too. |
 | `clippilot board context --json` | The user has the board open and says **this / that panel, this moment, here, the selected one**: run this first. It resolves their selection (scene, panel + intent, focused moment with clip, in/out, speed, tier, shot/role, `alternatives` ids). Exit 1 + `{error}` when no board has been opened yet; `stale: true` means some selected item was deleted since. |
 | `clippilot critic context [--cut id] --out <dir> --json` | Review loop: writes `context.json` (brief, per panel moment / protected + why / neighbours) and `strips/panel-<id>.png` for the cut critic to read. |
 | `clippilot critic save --file f.json --json` | Validate + store a critic's findings (ids must exist in the cut; `protected` is recomputed from the DB). |
@@ -110,6 +111,8 @@ Workflow:
    (clip seconds, needs `moment_id`, inside the moment, both remaining parts at least 1 s, moment not user-touched) cuts a
    stretch such as a shake out of the moment: the moment keeps the part before, a sibling moment with its own panel right
    behind plays the part after. The apply result carries `warnings` (see "Draft warnings" below).
+   Right after `cut apply` run `clippilot shakes fix --cut <id> --json`: it trims or splits AI moments around shakes and
+   marks the rest; its changes can add panels, so read the cut back afterwards.
 4. `clippilot cut show --json` to read the result back; summarise it for the user (totals, gaps).
 5. Hand off: `clippilot export --cut <id> --format otio --output <abs path>` (see the verbs table).
 
@@ -138,7 +141,11 @@ Rules when drafting:
 - Read `jitter` and `shakes` on every row. **Avoid band `shaky`** when a calmer moment of the same `dup_group` exists
   (calmer = not `shaky`, no `high`-confidence shake). A shake (`shakes` entry with `confidence: high`) inside an otherwise
   good moment: decide keep or `cut_out: [start, end]` of the shake (use the shake's `start` / `end`; the parts left must
-  be at least 1 s). Low-confidence shakes are usually camera moves in moving scenes: leave them.
+  be at least 1 s). Low-confidence shakes are usually camera moves in moving scenes: leave them for your own cuts. You
+  do not need to cut shakes out of unprotected AI moments yourself: `clippilot shakes fix --cut <id>` (after `cut apply`)
+  does it for every shake, high or low confidence, and checks with Gemini that the key action survives. Read
+  `shake_status` afterwards: `kept` moments still contain a shake (`shake_note` says why: the action is in the shake, no
+  clean range, a sentence would be cut, or the moment is protected); swap them for a calmer alternative or tell the user.
 - B-roll to cover a shake or a shaky stretch is only a suggestion in chat; do not build overlays.
 - Length: static or silent moments play at most 8 s (aim for 2-3 s). Moments with speech and clear action moments
   (role `action`, `motion.change` >= 0.03 or `motion.camera` >= 2) may run up to about 20 s.
@@ -196,6 +203,7 @@ JSON-encoded text columns:
   - `issues`: array of `blur` | `obstructed` | `overexposed` | `underexposed` (empty when clean; camera jitter is not an issue tag, it is measured: `jitter` on `moments list` / `cut show` rows)
   - `jitter`: `{score, band}` measured by `clippilot motion` (continuous handheld micro-movement; band `locked` | `stabilize` | `shaky`), `null` when not measured
   - `shakes`: single jolts inside the moment's range, `[{start, end, peak_at, strength, jump_pct, jump_px, confidence: high|low, moving_scene}]`, `null` when the clip is not measured
+  - `shake_status` / `shake_note`: result of the shake fit (`clippilot shakes fix`) for the current range: `clean` (no shake) | `fixed` (shakes trimmed out) | `kept` (a shake stays; `shake_note` = reason) | `null` (not checked yet, or the range changed since)
   - `slowmo` / `suggested_speed`: whether slow motion suits the moment and the playback speed derived from fps
 
 `analysis_status` of `done` means

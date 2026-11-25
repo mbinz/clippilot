@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { PM } from '../../board/types';
-import { starLabel, transcriptView, shakeLine, jitterLine, type SpokenSegment, type StoryLink } from '../../board/drawer';
+import { starLabel, transcriptView, shakeLine, shakeFitLine, jitterLine, type SpokenSegment, type StoryLink } from '../../board/drawer';
 import { fetchTranscript } from '../../board/api';
 import { effectiveTier, isHero, isOut, type UsageEntry } from '../../board/pool';
 import { btn, btnGhost, kbd, tagAi, tagMine } from './ui';
@@ -145,10 +145,11 @@ export function MomentDrawer(p: Props) {
           </span>
         </div>
         <p className="m-0 mb-2 text-[12.5px] text-[#cfd3db]">{m.description}</p>
-        {(m.jitter || (m.shakes && m.shakes.length > 0)) && (
+        {(m.jitter || (m.shakes && m.shakes.length > 0) || shakeFitLine(m)) && (
           <div className="mb-2 text-[11px] leading-snug text-bd-muted">
             {jitterLine(m.jitter) && <div>{jitterLine(m.jitter)}</div>}
             {m.shakes?.map((k, i) => <div key={i}>{shakeLine(k)}</div>)}
+            {shakeFitLine(m) && <div>{shakeFitLine(m)}</div>}
           </div>
         )}
         {spoken.parts.length > 0 && (
