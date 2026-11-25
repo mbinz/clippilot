@@ -34,7 +34,7 @@ handheld micro-movement (S1's "shake" today). Gemini's `shake` issue is dropped 
 (rename + drop), then W1** (border-patch experiment done: P 0.83 / R 0.93) — all under "W0 — Wackler prototype" below.
 
 **2026-11-25 (later):** grilling on **learning from human choices** (3 rounds) → PRD roadmap item **2c**, ARCHITECTURE
-decisions 9 (rewritten) + 13 and "Pipeline: who does what"; specs L0–L3 under "Roadmap item 2c" below. Order: A2 first.
+decisions 9 (rewritten) + 13 and "Pipeline: who does what"; specs L0–L3 under "Roadmap item 2c" below.
 
 `v0.1.0` — ingest (resumable) / analyze with timestamped highlights / search / summary; OTIO + FCPXML export verified in free Resolve (M1). No story/storyboard workflow yet (M3).
 Solo project, MIT. Run via `tsx`, no compiled binary.
@@ -1862,7 +1862,7 @@ the definition of quality; Claude improves the cut with the editing tools.
   proposals go to STATUS.md "Proposals"; resolve-prep ones to `~/dev/clippilot-post/status.md`. New critic angles = proposal
   only.
 
-**Order:** A2 (open, touches `src/core/analyze/prompts.ts` and takes migration 027) lands first; then L0 → L1 → L2 → L3.
+**Order:** A2 ✅ (merged; migration 027 taken, L0 moves its new prompt text too); then L0 → L1 → L2 → L3.
 Recording (L1) must be in before the full Portugal run so Portugal produces data.
 
 **L0 — instructions in one place (refactor, no behaviour change).**
