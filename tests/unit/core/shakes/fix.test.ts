@@ -137,7 +137,7 @@ describe('fixShakes', () => {
 
   it('dry run: plans only, no Gemini call, nothing written (not even clean / kept)', async () => {
     const [a, b, c] = t.addMoments(clipId, [{ start_sec: 2, end_sec: 12 }, { start_sec: 14, end_sec: 15.5 }, { start_sec: 20, end_sec: 26 }]);
-    putShakes(clipId, [shake(1.5, 3), shake(14.2, 14.4)]);
+    putShakes(clipId, [shake(1.5, 3), shake(14.5, 14.7)]);
     const v = fake('yes');
     const before = t.db.prepare('SELECT * FROM highlights ORDER BY id').all();
     const r = await run(v, { dryRun: true });

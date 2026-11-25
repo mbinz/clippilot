@@ -34,12 +34,15 @@ describe('planShakeFix (pure)', () => {
     });
   });
 
-  it('one part left but shorter than 1 s or total below 2 s -> kept (no clean range)', () => {
+  it('kiss-like case: 7.0-10.0 with a shake at 8.02-8.14 -> trim to 8.18-10.0 (1.82 s is enough)', () => {
+    expect(planShakeFix({ start: 7, end: 10 }, [k(8.02, 8.14)], [], { fps: 25 })).toEqual({ kind: 'trim', parts: [{ start: 8.18, end: 10 }] });
+  });
+
+  it('only a part of 1 s or more counts, even a single short one; none -> kept (no clean range)', () => {
+    expect(planShakeFix({ start: 2, end: 6 }, [k(3.5, 6)], [], { fps: 25 })).toEqual({ kind: 'trim', parts: [{ start: 2, end: 3.46 }] });
     expect(planShakeFix({ start: 2, end: 5 }, [k(2.2, 4.5)], [])).toEqual({ kind: 'kept', reason: 'no_clean_range' });
     // two 1.2 s parts = 2.4 s total is fine, two 0.9 s parts are dropped
     expect(planShakeFix({ start: 2, end: 6 }, [k(2.9, 5.1)], [], { fps: 25 })).toEqual({ kind: 'kept', reason: 'no_clean_range' });
-    // 1.5 s left in one part: below the 2 s total
-    expect(planShakeFix({ start: 2, end: 6 }, [k(3.5, 6)], [], { fps: 25 })).toEqual({ kind: 'kept', reason: 'no_clean_range' });
   });
 
   it('parts of 1 s or more with a total of 2 s or more split, even when no single part has 2 s', () => {
