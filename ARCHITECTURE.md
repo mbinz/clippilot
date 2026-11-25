@@ -144,6 +144,10 @@ belongs. Keep it current with every pipeline change.
 12. **Board state that isn't an edit stays out of undo** (2026-11-23). "Seen" (`highlights.seen_at`) and the board
    selection (for `clippilot board context`) are stored, not logged in `operations`.
 7. **Paid / vendor-specific sources are plugins.** Stock and AI-video gap fillers sit behind a plugin seam (M6); the core stays free and offline-capable except for Gemini analysis.
+14. **Similar = looks alike, measured locally** (2026-11-25). Similar moments are found by a local image-embedding
+    "look fingerprint" per moment (SigLIP, 3 frames averaged), scored by cosine + a small recording-time boost, within one
+    event, grouped by average linkage (no chaining). Gemini's role/shot labels no longer define similarity. No
+    fingerprint → nothing similar shown (no fallback). Specs SM1–SM4 in STATUS.md.
 
 ## Testing
 

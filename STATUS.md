@@ -43,6 +43,10 @@ the Odeceixe pass (brief → draft → loop); user idea: drop the general 2 s / 
 **2026-11-25 (later):** grilling on **learning from human choices** (3 rounds) → PRD roadmap item **2c**, ARCHITECTURE
 decisions 9 (rewritten) + 13 and "Pipeline: who does what"; specs L0–L3 under "Roadmap item 2c" below.
 
+**2026-11-25 (later):** grilling on **similar moments** (4 rounds): today's label match (event + role + shot) is
+replaced by a local look fingerprint per moment (SigLIP), nearest-first lists and average-linkage groups; specs SM1–SM3
+under "Similar moments by look" below, old clip similarity retired later (SM4).
+
 `v0.1.0` — ingest (resumable) / analyze with timestamped highlights / search / summary; OTIO + FCPXML export verified in free Resolve (M1). No story/storyboard workflow yet (M3).
 Solo project, MIT. Run via `tsx`, no compiled binary.
 
@@ -1946,6 +1950,76 @@ Recording (L1) must be in before the full Portugal run so Portugal produces data
 - No video; stills only when a lesson needs visual proof. Final message: accepted / rejected counts, files changed.
 - Done when: run on the Arrifana "Main" cut (whose history has user edits) produces at least one pattern per signal kind
   present, and the user judged the proposals.
+
+### Similar moments by look (grilling 2026-11-25, rounds 1–4) — specs SM1–SM3, SM4 deferred
+
+**Problem (user):** the board's "similar moments" look random — clearly different shots show up, near-identical takes
+sit further down. Cause: similar = exact match on `event_id | role | shot` (`web/src/board/pool.ts` `similarKey`,
+`service.ts` similar query), sorted ★ first then recording time. Gemini's role/shot labels are coarse (Odeceixe: 19
+moments → 4 groups, largest 10) and miss retakes that got a different label; nothing measures how alike two shots look.
+
+**Decisions**
+- [SM-1] **Similar = same setup / retake**, judged by the look of the frames; never across events.
+- [SM-2] **One meaning everywhere:** moment drawer list, panel options, pool groups, `slotFor`, draft/critic rules
+  (`rules.ts` `shaky_alternative`), critic context alternatives, `selection.ts`. The label match (`similarKey`) goes.
+- [SM-3] **Signal:** local **SigLIP base** image model via `@huggingface/transformers`, cached in `~/.clippilot/models`
+  (first run downloads once, prints the size first). If > ~1 s per moment on the user's Mac → CLIP ViT-B/32, user told.
+  Per moment: frames at 20 / 50 / 80 % of the moment from the proxy (software decode), each embedded, averaged,
+  normalized = the moment's **look fingerprint** (internal name; never shown in the UI).
+- [SM-4] **No new command.** `analyze` fills missing or stale fingerprints for already-analyzed clips **without calling
+  Gemini**; a re-trimmed moment is stale (fingerprint range ≠ current range) and is redone on the next `analyze`.
+  `analyze` prints how many moments still lack one.
+- [SM-5] **Missing fingerprint → nothing similar, no fallback, no UI hint**: drawer section hidden, panel options show
+  only the panel's own moment + candidates, pool shows it alone, `slotFor` only finds the panel using it, critic
+  "calmer take" check skips it.
+- [SM-6] **Score** = cosine similarity + a small recording-time boost (retakes are minutes apart). Role/shot labels and
+  ★ are **not** part of it; ★ is a badge only. Lists are nearest first (a near-identical unstarred take beats a starred
+  different shot).
+- [SM-7] **Lists:** above one global threshold, nearest first; below it a collapsed "▸ Other moments in this event · N".
+  **Groups:** average-linkage clustering per event with the same threshold (no union-find chaining: A≈B and B≈C must not
+  pull A and C together). A moment's drawer list always contains its group members (plus anything else above the line),
+  so pool groups and drawer lists never disagree.
+- [SM-8] **Pool:** a group with any ★ sits in the ★ section, starred takes first, then recording time; groups ordered
+  by earliest recording time as today.
+- [SM-9] **Tuning by eye:** tests use synthetic vectors only (no golden fixture). Threshold + time boost are constants in
+  one file; the user checks Odeceixe on the board and says "X should / shouldn't be with Y", the planner adjusts. No
+  scores or debug info in the UI.
+- [SM-10] The old clip-level similarity (`src/core/similarity/` union-find, `/similarity` routes, `SimilarityView`,
+  ClipDetail "Find similar", `clippilot similar`, `clip_similarity_*` tables) is retired in SM4 (deferred, separate slice).
+
+**SM1 — look fingerprints in `analyze`.**
+- Migration (next free number; L1 may claim one first): `highlights.look_vec BLOB` (Float32, normalized),
+  `look_model TEXT`, `look_start_sec REAL`, `look_end_sec REAL` (range it was computed for → stale check).
+- `src/core/look/`: frame times (pure), frame grab from the proxy (ffmpeg, software decode), embedder behind a small
+  interface (real = transformers SigLIP; tests = fake), average + normalize (pure).
+- `analyze`: after the Gemini step for new clips; for `done` clips fills missing/stale fingerprints only (no Gemini
+  call, no `--force` needed). Summary line: "look fingerprints: N new, M stale redone, K missing". Moments created later
+  (cut-out split, `insertMoment`) have none until the next `analyze` — fine per SM-5.
+- Tests first: frame times; average/normalize; stale rule; analyze fills only missing/stale and never calls Gemini for
+  done clips (fake embedder + fake Gemini); migration.
+- Done when typecheck + test:all green; run on `~/Video/ClipPilot Odeceixe` (and Arrifana) with time per moment printed.
+
+**SM2 — ranking in the drawers.**
+- `src/core/look/similar.ts` (pure): `score(a, b)` (cosine + time boost), `similarTo(moment, moments)` → same event,
+  both fingerprinted, not out; nearest first, split at `LOOK_THRESHOLD`. Constants `LOOK_THRESHOLD`, `TIME_BOOST`,
+  `TIME_BOOST_WINDOW_SEC` live here (start values picked from Odeceixe score spread, then tuned by SM-9).
+- Server computes per moment `similar_ids` (above the line, nearest first) and sends it with the board's moments (no
+  vectors to the browser: Portugal ≈ 1400 moments × 768 floats). `service.ts` similar-moments query uses it too.
+- Web: `alternatives()` = `similar_ids`; MomentDrawer "Similar moments · N" nearest first + collapsed "Other moments in
+  this event · N" (by time); PanelDrawer `optionList`: current, similar, collapsed others. Missing fingerprint → hidden.
+- Tests first: ranking/threshold/event-only/out-excluded/missing → empty on synthetic vectors; `optionList` +
+  `alternatives` with `similar_ids`. Browser check on Odeceixe by the planner, then the user's feedback round.
+
+**SM3 — look groups everywhere.**
+- Pure average-linkage clustering per event at `LOOK_THRESHOLD` → `look_group` per moment (null = alone / no
+  fingerprint); `similar_ids` ∪= group members (SM-7).
+- `poolOrder` groups by `look_group` with the ★ rule (SM-8); `slotFor`, `rules.ts` `shaky_alternative`,
+  `critic/context.ts` alternatives, `storyboard/selection.ts` similar ids all switch; `similarKey` removed.
+- Tests first: no chaining (A≈B, B≈C, A≉C → A and C apart); deterministic order; ★ section rule; `slotFor`;
+  `shaky_alternative` with/without fingerprints.
+
+**SM4 (deferred) — retire the old clip similarity** per SM-10, incl. a migration dropping `clip_similarity_*`, the
+SKILL/instructions mention of `similar` / `mark-best`, and the ARCHITECTURE "Query" line.
 
 ### Resolve capability test for post-production (2026-11-23, free Resolve, user import)
 
