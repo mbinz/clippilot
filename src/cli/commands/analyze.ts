@@ -11,6 +11,7 @@ import { recomputeDupGroups } from '../../core/similarity/dup-groups.js';
 import { ThumbnailRepository } from '../../db/repositories/thumbnail.repository.js';
 import { TranscriptRepository } from '../../db/repositories/transcript.repository.js';
 import { measureClips } from '../../core/motion/index.js';
+import { MotionRepository } from '../../db/repositories/motion.repository.js';
 import { transcribeClips, whisperModelAvailable, expandHome, resolveVadModel, vadMissingWarning } from '../../core/transcribe/index.js';
 import { analyzeClips } from '../../core/analyze/index.js';
 import { parseClipIds } from '../../core/calibration/sampling.js';
@@ -102,8 +103,8 @@ export function registerAnalyzeCommand(parent: Command): void {
         // Jitter and stillness of every moment that is not measured yet.
         const analyzed = clipRepo.findByIds(pending.map((c) => c.id));
         console.log('Measuring motion...');
-        const mo = await measureClips(analyzed, { highlights: highlightRepo }, { cfg: config });
-        console.log(`  Measured: ${mo.measured}, errors: ${mo.failed} (${mo.bands.locked} locked, ${mo.bands.stabilize} stabilize, ${mo.bands.shaky} shaky)`);
+        const mo = await measureClips(analyzed, { highlights: highlightRepo, motion: new MotionRepository(db), transcripts: transcriptRepo }, { cfg: config });
+        console.log(`  Measured: ${mo.measured} clips, errors: ${mo.failed} (${mo.bands.locked} locked, ${mo.bands.stabilize} stabilize, ${mo.bands.shaky} shaky; ${mo.shakes.high} shakes, ${mo.shakes.low} low confidence)`);
       } catch (err) {
         bar.stop();
         throw err;

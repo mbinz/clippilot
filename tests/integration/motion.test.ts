@@ -4,8 +4,8 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import path from 'node:path';
 import os from 'node:os';
-import { decodeFrames } from '../../src/core/motion/frames.js';
-import { measureFrames } from '../../src/core/motion/motion.js';
+import { decodeClipFrames } from '../../src/core/motion/frames.js';
+import { measureCurve, detectShakes, momentMotion } from '../../src/core/motion/curve.js';
 
 const run = promisify(execFile);
 
@@ -18,6 +18,7 @@ describe.skipIf(!ready)('motion integration (real ffmpeg)', () => {
   let dir: string;
   let still: string;
   let shaky: string;
+  let jolt: string;
 
   beforeAll(async () => {
     dir = await mkdtemp(path.join(os.tmpdir(), 'clippilot-motion-int-'));
@@ -30,18 +31,34 @@ describe.skipIf(!ready)('motion integration (real ffmpeg)', () => {
     shaky = path.join(dir, 'shaky.mp4');
     await gen(still, '32:18');
     await gen(shaky, "x='32+12*sin(n*2.3)':y='18+8*cos(n*3.1)'");
+    jolt = path.join(dir, 'jolt.mp4');
+    await gen(jolt, "x='32+14*between(n,50,52)-14*between(n,53,55)'");
   }, 60000);
 
   afterAll(async () => { await rm(dir, { recursive: true, force: true }); });
 
-  it('decodes a range at native fps and scores a locked clip far below a shaky one', async () => {
-    const a = await decodeFrames({ file: still, startSec: 0.5, durationSec: 3, fps: 25 });
-    expect(a.w).toBe(320);
-    expect(a.frames.length).toBe(75);
-    const locked = measureFrames(a, 25);
-    const b = measureFrames(await decodeFrames({ file: shaky, startSec: 0.5, durationSec: 3, fps: 25 }), 25);
-    expect(locked.score).toBeLessThan(0.05);
-    expect(b.score).toBeGreaterThan(0.4);
-    expect(b.maxPx).toBeGreaterThan(locked.maxPx);
+  const curveOf = async (file: string) => {
+    const f = await decodeClipFrames({ file, fps: 25 });
+    expect(f.w).toBe(320);
+    expect(f.srcWidth).toBe(320);
+    return measureCurve(f.frames, { w: f.w, h: f.h, fps: 25, srcWidth: f.srcWidth });
+  };
+
+  it('decodes a whole clip as a stream, derives jitter from the curve: locked far below shaky', async () => {
+    const a = await curveOf(still);
+    expect(a.dx.length).toBe(99); // 100 frames, frame count checked against the container
+    const locked = momentMotion(a, 0.5, 3.5);
+    const b = momentMotion(await curveOf(shaky), 0.5, 3.5);
+    expect(locked.jitter.score).toBeLessThan(0.05);
+    expect(b.jitter.score).toBeGreaterThan(0.4);
+    expect(b.jitter.maxPx).toBeGreaterThan(locked.jitter.maxPx);
+  }, 60000);
+
+  it('finds a single jolt as one shake near 2 s and none in a still clip', async () => {
+    expect(detectShakes(await curveOf(still)).shakes).toHaveLength(0);
+    const d = detectShakes(await curveOf(jolt));
+    expect(d.shakes).toHaveLength(1);
+    expect(d.shakes[0].start_sec).toBeGreaterThan(1.7);
+    expect(d.shakes[0].end_sec).toBeLessThan(2.6);
   }, 60000);
 });

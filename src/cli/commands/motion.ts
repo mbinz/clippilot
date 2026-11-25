@@ -7,15 +7,17 @@ import { ProjectRepository } from '../../db/repositories/project.repository.js';
 import { HighlightRepository } from '../../db/repositories/highlight.repository.js';
 import { resolveDbPath } from '../../utils/fs.js';
 import { loadConfig } from '../../core/config/manager.js';
+import { MotionRepository } from '../../db/repositories/motion.repository.js';
+import { TranscriptRepository } from '../../db/repositories/transcript.repository.js';
 import { measureClips, type MotionOptions } from '../../core/motion/index.js';
 import { resolveProject } from './resolve-project.js';
 
-export function registerMotionCommand(parent: Command, inject: Pick<MotionOptions, 'source' | 'exists'> = {}): void {
+export function registerMotionCommand(parent: Command, inject: Pick<MotionOptions, 'source' | 'measurer' | 'exists'> = {}): void {
   parent
     .command('motion')
-    .description('Measure jitter and stillness of every moment (read-only: never changes ranges, status or source)')
+    .description('Measure each clip once (motion curve + shakes), derive jitter / stillness of every moment, and nudge unprotected moment boundaries out of shakes')
     .option('--project <name>', 'Project name (default: the only project)')
-    .option('--force', 'Measure moments that are already measured', false)
+    .option('--force', 'Measure clips that already have a motion curve', false)
     .option('--json', 'Emit JSON (progress lines go to stderr)')
     .action(async (options) => {
       const basePath = process.cwd();
@@ -27,16 +29,21 @@ export function registerMotionCommand(parent: Command, inject: Pick<MotionOption
         if (!project) return;
         const clips = new ClipRepository(db).listByProject(project.id);
         const log = options.json ? console.error : console.log;
-        const result = await measureClips(clips, { highlights: new HighlightRepository(db) }, {
+        const t0 = Date.now();
+        const result = await measureClips(clips, {
+          highlights: new HighlightRepository(db), motion: new MotionRepository(db), transcripts: new TranscriptRepository(db),
+        }, {
           cfg: config, force: options.force, ...inject,
           onProgress: (done, total, name) => log(`[${done}/${total}] ${name}`),
         });
+        const elapsed = Math.round((Date.now() - t0) / 100) / 10;
         if (options.json) {
-          console.log(JSON.stringify({ project: project.name, ...result }, null, 2));
+          console.log(JSON.stringify({ project: project.name, ...result, elapsed_sec: elapsed }, null, 2));
         } else {
-          console.log(`Measured ${result.measured}, skipped ${result.skipped} (already done), ${result.failed} failed.`);
+          console.log(`Measured ${result.measured} clips, skipped ${result.skipped} (already done), ${result.failed} failed, in ${elapsed} s.`);
+          console.log(`  Shakes: ${result.shakes.high + result.shakes.low} (${result.shakes.high} high, ${result.shakes.low} low confidence); ${result.nudged} moment boundaries moved out of shakes.`);
           console.log(`  Bands: ${result.bands.locked} locked, ${result.bands.stabilize} stabilize, ${result.bands.shaky} shaky.`);
-          for (const e of result.errors) console.error(chalk.red(`  clip ${e.clip_id} moment ${e.moment_id}: ${e.message}`));
+          for (const e of result.errors) console.error(chalk.red(`  clip ${e.clip_id}: ${e.message}`));
         }
         if (result.failed > 0) process.exitCode = 1;
       } finally {

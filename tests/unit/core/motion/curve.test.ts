@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  measurePair, downsample2, shakeResidual, detectShakes, momentMotion, shakesForMoment, PATCH_COUNT,
+  measurePair, downsample2, checkFrameCount, shakeResidual, detectShakes, momentMotion, shakesForMoment, PATCH_COUNT,
   type RawCurve,
 } from '../../../../src/core/motion/curve.js';
 import { jitterScore, cameraMotion, type Shift } from '../../../../src/core/motion/motion.js';
@@ -264,5 +264,14 @@ describe('momentMotion (derived from the stored centre shifts, no decode)', () =
     expect(momentMotion(c, 4, 8).change).toBeCloseTo(0.05, 3);
     expect(momentMotion(c, 7.9, 40).jitter.score).toBeGreaterThanOrEqual(0);
     expect(momentMotion(c, 50, 60)).toEqual({ jitter: { score: 0, maxPx: 0 }, camera: 0, change: 0 });
+  });
+});
+
+describe('checkFrameCount', () => {
+  it('accepts +-1 and unknown counts, throws on a mismatch', () => {
+    expect(() => checkFrameCount(100, 100)).not.toThrow();
+    expect(() => checkFrameCount(99, 100)).not.toThrow();
+    expect(() => checkFrameCount(10, null)).not.toThrow();
+    expect(() => checkFrameCount(90, 100)).toThrow(/frame count mismatch: decoded 90, file has 100/);
   });
 });

@@ -8,7 +8,8 @@ import { runMigrations } from '../../../src/db/migrations/runner.js';
 import { ClipRepository } from '../../../src/db/repositories/clip.repository.js';
 import { ProjectRepository } from '../../../src/db/repositories/project.repository.js';
 import { registerMotionCommand } from '../../../src/cli/commands/motion.js';
-import type { FrameSource } from '../../../src/core/motion/frames.js';
+import type { ClipFrameSource } from '../../../src/core/motion/frames.js';
+import { MotionRepository } from '../../../src/db/repositories/motion.repository.js';
 
 let dir: string;
 let cwd: string;
@@ -22,7 +23,10 @@ function noise(seed: number): Uint8Array {
   for (let i = 0; i < a.length; i++) { s = (s * 1103515245 + 12345) & 0x7fffffff; a[i] = (s >> 16) & 255; }
   return a;
 }
-const still: FrameSource = async () => { const f = noise(1); return { w: W, h: H, frames: Array.from({ length: 10 }, () => f) }; };
+const still: ClipFrameSource = async () => {
+  const f = noise(1);
+  return { w: W, h: H, srcWidth: 1920, frames: (async function* () { for (let i = 0; i < 10; i++) yield f; })() };
+};
 
 function seed(): void {
   fs.mkdirSync(path.join(dir, '.clippilot'), { recursive: true });
@@ -68,20 +72,34 @@ afterEach(async () => {
 });
 
 describe('clippilot motion', () => {
-  it('--json reports measured, skipped, failed and the band counts', async () => {
+  it('--json reports clips measured / skipped / failed, shakes, nudged moments and the band counts', async () => {
     seed();
     await run('motion', '--json');
     expect(process.exitCode).toBeUndefined();
-    expect(JSON.parse(out.join('\n'))).toMatchObject({ project: 'trip', measured: 2, skipped: 0, failed: 0, bands: { locked: 2, stabilize: 0, shaky: 0 }, errors: [] });
+    expect(JSON.parse(out.join('\n'))).toMatchObject({
+      project: 'trip', measured: 1, skipped: 0, failed: 0, shakes: { high: 0, low: 0 }, nudged: 0,
+      bands: { locked: 2, stabilize: 0, shaky: 0 }, errors: [],
+    });
   });
 
-  it('a second run skips everything; --force measures again', async () => {
+  it('stores the curve per clip and the moment columns', async () => {
+    seed();
+    await run('motion', '--json');
+    const db = createDb(path.join(dir, '.clippilot', 'clippilot.db'));
+    expect(new MotionRepository(db).clipIdsWithCurve()).toEqual([1]);
+    const row = db.prepare('SELECT jitter_score, motion_start_sec, motion_end_sec FROM highlights WHERE id = 1').get();
+    expect(row).toEqual({ jitter_score: 0, motion_start_sec: 1, motion_end_sec: 4 });
+    db.close();
+  });
+
+  it('a second run skips the clip; --force measures it again; text output names the numbers', async () => {
     seed();
     await run('motion', '--json');
     await run('motion', '--json');
-    expect(JSON.parse(out.join('\n'))).toMatchObject({ measured: 0, skipped: 2 });
-    await run('motion', '--json', '--force');
-    expect(JSON.parse(out.join('\n'))).toMatchObject({ measured: 2, skipped: 0 });
+    expect(JSON.parse(out.join('\n'))).toMatchObject({ measured: 0, skipped: 1 });
+    await run('motion', '--force');
+    expect(out.join('\n')).toMatch(/Measured 1 clips, skipped 0/);
+    expect(out.join('\n')).toMatch(/Shakes: 0/);
   });
 
   it('uses the jitter thresholds from the config', async () => {
