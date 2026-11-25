@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as api from './api';
 import type { BoardMoment, CutTree, HistoryState } from './types';
+import { cutParam, resolveCut, searchWithCut } from './cuts';
 import { shouldRefetch, updateLabel, type Head } from './refresh';
 
 const POLL_MS = 2000;
@@ -23,6 +24,9 @@ export interface Toast {
  */
 export function useBoard(projectId: number | undefined) {
   const [cutId, setCutId] = useState<number | null>(null);
+  const [cuts, setCuts] = useState<api.CutSummary[]>([]);
+  /** The cut asked for in the URL (`?cut=<id>`); null = Main. Resolved against the project's cuts on load. */
+  const [wantedCut, setWantedCut] = useState<number | null>(() => cutParam(window.location.search));
   const [tree, setTree] = useState<CutTree | null>(null);
   const [moments, setMoments] = useState<BoardMoment[]>([]);
   const [history, setHistory] = useState<HistoryState>(NO_HISTORY);
@@ -104,10 +108,13 @@ export function useBoard(projectId: number | undefined) {
     (async () => {
       try {
         const cuts = await api.fetchCuts(projectId);
-        const main = cuts.find((c) => c.name === 'Main') ?? (await api.createCut(projectId, 'Main'));
+        const chosen = resolveCut(cuts, wantedCut);
+        const all = chosen ? cuts : [...cuts, await api.createCut(projectId, 'Main')];
+        const cut = chosen ?? all[all.length - 1]!;
         if (cancelled) return;
-        setCutId(main.id);
-        await reload(main.id, projectId);
+        setCuts(all);
+        setCutId(cut.id);
+        await reload(cut.id, projectId);
         if (!cancelled) setError(null);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
@@ -116,7 +123,16 @@ export function useBoard(projectId: number | undefined) {
       }
     })();
     return () => { cancelled = true; };
-  }, [projectId, reload]);
+  }, [projectId, wantedCut, reload]);
+
+  /** Show another cut of this project; the choice goes into the URL so a reload keeps it. */
+  const selectCut = useCallback((id: number) => {
+    const mainId = cuts.find((c) => c.name === 'Main')?.id ?? null;
+    try {
+      window.history.replaceState(null, '', `${window.location.pathname}${searchWithCut(window.location.search, id, mainId)}${window.location.hash}`);
+    } catch { /* URL is a convenience only */ }
+    setWantedCut(id === mainId ? null : id);
+  }, [cuts]);
 
   /** Run a mutation; on success adopt its history state, refetch, and (optionally) toast the label. */
   const act = useCallback(async <T extends { history?: HistoryState }>(label: string | null, fn: () => Promise<T>): Promise<T | null> => {
@@ -180,7 +196,7 @@ export function useBoard(projectId: number | undefined) {
   }, [cutId, projectId, reload, say, own]);
 
   return {
-    cutId, tree, moments, history, loading, error, toast, say,
+    cutId, cuts, selectCut, tree, moments, history, loading, error, toast, say,
     dismissToast: () => setToast(null),
     undo, redo, act, setSeen,
     actions: {

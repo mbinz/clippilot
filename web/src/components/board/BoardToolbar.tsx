@@ -4,7 +4,11 @@ import { btn, btnIcon, btnPrimary } from './ui';
 
 interface Props {
   projectName: string;
+  cutId: number;
   cutName: string;
+  /** The project's cuts; the breadcrumb becomes a picker when there is more than one. */
+  cuts: { id: number; name: string }[];
+  onSelectCut: (id: number) => void;
   brief: Brief | null;
   briefState: 'none' | 'proposed' | 'confirmed';
   total: number;
@@ -28,7 +32,19 @@ export function BoardToolbar(p: Props) {
     : 'Brief · not set';
   return (
     <div className="flex flex-none items-center gap-3 border-b border-bd-line px-4 py-2.5 max-[900px]:flex-wrap max-[900px]:gap-2">
-      <span className="whitespace-nowrap text-bd-muted">{p.projectName} {'›'} {p.cutName}</span>
+      <span className="flex items-center gap-1 whitespace-nowrap text-bd-muted">
+        {p.projectName} {'›'}{' '}
+        {p.cuts.length > 1 ? (
+          <select
+            value={p.cutId}
+            onChange={(e) => p.onSelectCut(Number(e.target.value))}
+            title="Switch cut"
+            className="cursor-pointer rounded-md border border-bd-line bg-transparent px-1.5 py-0.5 font-[inherit] text-bd-text hover:border-bd-line2"
+          >
+            {p.cuts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        ) : p.cutName}
+      </span>
       <button
         onClick={p.onBrief}
         disabled={!p.onBrief}

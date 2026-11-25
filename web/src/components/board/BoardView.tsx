@@ -74,7 +74,7 @@ export function BoardView({ projectId }: Props) {
   useEffect(() => {
     setSceneId(null);
     setOpen(null);
-  }, [projectId]);
+  }, [projectId, board.cutId]);
 
   const scenes: BoardScene[] = tree?.scenes ?? [];
   const scene = scenes.find((s) => s.id === sceneId) ?? scenes[0] ?? null;
@@ -236,7 +236,10 @@ export function BoardView({ projectId }: Props) {
     <div className="relative flex h-full flex-col overflow-hidden bg-bd-bg text-[13px] leading-[1.45] text-bd-text">
       <BoardToolbar
         projectName={projectName || 'Project'}
+        cutId={tree.cut.id}
         cutName={tree.cut.name}
+        cuts={board.cuts}
+        onSelectCut={board.selectCut}
         brief={tree.brief}
         briefState={tree.brief_state}
         total={cutLength(scenes)}
