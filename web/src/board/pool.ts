@@ -68,7 +68,9 @@ export function poolOrder(moments: PoolMoment[]): { heroes: PoolMoment[][]; rest
     const firstId = (g: PoolMoment[]): number => Math.min(...g.map((m) => m.id));
     return groups.sort((a, b) => start(a) - start(b) || firstId(a) - firstId(b));
   };
-  return { heroes: group(vis.filter(isHero)), rest: group(vis.filter((m) => !isHero(m))), out };
+  // Stars sit in one row by recording time, not grouped (one-moment rows scroll badly — user, 2026-11-25).
+  const stars = vis.filter(isHero).sort((a, b) => recTime(a) - recTime(b) || a.id - b.id);
+  return { heroes: stars.length ? [stars] : [], rest: group(vis.filter((m) => !isHero(m))), out };
 }
 
 /** Similar moments (by look, nearest first) as the server ranked them; out moments and unknown ids are dropped. */
