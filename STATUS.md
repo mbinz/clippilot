@@ -20,12 +20,13 @@ Order agreed 2026-11-25. Each line: theme — what — spec.
 ### Now
 - [x] **Similar moments** SM1 look fingerprints in `analyze` (SigLIP, 0.24 s/moment) + SM2 drawer ranking — done
   2026-11-25; Arrifana (180) + Odeceixe (19) fingerprinted
-- [ ] **Similar moments** — SM3 groups everywhere, **after** the tuning round below —
-  [spec](docs/specs/similar-moments.md)
+- [x] **Similar moments** SM3 look groups everywhere (pool, `slotFor`, draft rule, critic) — done 2026-11-25;
+  Arrifana: 23 groups, some large (Delfine 23 of 66) — [spec](docs/specs/similar-moments.md)
+- [x] **Board fixes** BF1 cut picker (`?cut=`) + BF2 `ingest` runs `analyze` — done 2026-11-25 —
+  [spec](docs/specs/board-fixes.md)
 
 ### Next
-- [ ] **Board fixes** — cut picker (the board always opens "Main"); `ingest` should run `analyze` (help text says it
-  does, it doesn't); critic findings on the board (apply / dismiss) — no spec yet
+- [ ] **Board fixes, part 3** — critic findings on the board (apply / dismiss) — grill first, no spec yet
 - [ ] **Learning from edits, part 1** — L0 instructions in one folder → L1 who made each edit. **L1 before full
   Portugal**, or Portugal produces no learning data — [spec](docs/specs/learning.md)
 - [ ] **Odeceixe end to end** — brief → draft → review loop on `~/Video/ClipPilot Odeceixe`; first real test of
@@ -36,14 +37,16 @@ Order agreed 2026-11-25. Each line: theme — what — spec.
   [spec](docs/specs/analysis-polish.md) (Q4)
 
 ### Needs you
-- [ ] Tune similar moments by eye (SM-9): open panel/moment drawers on Arrifana + Odeceixe, note "X should / shouldn't
-  be with Y". One knob: `LOOK_THRESHOLD` = 0.80 in `src/core/look/similar.ts` (2 of 19 Odeceixe moments have none)
+- [ ] Tune similar moments by eye (SM-9): drawers + pool groups on Arrifana, note "X should / shouldn't be with Y",
+  groups too big? One knob: `LOOK_THRESHOLD` = 0.80 in `src/core/look/similar.ts`. Since SM3 a drawer list also holds
+  the whole group (median 14 per moment); a ★ anywhere pulls the group into the ★ section (★ 9 → 43 on Arrifana)
 - [ ] Score the acceptance run against `acceptance-key.md` (≥ 8 of 11 found, few false alarms) —
   [how](docs/specs/draft-quality.md) ("How to run the acceptance test")
 - [ ] Decide: drop the general 2 s / 8 s moment-length rules?
 - [ ] Optional: `npm run skill:install` to install the current skills globally
 
 ### Later (roadmap order)
+- [ ] Board: create / rename / delete cuts (BF1 only picks)
 - [ ] **Mac app** — Electron shell, project picker, ingest/analyze from the UI; CI with packaging
 - [ ] **Assistant in the board** — chat panel via the Agent SDK, acting through the CLI verbs
 - [ ] **Gap fillers + plugins** — [spec](docs/specs/gap-fillers.md)
