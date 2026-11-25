@@ -1629,6 +1629,14 @@ labels are sharp PNG overlays (local ffmpeg has no drawtext), 854×480 letterbox
 panels in 57 s, strips correct (3 protected). Deferred: 429/503 backoff for the story call, chunked preview for 100+
 panels, prices in config. Open (→ D1): an `--ai` trim must keep the moment unprotected (move the ai range too).
 
+**C1b result (2026-11-25):** ✅ (1130 tests). `gemini-2.5-pro` returned 404 "no longer available to new users" → default
+`story_critic_model` = `gemini-3.1-pro-preview` [D-11 updated]; prices $2 / $12 per M (≤ 200 k), $4 / $18 above (third-party
+price lists, Google page not confirmed); 404 error names the model + config key. Finding proposals are structured and
+validated per kind (string proposals in old files read as `{note}`); the story prompt gives clip in/out, speed, preview
+start and speech per panel. [D-16] Planner made 3 paid story-critic runs on Arrifana "Main" (≈ $0.45 total; 1 failed on the
+404): 168 s preview, 53 k input tokens, ~87 s per run. The real run found the user's own case (panel 54 belongs to the cliff
+scene, `move_scene` to scene 6) plus repetitions and cut-off speech; findings only, nothing applied.
+
 **C2 — critic agents + review loop skill (planner, 2026-11-25; after C1 + D1)** — written by the planner (prompts/skills,
 no production code): `.claude/agents/cut-critic.md` [D-10], `.claude/skills/cut-critic/SKILL.md` (rules: static ≈ 2–3 s,
 speech / clear action longer; cut-off sentences; shakes / shaky moments with calmer alternatives; last panel of a scene
