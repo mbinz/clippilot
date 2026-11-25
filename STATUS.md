@@ -27,8 +27,10 @@ Order agreed 2026-11-25. Each line: theme — what — spec.
 
 ### Next
 - [ ] **Board fixes, part 3** — critic findings on the board (apply / dismiss) — grill first, no spec yet
-- [ ] **Learning from edits, part 1** — L0 instructions in one folder → L1 who made each edit. **L1 before full
-  Portugal**, or Portugal produces no learning data — [spec](docs/specs/learning.md)
+- [x] **Learning from edits** L1 who made each edit (`operations.actor`, `--ai` on scene/panel verbs) — done 2026-11-25,
+  ahead of L0 so this week's board edits are recorded
+- [ ] **Learning from edits, part 1b** — L0 instructions in one folder. Note: skills aren't in the repo (only
+  `~/.claude/skills/`), `npm run skill:install` points at missing paths — L0 fixes both — [spec](docs/specs/learning.md)
 - [ ] **Odeceixe end to end** — brief → draft → review loop on `~/Video/ClipPilot Odeceixe`; first real test of
   similar moments
 - [ ] **Learning from edits, part 2** — L2 `learn context` → L3 learning skill; first run on Odeceixe —
@@ -43,7 +45,6 @@ Order agreed 2026-11-25. Each line: theme — what — spec.
 - [ ] Score the acceptance run against `acceptance-key.md` (≥ 8 of 11 found, few false alarms) —
   [how](docs/specs/draft-quality.md) ("How to run the acceptance test")
 - [ ] Decide: drop the general 2 s / 8 s moment-length rules?
-- [ ] Optional: `npm run skill:install` to install the current skills globally
 
 ### Later (roadmap order)
 - [ ] Board: create / rename / delete cuts (BF1 only picks)
