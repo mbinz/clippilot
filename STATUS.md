@@ -1612,6 +1612,16 @@ moment drawer.
   `cut_out`; B-roll cover only as a suggestion in chat; name `shaky_kept` warnings in the draft summary; action moments up
   to ~20 s, static/silent ≤ 8 s.
 
+**D1 result (2026-11-25):** ✅ (1232 tests after merging main). Migration 024 (`highlights.split_of`, `highlights.ai_speed`);
+`--ai` on `moment trim | speed | cut-out` and `panel place` (no confirm, ai range / ai speed move along, refused on
+protected targets); `moment cut-out` + draft `cut_out` (sibling moment, one undo step; undo of a draft now restores every
+moment it changed); `cut apply` → `warnings` (`shaky_alternative`, `shaky_kept`, `too_long`); tile icon "≈" (neutral) for
+shaky / high-confidence shake; SKILL.md drafting rules. Implementer decisions (review) [D-19]: a draft `speed` on an AI
+moment also records `ai_speed` (else it became protected); "★" for `shaky_kept` = effective tier hero (AI or user), so
+AI-hero shaky moments without an alternative warn as kept; action = role action OR change ≥ 0.03 OR camera ≥ 2 %/s;
+the sibling has no dup group. Planner check: Arrifana DB migrated (backup `clippilot.pre-024.db`), board shows "≈" on 19
+tiles (title "Shaky · Jitter shaky · 0.55 %").
+
 **C1 — critic plumbing + cut critic context (planner spec, 2026-11-25; parallel to W1)** — PRD 2b.4/2b.6 code part.
 - Findings schema (Zod, `src/core/critic/findings.ts`) per [D-12]; `clippilot critic save --file f.json [--json]` validates
   (ids must exist in the cut; protected flag recomputed from the DB, never trusted from the file) and stores it;
