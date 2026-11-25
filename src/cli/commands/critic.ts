@@ -131,7 +131,7 @@ export function registerCriticCommands(parent: Command, inject: CriticInject = {
     .requiredOption('--out <dir>', 'Directory for context.json and strips/panel-<id>.png')
     .option('--json', 'Emit JSON (output is always JSON)')
     .action((o) => withCtx(async (c) => {
-      print(await buildContext(c.svc, c.hl, cutIdOf(c, o.cut, o.project), path.resolve(o.out)));
+      print(await buildContext(c.svc, c.hl, cutIdOf(c, o.cut, o.project), path.resolve(o.out), { db: c.db }));
     }));
 
   critic.command('story')

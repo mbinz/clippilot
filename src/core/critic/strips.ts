@@ -33,6 +33,21 @@ export function stripTimes(startSec: number, endSec: number, fps: number | null 
   return times.map((t, i) => ({ t, label: `${t.toFixed(2)}s${i === times.length - 1 && times.length > 1 ? ' end' : ''}` }));
 }
 
+/**
+ * Short explanation for the critic when a regular frame was left out because it fell within 0.25 s of the last frame
+ * (so the gap before the last frame is intentional); undefined when nothing was dropped.
+ */
+export function stripNote(startSec: number, endSec: number, fps: number | null | undefined): string | undefined {
+  const frame = 1 / (fps && fps > 0 ? fps : 25);
+  const last = r3(Math.max(startSec, endSec - frame));
+  for (let k = 0; startSec + k * STRIP_STEP_SEC < last - 1e-9; k++) {
+    if (startSec + k * STRIP_STEP_SEC >= last - 0.25 - 1e-9) {
+      return 'A regular frame was dropped because it fell within 0.25 s of the last frame; the gap before the last frame is intentional.';
+    }
+  }
+  return undefined;
+}
+
 /** Adapter: write one frame of `file` at source time `t` to a PNG. Injectable for tests. */
 export type FrameGrabber = (file: string, t: number, outPath: string) => Promise<void>;
 

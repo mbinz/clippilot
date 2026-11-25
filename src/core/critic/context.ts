@@ -1,19 +1,48 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import type Database from 'better-sqlite3';
 import type { StoryboardService, MomentWithSpeech, PanelNode } from '../storyboard/service.js';
 import type { HighlightRepository } from '../../db/repositories/highlight.repository.js';
 import { panelLabels } from './findings.js';
-import { renderStrip, grabFrame, type FrameGrabber, type StripFrame } from './strips.js';
+import { TranscriptRepository } from '../../db/repositories/transcript.repository.js';
+import { transcriptSentences } from '../transcribe/speech.js';
+import { renderStrip, stripNote, grabFrame, type FrameGrabber, type StripFrame } from './strips.js';
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
+
+const SENTENCE_WINDOW_SEC = 3;
+const MAX_ALTERNATIVES = 5;
+const ALT_DESCRIPTION_MAX = 120;
+
+export interface ContextSentence { start: number; end: number; text: string; in_moment: boolean }
+
+export interface ContextAlternative {
+  id: number;
+  clip_file: string;
+  start_sec: number;
+  end_sec: number;
+  tier: string;
+  shot: string | null;
+  role: string | null;
+  description: string;
+  jitter: MomentWithSpeech['jitter'];
+  /** Shakes of high confidence inside the alternative's range. */
+  high_shakes: number;
+  in_dup_group: boolean;
+}
 
 export interface ContextMoment {
   id: number;
   clip_id: number;
   clip_file: string;
+  clip_fps: number | null;
+  /** The clip's own event (the scene's event is on the panel's `scene`). */
+  clip_event: string | null;
   start_sec: number;
   end_sec: number;
   speed: number;
+  slowmo: string;
+  suggested_speed: number;
   played_sec: number;
   tier: string;
   shot: string | null;
@@ -31,6 +60,10 @@ export interface ContextMoment {
   dup_group: number | null;
   /** Other moments of the same duplicate group. */
   dup_alternatives: number[];
+  /** Transcript sentences within 3 s of the moment (clip seconds); empty without a transcript. */
+  sentences: ContextSentence[];
+  /** Up to 5 similar / duplicate moments not yet used in the cut. */
+  alternatives: ContextAlternative[];
 }
 
 export interface ContextPanel {
@@ -49,7 +82,7 @@ export interface ContextPanel {
   protected_reasons: string[];
   prev_panel_id: number | null;
   next_panel_id: number | null;
-  strip: { path: string; frames: StripFrame[] } | null;
+  strip: { path: string; frames: StripFrame[]; note?: string } | null;
   strip_error?: string;
 }
 
@@ -67,7 +100,7 @@ export interface CriticContext {
  */
 export async function buildContext(
   svc: StoryboardService, hl: HighlightRepository, cutId: number, outDir: string,
-  opts: { grab?: FrameGrabber } = {},
+  opts: { grab?: FrameGrabber; db?: Database.Database } = {},
 ): Promise<CriticContext> {
   const tree = svc.getCut(cutId);
   if (!tree) throw new Error(`Cut ${cutId} not found`);
@@ -75,6 +108,39 @@ export async function buildContext(
   const flat = tree.scenes.flatMap((s) => s.panels);
   const stripDir = path.join(outDir, 'strips');
   await fs.mkdir(stripDir, { recursive: true });
+
+  const transcripts = opts.db ? new TranscriptRepository(opts.db) : null;
+  const sentenceCache = new Map<number, { start: number; end: number; text: string }[]>();
+  const sentencesOf = (clipId: number) => {
+    if (!sentenceCache.has(clipId)) {
+      const t = transcripts?.get(clipId);
+      sentenceCache.set(clipId, t ? transcriptSentences(t.segments, t.words) : []);
+    }
+    return sentenceCache.get(clipId)!;
+  };
+  const clipEvent = (clipId: number): string | null => opts.db
+    ? ((opts.db.prepare('SELECT e.name FROM clips c JOIN events e ON e.id = c.event_id WHERE c.id = ?').get(clipId) as { name: string } | undefined)?.name ?? null)
+    : null;
+  // Jitter band / shakes come from the same storyboard read as `cut show` (listMoments), once per project.
+  const projectIds = new Set<number>();
+  const used = new Set<number>();
+  for (const p of flat) {
+    if (p.state === 'filled' && p.moment) { used.add(p.moment.id); projectIds.add(svc.projectIdOfClip(p.moment.clip_id)); }
+  }
+  const pool = new Map<number, ReturnType<StoryboardService['listMoments']>[number]>();
+  for (const pid of projectIds) for (const r of svc.listMoments(pid)) pool.set(r.id, r);
+  const alternativesOf = (momentId: number, dups: number[]): ContextAlternative[] => {
+    const ids = [...new Set([...svc.alternatives(momentId), ...dups])].filter((id) => id !== momentId && !used.has(id) && pool.has(id));
+    return ids.slice(0, MAX_ALTERNATIVES).map((id) => {
+      const r = pool.get(id)!;
+      return {
+        id, clip_file: svc.clipFileName(r.clip_id), start_sec: r.start_sec, end_sec: r.end_sec, tier: r.tier,
+        shot: r.shot, role: r.role, description: r.description.slice(0, ALT_DESCRIPTION_MAX), jitter: r.jitter,
+        high_shakes: (r.shakes ?? []).filter((s) => s.confidence === 'high').length,
+        in_dup_group: dups.includes(id),
+      };
+    });
+  };
 
   const panels: ContextPanel[] = [];
   for (const [si, scene] of tree.scenes.entries()) {
@@ -89,12 +155,17 @@ export async function buildContext(
         position: pi + 1, intent: p.intent, state: p.state, source: p.source,
         moment: m && p.clip ? {
           id: m.id, clip_id: m.clip_id, clip_file: svc.clipFileName(m.clip_id),
+          clip_fps: p.clip.fps, clip_event: clipEvent(m.clip_id), slowmo: m.slowmo, suggested_speed: m.suggested_speed,
           start_sec: m.start_sec, end_sec: m.end_sec, speed: m.speed, played_sec: round2((m.end_sec - m.start_sec) / m.speed),
           tier: m.user_tier ?? m.tier, shot: m.shot, role: m.role, description: m.description,
           speech: m.speech, speech_cut: m.speech_cut, jitter: m.jitter,
           shakes: (m as unknown as { shakes?: unknown }).shakes ?? null, motion: m.motion,
           audio_keep: m.audio_keep === 1, protected: reasons.length > 0, protected_reasons: reasons,
           dup_group: m.dup_group, dup_alternatives: hl.dupGroupMembers(m.id),
+          sentences: sentencesOf(m.clip_id)
+            .filter((s) => s.end > m.start_sec - SENTENCE_WINDOW_SEC && s.start < m.end_sec + SENTENCE_WINDOW_SEC)
+            .map((s) => ({ start: s.start, end: s.end, text: s.text, in_moment: s.end > m.start_sec && s.start < m.end_sec })),
+          alternatives: alternativesOf(m.id, hl.dupGroupMembers(m.id)),
         } : null,
         candidates: p.candidates.map((c) => ({
           id: c.id, clip_id: c.clip_id, start_sec: c.start_sec, end_sec: c.end_sec, tier: c.user_tier ?? c.tier, description: c.description,
@@ -109,6 +180,8 @@ export async function buildContext(
           const file = path.join(stripDir, `panel-${p.id}.png`);
           const frames = await renderStrip(p.clip.proxy_path ?? p.clip.file_path, m.start_sec, m.end_sec, p.clip.fps, file, opts.grab ?? grabFrame);
           panel.strip = { path: file, frames };
+          const note = stripNote(m.start_sec, m.end_sec, p.clip.fps);
+          if (note) panel.strip.note = note;
         } catch (err) {
           panel.strip_error = (err as Error).message;
         }
