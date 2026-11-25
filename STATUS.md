@@ -1688,6 +1688,13 @@ proposal concrete: new in/out, replacement moment id, target scene), and a "Revi
 faults + the user's 2 real cases (42 panels, 235.7 s vs target 165 s). Key (don't read before the test):
 `~/Video/ClipPilot Arrifana/.clippilot/reviews/acceptance-key.md`.
 
+**Loop dry run + C1d (2026-11-25):** one full loop round (sonnet sub-agent doing the cut critic inline + story critic,
+≈ $0.20) on a **copy** of the DB, cut "Acceptance": 30 findings, 20 changes applied, 235.7 → 172.0 s (target 165), no
+command failed; the real DB was not touched. Problems found and fixed: commands default to cut "Main" → skills always
+pass the cut id; `panel move` is 0-based vs 1-based findings → `critic show` adds `cli_position`; summary labels drifted
+after moves → labels stored at save time, merged findings shown once (`distinct_changes`); must-haves → `brief_check`
+in `critic context`; rules for conflicting findings across critics written into the review-loop skill. C1d ✅ (1238 tests).
+
 **How to run the acceptance test (user)**
 1. Review the decisions [D-1]…[D-19] above (and the implementer decisions in the W1 / C1 / C1b / D1 results).
 2. `cd ~/dev/clippilot && npm run skill:install` (installs the clippilot, cut-critic, review-loop skills and the cut-critic
