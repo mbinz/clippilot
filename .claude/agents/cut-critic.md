@@ -10,7 +10,7 @@ first.
 You get from the caller: the project directory, the cut id (or "Main"), the round number, and an output directory.
 
 Steps:
-1. `cd` into the project directory. Run `clippilot critic context --cut <id> --out <output dir> --json` (if `clippilot`
+1. `cd` into the project directory. Run `clippilot critic context --cut <id> --out <output dir> --json` (always with the cut id) (if `clippilot`
    is not on PATH, use `npx tsx ~/dev/clippilot/bin/clippilot.ts`).
 2. Read every panel's still strip (the `strip` PNG paths) and its data.
 3. Write the findings JSON (format in the skill) to `<output dir>/cut-critic-r<round>.json`, then

@@ -13,7 +13,11 @@ Run every command in the project directory (the folder containing `.clippilot/`)
 
 ## 0. Before round 1
 
-1. `clippilot cut show --json` → cut id, panel count, brief state. The brief must be `confirmed`; if not, stop and ask the
+**Always name the cut.** Commands without a cut id work on the cut "Main". Find the id with `clippilot cut list --json`
+and pass it everywhere: `cut show <id>`, `critic … --cut <id>`, and `--cut <id>` on every `moment …` verb (that is where
+its undo step is logged). `panel …` verbs find their cut themselves.
+
+1. `clippilot cut show <id> --json` → panel count, brief state. The brief must be `confirmed`; if not, stop and ask the
    user to confirm it first (clippilot skill, "Brief first").
 2. `clippilot motion --json` (fast when already measured; it fills jitter + shakes for new moments). Not optional: the
    cut critic needs `jitter` and `shakes`.
@@ -24,24 +28,33 @@ Run every command in the project directory (the folder containing `.clippilot/`)
 ## 1. One round (r = 1, 2, 3)
 
 1. **Cut critic:** spawn the `cut-critic` sub-agent (Agent tool, `subagent_type: "cut-critic"`) with: project directory,
-   cut id, round r, output dir `.clippilot/reviews/work-r<r>`. It saves its findings and returns the file name.
+   cut id, round r, output dir `.clippilot/reviews/work-r<r>` (if the `cut-critic` agent type is not available, do its
+   job yourself following the `cut-critic` skill). It saves its findings and returns the file name.
 2. **Story critic** (round 1 and the final round only, and only with the user's cost OK):
    `clippilot critic story --cut <id> --yes --round <r> --json`.
-3. Read both: `clippilot critic show <file> --json` (or `latest`). Merge findings that target the same panel with the
-   same kind; when they disagree, the cut critic's concrete numbers win for trims, the story critic wins for order /
-   scene membership / repetition.
+3. Read both: `clippilot critic show <file> --json`. Group findings by panel:
+   - same panel, same kind → apply once (the cut critic's numbers win for trims / cut-outs, the story critic's for
+     order / scene membership), then resolve the finding in **each** file (ids differ per file: `f1` vs `F1`).
+   - same panel, different kinds: complementary ones are both applied (`speed` → 1 plus a `trim`; `move_scene` plus a
+     `trim`); conflicting ones (`trim` vs `remove`, `replace` vs `trim`): prefer the smaller change that fixes the stated
+     problem, resolve the other `skipped --note "superseded by <file>#<id>"`.
+   - `critic context --cut <id> --out <dir> --json` has a `brief_check` (must-haves in the cut, played total vs target):
+     a missing must-have the critics didn't catch is your own finding to raise in the report (don't invent edits).
 4. **Apply** every `must` and `should` finding that is **not protected**, one command per finding, always with `--ai`
    where the verb has it:
 
    | kind | command |
    |---|---|
-   | `trim` {start_sec, end_sec} | `clippilot moment trim <moment_id> <start> <end> --ai` |
-   | `cut_out` {from, to} | `clippilot moment cut-out <moment_id> <from> <to> --ai` |
-   | `speed` {speed} | `clippilot moment speed <moment_id> <speed> --ai` |
+   | `trim` {start_sec, end_sec} | `clippilot moment trim <moment_id> <start> <end> --ai --cut <id>` |
+   | `cut_out` {from, to} | `clippilot moment cut-out <moment_id> <from> <to> --ai --cut <id>` |
+   | `speed` {speed} | `clippilot moment speed <moment_id> <speed> --ai --cut <id>` |
    | `replace` {moment_id} | `clippilot panel place <panel_id> <new moment_id> --ai` |
    | `remove` | `clippilot panel delete <panel_id>` |
-   | `reorder` {position} | `clippilot panel move <panel_id> <same scene id> <position>` |
-   | `move_scene` {to_scene_id, position} | `clippilot panel move <panel_id> <to_scene_id> <position>` (end = panel count of that scene + 1) |
+   | `reorder` {position} | `clippilot panel move <panel_id> <same scene id> <cli_position>` |
+   | `move_scene` {to_scene_id, position?} | `clippilot panel move <panel_id> <to_scene_id> <cli_position>` |
+
+   Positions: findings use 1-based `position`; `panel move` is **0-based**. Use the `cli_position` that
+   `critic show --json` adds to each finding (no position on a `move_scene` = append at the end).
    | `other` / no proposal | don't apply; list it for the user |
 
    After each command record the outcome: `clippilot critic resolve <file> <finding id> applied` (or `skipped --note
@@ -56,9 +69,10 @@ replace the draft); spend on the story critic without the user's OK.
 
 ## 2. Report (in chat, short)
 
-`clippilot critic summary --json` gives per round the counts and the applied change lines. Write:
+`clippilot critic summary --cut <id> --json` gives per round the counts and the applied change lines (labels as they
+were when the critics looked, i.e. before your moves). Write:
 
-- One line per round: "Round 1: 6 applied (3 must, 3 should), 1 protected, 2 nits".
+- One line per round: "Round 1: 6 changes (3 must, 3 should), 1 protected, 2 nits" (use `distinct_changes`).
 - The applied changes, one line each, by panel label ("S2·P3 trim 12.0–15.5 s — speech no longer cut").
 - **For you to decide** (protected findings and nits), one line each with the critic's reason.
 - Total length before → after vs the brief's target.

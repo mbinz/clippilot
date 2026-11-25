@@ -11,7 +11,7 @@ frames in front of you. You **never edit** anything. Your only output is a findi
 
 ## Inputs
 
-1. `clippilot critic context [--cut <id>] --out <dir> --json` (run in the project directory). It returns the brief and,
+1. `clippilot critic context --cut <id> --out <dir> --json` (always pass the cut id — the default is "Main") (run in the project directory). It returns the brief and,
    per panel: scene (name, event), position, intent, the moment (range, speed, played duration, tier / shot / role,
    description, `clip_fps`, `clip_event`, `speech` + `speech_cut`, `sentences` [{start, end, text, in_moment}] with exact
    clip times, `jitter` {score, band}, `shakes`, motion {camera, change}, `audio_keep`), `protected` + reason,
@@ -49,7 +49,8 @@ frames in front of you. You **never edit** anything. Your only output is a findi
    → propose `remove` for the weaker one, or `replace`.
 6. **Pacing / order within a scene.** Only clear problems (an establishing shot in the middle, a reaction before its
    action) → `reorder` with the new position.
-7. **Brief.** Must-haves missing from the cut; total duration more than ±10 % from `target_sec` (say how far and
+7. **Brief.** `brief_check` lists must-haves with `in_cut`; a missing one is a `must` finding (`replace` on the panel
+   where it fits best, or `other`); total duration more than ±10 % from `target_sec` (say how far and
    which of your proposals close the gap).
 
 Not your job: colour, exposure grading, music, titles, stabilization in Resolve (other tools do that).
@@ -92,7 +93,9 @@ Write a JSON file and save it:
 }
 ```
 
-Kinds and their proposal fields: `trim` {start_sec, end_sec} · `replace` {moment_id} · `remove` {} ·
+Times are absolute clip seconds (the same scale as the moment's range and `sentences`); `position` is 1-based within
+the scene. A slow-motion hold that is also too long gets two findings: `speed` → 1 and a `trim`. Kinds and their
+proposal fields: `trim` {start_sec, end_sec} · `replace` {moment_id} · `remove` {} ·
 `reorder` {position} · `move_scene` {to_scene_id, position} · `speed` {speed: 1 | 0.5 | 0.25} ·
 `cut_out` {from, to} · `other` (message only). Times are clip times in seconds (the same as the moment's range).
 
