@@ -49,6 +49,28 @@ export function buildRequest(model: string, videoPart: VideoPart) {
   };
 }
 
+export function createApiTransport(ai: GoogleGenAI): VideoTransport {
+  return {
+    upload: async (path) => {
+      const f = await ai.files.upload({ file: path, config: { mimeType: 'video/mp4' } });
+      return { name: f.name ?? '', uri: f.uri ?? '', mimeType: f.mimeType ?? 'video/mp4' };
+    },
+    waitActive: async (name) => {
+      const deadline = Date.now() + FILE_MAX_WAIT_MS;
+      for (;;) {
+        const f = await ai.files.get({ name });
+        if (f.state === 'ACTIVE') return;
+        if (f.state === 'FAILED') throw new Error(`File processing failed: ${name}`);
+        if (Date.now() >= deadline) throw new Error(`File not active after ${FILE_MAX_WAIT_MS / 1000}s: ${name}`);
+        await new Promise((resolve) => setTimeout(resolve, FILE_POLL_MS));
+      }
+    },
+    remove: async (name) => {
+      await ai.files.delete({ name });
+    },
+  };
+}
+
 export class GeminiClient {
   private ai: GoogleGenAI;
   private model: string;
@@ -76,25 +98,7 @@ export class GeminiClient {
   }
 
   private apiTransport(): VideoTransport {
-    return {
-      upload: async (path) => {
-        const f = await this.ai.files.upload({ file: path, config: { mimeType: 'video/mp4' } });
-        return { name: f.name ?? '', uri: f.uri ?? '', mimeType: f.mimeType ?? 'video/mp4' };
-      },
-      waitActive: async (name) => {
-        const deadline = Date.now() + FILE_MAX_WAIT_MS;
-        for (;;) {
-          const f = await this.ai.files.get({ name });
-          if (f.state === 'ACTIVE') return;
-          if (f.state === 'FAILED') throw new Error(`File processing failed: ${name}`);
-          if (Date.now() >= deadline) throw new Error(`File not active after ${FILE_MAX_WAIT_MS / 1000}s: ${name}`);
-          await new Promise((resolve) => setTimeout(resolve, FILE_POLL_MS));
-        }
-      },
-      remove: async (name) => {
-        await this.ai.files.delete({ name });
-      },
-    };
+    return createApiTransport(this.ai);
   }
 
   async analyzeVideo(proxyPath: string): Promise<ClipAnalysisResponse> {

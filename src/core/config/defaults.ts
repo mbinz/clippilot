@@ -7,6 +7,7 @@ const clippilotHome = process.env['CLIPPILOT_HOME'] ? path.resolve(process.env['
 export const DEFAULT_CONFIG: AppConfig = {
   gemini_api_key: '',
   gemini_model: 'gemini-2.5-flash',
+  story_critic_model: 'gemini-2.5-pro',
   language: 'de',
   thumbnail_interval_sec: 5,
   analysis_parallelism: 5,

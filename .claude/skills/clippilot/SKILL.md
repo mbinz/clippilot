@@ -57,6 +57,12 @@ on success. Always pass `--json` so output is parseable.
 | `clippilot events list [--project <name>] --json` | Events: clips grouped by folder (deepest folder) or by recording time (gap > 45 min). See "Events" below. |
 | `clippilot cut show --json` / `cut brief` / `cut apply --file f.json` / `moments list --json` | The storyboard: brief, draft, read back. See "Storyboard" below. |
 | `clippilot board context --json` | The user has the board open and says **this / that panel, this moment, here, the selected one**: run this first. It resolves their selection (scene, panel + intent, focused moment with clip, in/out, speed, tier, shot/role, `alternatives` ids). Exit 1 + `{error}` when no board has been opened yet; `stale: true` means some selected item was deleted since. |
+| `clippilot critic context [--cut id] --out <dir> --json` | Review loop: writes `context.json` (brief, per panel moment / protected + why / neighbours) and `strips/panel-<id>.png` for the cut critic to read. |
+| `clippilot critic save --file f.json --json` | Validate + store a critic's findings (ids must exist in the cut; `protected` is recomputed from the DB). |
+| `clippilot critic list [--cut id] --json` / `critic show <file\|latest> --json` | Stored reviews of the cut / one review with its resolutions. |
+| `clippilot critic resolve <file> <finding id> applied\|skipped\|protected [--note t]` | Record what happened to a finding. |
+| `clippilot critic summary [--cut id] --json` | Per round: counts by severity and resolution, plus the applied changes one line each. |
+| `clippilot critic story [--cut id] [--round n] [--yes] --json` | Story critic (gemini-2.5-pro) on a 480p preview of the cut. Without `--yes` only prints `{estimate_usd, duration_sec, preview}` and exits 2; show the estimate to the user, rerun with `--yes` only after their OK. |
 | `clippilot proxies rebuild [--project <name>] [--only-bad] [--json]` | Playback is skippy/freezes: re-encode proxies to yuv420p with 1 s keyframes (sequential; `--only-bad` skips proxies already yuv420p; reports clips whose original is missing). |
 | `clippilot similar <id>` | User asks "what other takes of this exist" or "any duplicates of clip N". |
 | `clippilot mark-best <id> [--group <gid>]` | User picks the best take among similar clips. Defaults to all groups containing the clip. |

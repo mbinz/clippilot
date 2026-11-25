@@ -57,6 +57,15 @@ export interface InsertHighlight {
   audio_type?: AudioType;
 }
 
+/** Edits that make a moment the user's own: moved range, changed speed, a ★. */
+function editReasons(r: HighlightRecord, fps: number | null | undefined): string[] {
+  const reasons: string[] = [];
+  if (r.start_sec !== (r.ai_start_sec ?? r.start_sec) || r.end_sec !== (r.ai_end_sec ?? r.end_sec)) reasons.push('trimmed');
+  if (r.speed !== defaultSpeed(r.suggested_speed, fps)) reasons.push('speed');
+  if (r.user_tier !== null) reasons.push('starred');
+  return reasons;
+}
+
 export class HighlightRepository {
   private stmtReplaceable: Database.Statement;
   private stmtDelete: Database.Statement;
@@ -108,9 +117,30 @@ export class HighlightRepository {
   findUnprotected(clipId: number): HighlightRecord[] {
     const fps = this.clipFps(clipId);
     const rows = this.stmtReplaceable.all(clipId) as HighlightRecord[];
-    return rows.filter((r) => !(
-      r.start_sec !== (r.ai_start_sec ?? r.start_sec) || r.end_sec !== (r.ai_end_sec ?? r.end_sec)
-      || r.speed !== defaultSpeed(r.suggested_speed, fps) || r.user_tier !== null));
+    return rows.filter((r) => editReasons(r, fps).length === 0);
+  }
+
+  /**
+   * Why a tool must not change this moment: the user decided it (`confirmed`, `rejected`) or edited it (`trimmed`,
+   * `speed`, `starred`). Same definition as `findUnprotected` except "used by a panel", which is no reason for
+   * the critics (every moment they look at is in a panel). Empty = the moment is an untouched AI proposal.
+   */
+  protectionReasons(id: number): string[] {
+    const r = this.db.prepare('SELECT * FROM highlights WHERE id = ?').get(id) as HighlightRecord | undefined;
+    if (!r) return [];
+    const reasons: string[] = [];
+    if (r.status === 'confirmed' || r.status === 'rejected') reasons.push(r.status);
+    return [...reasons, ...editReasons(r, this.clipFps(r.clip_id))];
+  }
+
+  /** Other moments of the same duplicate group (same project), rejected ones left out. */
+  dupGroupMembers(id: number): number[] {
+    const rows = this.db.prepare(`SELECT o.id FROM highlights h
+      JOIN clips hc ON hc.id = h.clip_id
+      JOIN highlights o ON o.dup_group = h.dup_group AND o.id <> h.id AND o.status <> 'rejected'
+      JOIN clips oc ON oc.id = o.clip_id AND oc.project_id IS hc.project_id
+      WHERE h.id = ? AND h.dup_group IS NOT NULL ORDER BY o.id`).all(id) as { id: number }[];
+    return rows.map((r) => r.id);
   }
 
   /** Set the range of an unprotected moment as the analysis' own range (ai range too), so it stays unprotected. */

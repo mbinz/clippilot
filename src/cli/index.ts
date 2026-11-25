@@ -21,6 +21,7 @@ import { registerBoardCommand } from './commands/board.js';
 import { registerProxiesCommand } from './commands/proxies.js';
 import { registerTranscribeCommand } from './commands/transcribe.js';
 import { registerMotionCommand } from './commands/motion.js';
+import { registerCriticCommands } from './commands/critic.js';
 import { setLogLevel } from '../utils/logger.js';
 
 export function createProgram(): Command {
@@ -60,6 +61,7 @@ export function createProgram(): Command {
   registerTranscribeCommand(program);
   registerMotionCommand(program);
   registerBoardCommand(program);
+  registerCriticCommands(program);
 
   return program;
 }

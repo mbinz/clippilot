@@ -1,6 +1,8 @@
 export interface AppConfig {
   gemini_api_key: string;
   gemini_model: string;
+  /** Model of the story critic (`critic story`): reviews a rendered preview of a whole cut. */
+  story_critic_model: string;
   language: string;
   thumbnail_interval_sec: number;
   analysis_parallelism: number;
