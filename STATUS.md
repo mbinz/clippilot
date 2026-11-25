@@ -1743,6 +1743,44 @@ moment rules entirely → open question). Real run on Arrifana (backup `clippilo
 lies before the shake — user decision: keep it, Gemini judges speech + action ("it will never be perfect"); moment 243 — the kiss happens during the
 shake → kept, correct. Implementer notes: undo of one cut's step also removes sibling panels in other cuts.
 
+**Acceptance loop run (2026-11-25, planner, user-approved ≈ $0.40):** 3 rounds on cut "Acceptance" (id 2, renamed "Main"
+for board viewing; the original is "Main (original)"): 31 changes, 230.4 → 153.6 s (target 165); both real cases fixed
+(R1 moved to the cliffs in round 2, R2 aerial trimmed in round 3); 3 story-critic removals skipped for length (cut would
+have been ~142 s); findings for the user live only in `.clippilot/reviews/*.json` / CLI (→ open: show them on the board).
+
+**B1 — false protection by draft speed (bug, planner spec 2026-11-25).** Three boat moments (293, 312, 317) count as
+protected ("speed") although only Claude's first draft (2026-11-22, before `ai_speed` existed) set them from Gemini's
+suggested 0.5× to 1×. Every user edit confirms the moment, so a speed change on a moment that is still `proposed` can only
+come from the AI. Migration 026: `UPDATE highlights SET ai_speed = speed WHERE status = 'proposed' AND ai_speed IS NULL`
+for rows whose speed differs from `defaultSpeed(suggested_speed, clip fps)` (do it in TS with the existing helper). Tests:
+migration backfills only proposed moments with a changed speed; confirmed / rejected / unchanged untouched; afterwards
+`protectionReasons` is empty for such a moment. Done when green and the 3 boat moments are unprotected on Arrifana.
+
+**A2 — shake- and speech-aware analysis (user decision 2026-11-25, planner spec).** Today Gemini picks moments blind and
+the shake fit / transcript snap repair them afterwards. New order inside `analyze` for the clips being analysed:
+1. transcribe (when the whisper model exists; unchanged code), 2. measure motion curves + detect shakes (W1 code, no moments
+needed yet), 3. Gemini analysis with a **measured-context block** in the prompt, 4. normaliser as today (clamp, 2–8 s,
+speech snap), 5. shake fit (F1) as the safety net.
+- Context block per clip (pure builder, tested), only the parts that exist:
+  - "Camera jolts (measured): 4.74–4.94 s (strong), 8.02–8.14 s (weak) …" (strong = high confidence), plus the clip's
+    handheld jitter in words when the clip is continuously shaky.
+  - "Spoken (transcript): [3.1–7.8 s] "1, 2, 3, 4, 5, 9." …" — sentences with times, max ~1500 characters (cut evenly, say so).
+- Instructions (prompt text, keep it short, in the prompt's language): moment boundaries never inside a jolt or a
+  sentence; prefer ranges without a jolt inside; if the moment's key action happens during a jolt, keep the moment and set
+  `jolt_at_key_action: true`.
+- Schema: new optional boolean `jolt_at_key_action` per moment (default false) → stored (migration 027
+  `highlights.jolt_at_key_action INTEGER DEFAULT 0`) and on moment JSON.
+- Shake fit: a moment with `jolt_at_key_action` that overlaps a shake is marked `kept` with note "Key action at the jolt
+  (analysis)" **without** a verify call; everything else as F1.
+- Prompt version: bump whatever identifies the analysis prompt; clips analysed before keep their data.
+- Without whisper model / when motion fails for a clip: the block omits that part; analysis still runs.
+- Tests first: block builder (jolts only, speech only, both, none, truncation), analyze order with injected fakes
+  (transcribe and motion run before the Gemini call and the prompt contains the block), schema accepts / defaults the flag,
+  flag → kept without verify, regression: existing analyze tests still pass.
+- Done when typecheck + test:all green; planner test run **from scratch** on Praia do Odeceixe (13 clips) in a new project
+  `~/Video/ClipPilot Odeceixe` and compares with the Odeceixe moments in the Arrifana project (old prompt): moments with a
+  shake inside before the fit, fit actions (fixed / kept / Gemini calls), sentence cuts, total cost.
+
 **How to run the acceptance test (user)**
 1. Review the decisions [D-1]…[D-19] above (and the implementer decisions in the W1 / C1 / C1b / D1 results).
 2. `cd ~/dev/clippilot && npm run skill:install` (installs the clippilot, cut-critic, review-loop skills and the cut-critic
