@@ -16,7 +16,8 @@ AI-assisted ingest + structured analysis of video footage, driven by a CLI that 
 ## Tracking
 - PRD: ./PRD.md
 - Architecture: ./ARCHITECTURE.md
-- Status: ./STATUS.md
+- Status (todo list): ./STATUS.md
+- Specs per theme: ./docs/specs/ · history: ./docs/history.md
 
 ## Project-specific notes
 - Surface is CLI-as-skill, not MCP. Every read command emits `--json`.

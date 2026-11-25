@@ -147,14 +147,14 @@ belongs. Keep it current with every pipeline change.
 14. **Similar = looks alike, measured locally** (2026-11-25). Similar moments are found by a local image-embedding
     "look fingerprint" per moment (SigLIP, 3 frames averaged), scored by cosine + a small recording-time boost, within one
     event, grouped by average linkage (no chaining). Gemini's role/shot labels no longer define similarity. No
-    fingerprint → nothing similar shown (no fallback). Specs SM1–SM4 in STATUS.md.
+    fingerprint → nothing similar shown (no fallback). Specs in `docs/specs/similar-moments.md`.
 
 ## Testing
 
 - `vitest`, layout `tests/{unit,integration,fixtures}`.
 - Unit covers pure modules (search engine, similarity union-find, exporters, schema, hasher, probe, scanner, JSON projection, contact-sheet layout, migration runner).
 - Integration covers ingest end-to-end against fixture media.
-- Module-by-module coverage map lives in `STATUS.md`. `gemini-client` is tested through an injected `generate` function; the real API call is deliberately untested.
+- The module-by-module coverage map (snapshot 2026-11-21) is in `docs/history.md`. `gemini-client` is tested through an injected `generate` function; the real API call is deliberately untested.
 
 ## What's external
 - Gemini API (`@google/genai`) — analysis.

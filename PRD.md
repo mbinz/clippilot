@@ -1,5 +1,8 @@
 # ClipPilot — PRD
 
+> 2026-11-25 (later): roadmap reorganised into named **themes** (no more M-numbers / "item 2b"); **similar moments**
+> by look planned. Todo list in STATUS.md, specs in `docs/specs/`, history in `docs/history.md`.
+>
 > 2026-11-25: **learning from human choices** planned (roadmap 2c) after three grilling rounds: all agent instructions
 > move to `instructions/`, the user's final cut vs the AI's cut drives approved instruction changes and project proposals.
 >
@@ -90,7 +93,7 @@ finishing.
      "proposed". AI picks and human picks are visually distinct; both are exportable any time. Undo for every edit.
    - Edit: scenes add / rename / delete / reorder; panels add / delete / reorder / intent.
    - **Preview** a scene or the whole cut in the browser (panels played in order, at their moment's speed).
-7. **Fill gaps** (M5) — reshape the story around what exists, or find a filler for that gap: own library → locally generated (title cards, route map, photo pan/zoom) → stock (plugin) → AI video (plugin).
+7. **Fill gaps** (theme "Gap fillers + plugins") — reshape the story around what exists, or find a filler for that gap: own library → locally generated (title cards, route map, photo pan/zoom) → stock (plugin) → AI video (plugin).
 8. **Export** — "Export to Resolve" button: one OTIO timeline per cut with scene markers (FCPXML secondary), into free Resolve, every clip online, correct speed.
 
 ## Data model
@@ -124,83 +127,39 @@ Project (the trip — "Portugal")
 - **CLI (AI + scripting):** ingest, analyze, events, brief, cut/scene/panel verbs, search, summary, export… All read commands emit JSON. Claude drafts through these in chat.
 - **Web UI (React + Vite):** events view, brief form, **scene board**, browser preview, export button. Browse/search stays.
 
-## Milestones
+## Roadmap
 
-| | Milestone | Done when |
-|---|---|---|
-| **M0** ✅ | Docs reset | — |
-| **M1** ✅ | Export that works | Verified in free Resolve; OTIO primary |
-| **M2** ✅ | Understand the footage | Resumable ingest, proxy-video analysis with moments, summary (piloted on Delfine) |
-| **M2.6** ✅ | Review page + moment tags | Moment tags/tier/slow-mo, clip scores dropped; taste-profile learning tried and dropped |
-| **M2.7** | Analysis groundwork | Files API upload, prompt cleanup, ≥ 3 s moments, shake metric, audio tag, duplicate groups, taste-profile code removed |
-| **M2.8** | Events | Folders → events, flat files → time grouping, CLI rename/merge/split, simple events view in UI; `03 Arrifana` (104 clips) ingested + analyzed |
-| **M3** | Storyboard model + CLI | Events/brief/scene/panel schema (panel source ai/user, moment status); Claude proposes a brief and drafts the Arrifana cut in chat |
-| **M4** | Scene board UI | Mockup first; pool + board + placing/👎/hide, trim, speed, preview, export button |
-| **M7** ✅ | Board v3 | Moment = edit; panel drawer (choose) vs moment drawer (review); ★ first + similar side by side; alternatives; seen; ★ editable; Show in Finder — mockup `scene-board-v3.html` |
-| **M8** ✅ | Assistant link | Claude Code knows the board selection (`clippilot board context --json`); the board refreshes itself after any edit (CLI / Claude) |
-| **M5** | Gap fillers (free) | Per-gap library search; local title cards, route map, photo pan/zoom — ingested as clips |
-| **M6** | Plugins (optional) | Stock and AI-video gap fillers behind a plugin seam |
+Themes in order (2026-11-25). The todo list with slice codes and spec links is in [STATUS.md](STATUS.md#todo); the
+former milestone table (M0–M8) and numbered roadmap are kept in [docs/history.md](docs/history.md).
 
-**v0.2 = M0–M4 ✅ 2026-11-23.** Acceptance met: `03 Arrifana` went ingest → events → brief → storyboard → export,
-imported cleanly into free Resolve, and the author prefers it over an empty timeline.
-**v0.3 = M7 + M8 ✅ 2026-11-23** (board v3 + assistant link). Done when: on the real Arrifana cut the author can review a scene's
-★ moments, compare and swap shots, trim/speed moments, and ask Claude Code about "this panel" — and leaves with
-"I didn't see everything, but these are the right choices".
+**Scope:** ClipPilot = sorting + storyboard drafting + rough-cut export. Post-production (titles, music + sound,
+stabilization, color) lives in separate Claude skills/tools (`~/dev/clippilot-post`, `resolve-prep`). Resolve (free)
+stays the finishing tool; fine cut, timing, mix and grade taste stay manual.
 
-## Roadmap (prioritized 2026-11-23, updated end of day)
+**Done:** Export to free Resolve (OTIO primary) · Understand the footage · Events · Storyboard model + CLI · Scene board
+(v0.2 ✅ 2026-11-23) · Board v3 + assistant link (v0.3 ✅ 2026-11-23) · Analysis polish · Post-production tools v0.1 ·
+Draft quality (transcript, jitter + shakes, draft rules, cut + story critic, review loop).
 
-**Scope decision (2026-11-23):** ClipPilot = sorting + storyboard drafting + rough-cut export. Post-production
-automation (titles/animations, music + sound, stabilization, color) lives in **separate Claude skills/tools** next to
-ClipPilot (`~/dev/clippilot-post`, CLI/skill `resolve-prep`, v0.1 built 2026-11-24), working on the OTIO/FCPXML export + originals. Resolve (free) stays the
-finishing tool; fine cut, timing, mix and grade taste stay manual. Full workflow map + who-does-what: STATUS.md
-"Post-production plan".
+**Now**
+1. **Similar moments** — similar = same setup / retake, measured from the frames (local look fingerprint), nearest
+   first; replaces the role/shot label match.
 
-1. **v0.3 — Board v3 + assistant link** (M7, M8) ✅.
-2. **Analysis polish** ✅ (prompt v3: 2–8 s moments, ★ ~10 %, strict audio; Q1/Q1b; Arrifana re-run). Small fixes (Q3)
-   and **full Portugal** (Q4) follow after the first post-tools.
-2a. ✅ 2026-11-24 **Post-tools (Claude skills, outside ClipPilot):** titles first (style chosen), then music + sound track placement,
-   stabilization + camera marking. Based on the Resolve capability test (STATUS.md).
-2b. **Draft quality (decided 2026-11-24, grilling Q1–Q23):** before full Portugal.
-   1. **Transcript** — local whisper.cpp (`large-v3-turbo`, word timestamps), all clips with audio; spoken text per moment
-      in `moments list`, cut-off sentences flagged; AI moments snap to sentence boundaries; **no length cap for speech
-      moments**; drawer shows it, search finds spoken words.
-   2. **Motion measurement** — per moment, local: shake (locked < 0.02 / stabilize / shaky ≥ 0.4 % of width, project
-      config) + stillness; `cut.json` carries the band; resolve-prep reads it instead of measuring.
-      2026-11-24: ✅ per-moment shake/stillness (S1). Next: **J1** rename S1's "shake" to **jitter** (continuous handheld
-      micro-movement) and drop Gemini's `shake` issue (measured instead), then **per-clip motion curve + single shakes**
-      (jolts, was "Wackler"; ranked by jump distance) — marked only, AI-moment boundaries moved out of a shake, drafter decides keep / cut out, B-roll cover = suggestion +
-      Resolve marker (no second track yet). Light-jitter ("locked") calibration deferred.
-   3. **Draft rules + board** — shaky moments stay out of drafts unless must-have/★ without a calmer alternative in the
-      similar group (named in the draft summary); subtle tile icon, details in the drawer, no auto-reject. Continuous
-      action moments may run to ~20 s, silent/static ones keep the 8 s cap.
-   4. **Cut critic** (own agent + skill) — measurements, transcript, stills every 0.5 s + last frame; rule of thumb:
-      static ~2–3 s, speech/clear action much longer; proposes concrete trims, calmer alternatives, cut-off sentences.
-   5. **Story critic** (own agent + skill) — 480p preview of the cut from proxies (original sound: keep loud, bed low,
-      no music) watched by Gemini 2.5 Pro with the brief; cost shown before each run.
-   6. **Loop** — findings as validated JSON (must / should / nit) in `.clippilot/reviews/`; Claude applies must+should,
-      max 3 rounds; result on the board (undoable history) + short change list in chat.
-   7. **Acceptance** — ~10 seeded faults in a copy of the Arrifana cut + the user's 2 real cases (+ notes later); ≥ 8/10
-      found, few false alarms.
-2c. **Learning from human choices (decided 2026-11-25, grilling rounds 1–3):** after 2b, before full Portugal's learning
-   run (recording must exist before Portugal). Critics are the definition of quality; Claude improves the cut with the
-   editing tools; the user's final cut is the answer key.
-   1. **L0 Instructions in one place** — every prompt/skill in `instructions/`, `.claude` points there; Claude's skill
-      split by role (clippilot, brief, draft, **edit** = the catalogue of editing tools that exist today, cut-critic,
-      review-loop); "Pipeline: who does what" in ARCHITECTURE.md.
-   2. **L1 Who made each edit** — edit history records `ai | user` per step.
-   3. **L2 Human interventions, static** — `clippilot learn context`: the AI's last version vs the final cut (panels,
-      scenes, moments, rejects, hidden clips) + every critic finding and what happened to it + the brief.
-   4. **L3 Learning skill** — started by the user; patterns → which step owns each → (A) instruction diffs, (B) project
-      proposals into STATUS.md; short interview, one question per pattern; the user accepts / edits / rejects each.
-3. **Mac app + ingest/analyze from the UI** — Electron shell around the server + web UI, project picker, CLI keeps
-   working on the same DB; no terminal for a new trip. CI comes with packaging.
-4. **Assistant in the app** — chat panel in the board (Claude via the Agent SDK with the user's login, acting through
-   the CLI verbs, one undo step per action, suggestion chips by context). Replaces hard-wired "AI action" buttons
-   (decided 2026-11-23: assistant route, not fixed buttons).
-5. **M5 gap fillers**, then **M6 plugins**.
-6. **Phone review** (moved back 2026-11-23) — Mac as server via Tailscale + access key; review-first (preview, swap,
-   👎, ★, reorder); cloud sync only if "Mac must be awake" proves to be the blocker.
-7. Wishlist (below), as it becomes relevant.
+**Next**
+2. **Board fixes** — cut picker, `ingest` runs `analyze`, critic findings on the board.
+3. **Learning from edits** — all agent instructions in `instructions/`; the edit history records AI vs user; the user's
+   final cut vs the AI's cut drives approved instruction changes and project proposals. Part 1 (L0, L1) before full
+   Portugal, part 2 (L2, L3) after the Odeceixe run.
+4. **Odeceixe end to end** — first from-scratch project through brief → draft → review loop → learning.
+5. **Full Portugal** — the acceptance project (508 videos).
+
+**Later**
+6. **Mac app** — Electron shell around the server + web UI, project picker, ingest/analyze from the UI; CI with packaging.
+7. **Assistant in the board** — chat panel (Claude via the Agent SDK with the user's login, acting through the CLI
+   verbs, one undo step per action). Replaces hard-wired "AI action" buttons.
+8. **Gap fillers + plugins** — per-gap library search, local title cards / route map / photo pan; stock and AI-video
+   behind a plugin seam.
+9. **Phone review** — Mac as server via Tailscale + access key; review-first.
+
 
 ## Out of scope for v0.2 / v0.3
 
@@ -211,7 +170,7 @@ finishing tool; fine cut, timing, mix and grade taste stay manual. Full workflow
 - Effects, transitions, audio mixing
 - Touching originals (delete / move / rename)
 - Bins / keywords / selects export
-- Automatically learned taste profiles (learning only through user-approved instruction changes, roadmap 2c)
+- Automatically learned taste profiles (learning only through user-approved instruction changes, "Learning from edits")
 - AI model provider abstraction; packaging, CI, MCP surface; Resolve scripting
 
 ## Future / wishlist

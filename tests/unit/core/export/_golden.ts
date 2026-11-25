@@ -9,7 +9,7 @@ import { child, findAll, parseXml, rat, Rat, type XmlNode } from './_fcpxml-pars
 const GOLDEN_PATH = new URL('../../../fixtures/resolve-golden/m1-fixture.fcpxml', import.meta.url);
 export const golden = readFileSync(GOLDEN_PATH, 'utf-8');
 
-// ffprobe facts Resolve's FCPXML does not carry (STATUS.md, M1 fixture table).
+// ffprobe facts Resolve's FCPXML does not carry (docs/history.md, M1 fixture table).
 export const FFPROBE_TC: Record<string, string> = {
   'C0289.MP4': '05:32:12:00',
   'GH010365.MP4': '13:58:58:20',
