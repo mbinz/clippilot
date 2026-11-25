@@ -52,6 +52,7 @@ export function MomentTile({ m, used, currentSceneIndex, selected, onSelect, onS
         a={m.start_sec}
         b={m.end_sec}
         rate={2}
+        fps={m.clip.fps}
         className={out ? 'grayscale' : faded ? '[filter:saturate(0)_brightness(.7)] group-hover/tile:[filter:none]' : ''}
       />
       {mark && (

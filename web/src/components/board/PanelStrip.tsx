@@ -67,7 +67,7 @@ export function PanelStrip({ panels, selectedId, compact, momentsById, onSelect,
               {p.state === 'gap' ? (
                 <span>empty {'—'} drop a moment</span>
               ) : (
-                <VideoThumb poster={poster} src={src} a={r!.a} b={r!.b} rate={Math.max(1, 2 * r!.speed)} />
+                <VideoThumb poster={poster} src={src} a={r!.a} b={r!.b} rate={Math.max(1, 2 * r!.speed)} fps={p.clip?.fps ?? p.candidates[0]?.clip?.fps} />
               )}
               <div className={`pointer-events-none absolute inset-0 z-[3] rounded-[9px] ${ring}`} />
               <span className="pointer-events-none absolute left-1.5 top-1.5 z-[4] rounded-[5px] bg-black/80 px-1.5 text-[10.5px] tabular-nums">{i + 1}</span>

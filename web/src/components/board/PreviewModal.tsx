@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { BoardPanel, BoardScene } from '../../board/types';
 import { panelLength, panelRange, type PanelRange } from '../../board/logic';
 import { stopHoverPlayback } from './VideoThumb';
+import { frameEndReached, frameSec, useFrameWatch } from '../../board/frameWatch';
 import { btn } from './ui';
 
 export interface PreviewItem {
@@ -87,6 +88,17 @@ export function PreviewModal({ items, onClose }: Props) {
   useEffect(() => () => clearTimeout(titleTimer.current), []);
 
   const cur = seq[k];
+  const advancedFor = useRef(-1);
+  useEffect(() => { advancedFor.current = -1; }, [k, seq]);
+
+  // Advance on the last frame before the panel's end (timeupdate is ~0.25 s too coarse).
+  useFrameWatch(videoRef, (t) => {
+    const c = seq[k];
+    if (!c || advancedFor.current === k || !frameEndReached(t, c.range.b, frameSec(c.panel.clip?.fps ?? c.panel.candidates[0]?.clip?.fps))) return;
+    advancedFor.current = k;
+    setK(k + 1);
+  }, [k, seq, seq.length > 0]);
+
   const ended = k >= seq.length;
 
   return (
@@ -111,7 +123,6 @@ export function PreviewModal({ items, onClose }: Props) {
                   if (!cur) return;
                   const t = e.currentTarget.currentTime;
                   setProgress(Math.min(1, Math.max(0, (t - cur.range.a) / (cur.range.b - cur.range.a))));
-                  if (t >= cur.range.b) setK(k + 1);
                 }}
               />
               <div
