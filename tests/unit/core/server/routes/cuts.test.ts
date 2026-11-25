@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { setup } from '../../storyboard/_helpers.js';
+import { setup, setLook } from '../../storyboard/_helpers.js';
 import { ThumbnailRepository } from '../../../../../src/db/repositories/thumbnail.repository.js';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -185,6 +185,17 @@ describe('Cut API routes', () => {
       });
       expect(rows[1].thumbnail).toBe('/media/thumbnails/a_10.jpg');
       expect(rows[2]).toMatchObject({ thumbnail: null, clip: { id: clipB, proxy_url: null, fps: 25 } });
+    });
+
+    it('moments carry similar_ids (nearest first, same event); no vectors are sent', async () => {
+      const ev = Number(t.db.prepare("INSERT INTO events (project_id, name, source, sort_order) VALUES (?, 'E', 'folder', 0)").run(t.projectId).lastInsertRowid);
+      t.db.prepare('UPDATE clips SET event_id = ? WHERE id IN (?, ?)').run(ev, clipA, clipB);
+      setLook(t.db, [ma[0], ma[1], mb[0]], (id) => (id === ma[1] ? 0.3 : 0));
+      const rows = await ok('GET', `/projects/${t.projectId}/moments`);
+      expect(rows[0].similar_ids).toEqual([mb[0], ma[1]]);
+      expect(rows[0]).not.toHaveProperty('look_vec');
+      t.db.prepare('UPDATE highlights SET look_vec = NULL WHERE id = ?').run(ma[1]);
+      expect((await ok('GET', `/projects/${t.projectId}/moments`))[1].similar_ids).toEqual([]);
     });
 
     it('filters: event_id, include_rejected, include_hidden', async () => {

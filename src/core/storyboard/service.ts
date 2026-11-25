@@ -1,3 +1,5 @@
+import { similarTo, type LookMoment } from '../look/similar.js';
+import { lookState } from '../look/stale.js';
 import type Database from 'better-sqlite3';
 import type { BriefState, Cut, Panel, PanelSource, Scene } from '../../types/story.js';
 import type { Clip } from '../../types/clip.js';
@@ -273,22 +275,34 @@ export class StoryboardService {
   }
 
   /**
-   * Similar moments: same event + role + shot (null matches null), not rejected, clip not hidden; star (effective
-   * tier) first, then recording time. Same rule as `alternatives` in web/src/board/pool.ts.
+   * Look fingerprints of a project's moments for ranking: fresh ones only (missing / stale -> `vec` null), rejected
+   * moments and hidden clips flagged `out`.
    */
+  private lookMoments(projectId: number): LookMoment[] {
+    const rows = this.db.prepare(`SELECT h.id, h.start_sec, h.end_sec, h.status, h.look_vec, h.look_start_sec, h.look_end_sec,
+        c.event_id, c.recorded_at, c.hidden FROM highlights h JOIN clips c ON c.id = h.clip_id WHERE c.project_id = ?`)
+      .all(projectId) as (Parameters<typeof lookState>[0] & { id: number; status: string; event_id: number | null; recorded_at: string | null; hidden: number })[];
+    return rows.map((r) => ({
+      id: r.id, event_id: r.event_id, out: r.status === 'rejected' || r.hidden !== 0,
+      rec_sec: (Date.parse(r.recorded_at ?? '') || 0) / 1000 + r.start_sec,
+      vec: lookState(r) === 'fresh' ? new Float32Array(new Uint8Array(r.look_vec!).buffer) : null,
+    }));
+  }
+
+  /** Per moment of the project: ids of its similar moments (same event, by look), nearest first (SM2). */
+  similarIds(projectId: number): Map<number, number[]> {
+    const ms = this.lookMoments(projectId);
+    return new Map(ms.map((m) => [m.id, similarTo(m, ms).similar]));
+  }
+
+  /** Similar moments of one moment (see `similarIds`); a moment without a fresh fingerprint has none. */
   alternatives(momentId: number): number[] {
-    const subject = this.db.prepare(`SELECT c.event_id, h.role, h.shot, c.project_id FROM highlights h JOIN clips c ON c.id = h.clip_id
-      WHERE h.id = ?`).get(momentId) as { event_id: number | null; role: string | null; shot: string | null; project_id: number } | undefined;
-    if (!subject) return [];
-    const rows = this.db.prepare(`SELECT h.id, h.start_sec, h.tier, h.user_tier, c.recorded_at
-      FROM highlights h JOIN clips c ON c.id = h.clip_id
-      WHERE c.project_id = ? AND h.id <> ? AND h.status <> 'rejected' AND c.hidden = 0
-        AND c.event_id IS ? AND h.role IS ? AND h.shot IS ?`)
-      .all(subject.project_id, momentId, subject.event_id, subject.role, subject.shot) as
-      { id: number; start_sec: number; tier: string; user_tier: string | null; recorded_at: string | null }[];
-    const time = (r: { start_sec: number; recorded_at: string | null }) => (Date.parse(r.recorded_at ?? '') || 0) / 1000 + r.start_sec;
-    const star = (r: { tier: string; user_tier: string | null }) => ((r.user_tier ?? r.tier) === 'hero' ? 1 : 0);
-    return rows.sort((a, b) => star(b) - star(a) || time(a) - time(b)).map((r) => r.id);
+    const row = this.db.prepare('SELECT c.project_id FROM highlights h JOIN clips c ON c.id = h.clip_id WHERE h.id = ?')
+      .get(momentId) as { project_id: number } | undefined;
+    if (!row) return [];
+    const ms = this.lookMoments(row.project_id);
+    const subject = ms.find((m) => m.id === momentId);
+    return subject ? similarTo(subject, ms).similar : [];
   }
 
   // ---------- lookups for logging (which cut an edit belongs to, human names for labels) ----------

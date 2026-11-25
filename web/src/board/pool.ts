@@ -14,6 +14,8 @@ export interface PoolMoment {
   shot: string | null;
   status: string;
   seen?: boolean;
+  /** Ids of similar moments by look (server-computed, nearest first); missing/empty = none (no fingerprint). */
+  similar_ids?: number[];
   clip: { event_id: number | null; recorded_at: string | null; hidden: boolean | number };
 }
 
@@ -64,9 +66,20 @@ export function poolOrder(moments: PoolMoment[]): { heroes: PoolMoment[][]; rest
   return { heroes: groups(vis.filter(isHero)), rest: groups(vis.filter((m) => !isHero(m))), out };
 }
 
+/** Similar moments (by look, nearest first) as the server ranked them; out moments and unknown ids are dropped. */
 export function alternatives(m: PoolMoment, moments: PoolMoment[]): PoolMoment[] {
-  const k = similarKey(m);
-  return moments.filter((x) => x.id !== m.id && !isOut(x) && similarKey(x) === k).sort(starsThenTime);
+  const byId = new Map(moments.map((x) => [x.id, x]));
+  return (m.similar_ids ?? [])
+    .map((id) => byId.get(id))
+    .filter((x): x is PoolMoment => !!x && x.id !== m.id && !isOut(x));
+}
+
+/** The rest of the moment's event (not out, not similar), by recording time. */
+export function otherInEvent(m: PoolMoment, moments: PoolMoment[]): PoolMoment[] {
+  const sim = new Set(m.similar_ids ?? []);
+  return moments
+    .filter((x) => x.id !== m.id && !isOut(x) && x.clip.event_id === m.clip.event_id && !sim.has(x.id))
+    .sort(byTime);
 }
 
 /** The moment a panel shows: filled -> its moment, candidates -> first candidate. */

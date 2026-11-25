@@ -40,6 +40,8 @@ export interface BoardMoment {
   ai_tier: Tier | string;
   user_tier: Tier | null;
   seen: boolean;
+  /** Similar moments by look, nearest first (server-computed; empty = none or no fingerprint). */
+  similar_ids: number[];
   shot: string | null;
   role: string | null;
   issues: string[];

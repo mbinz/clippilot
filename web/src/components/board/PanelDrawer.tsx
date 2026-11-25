@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { BoardMoment, BoardPanel, BoardScene, PM } from '../../board/types';
-import { decisionFor, optionList } from '../../board/drawer';
+import { decisionFor, optionList, otherOptions } from '../../board/drawer';
 import { effectiveTier, isOut, type UsageEntry } from '../../board/pool';
 import { btn, btnAttn, btnDanger, btnGhost, kbd, sectionLabel, tagAi, tagMine } from './ui';
 import { ClipPlayer } from './ClipPlayer';
@@ -47,6 +47,8 @@ export function PanelDrawer(p: Props) {
     candidateIds: panel.state === 'candidates' ? panel.candidates.map((c) => c.id) : [],
   });
   const base = current ?? m;
+  const others = otherOptions({ options, base, moments: p.moments });
+  const [othersOpen, setOthersOpen] = useState(false);
   const neighbours = [scene.panels[index - 1], panel, scene.panels[index + 1]];
   const ring = (x: BoardPanel) =>
     x.state === 'gap' ? 'border border-dashed border-bd-line' : x.source === 'user' ? 'outline outline-2 -outline-offset-2 outline-bd-mine' : 'outline outline-2 -outline-offset-2 outline-dashed outline-bd-ai';
@@ -151,6 +153,23 @@ export function PanelDrawer(p: Props) {
             />
           ))}
         </div>
+        {others.length > 0 && (
+          <div className="mt-3">
+            <button className="cursor-pointer border-0 bg-transparent p-0 text-bd-text underline underline-offset-[3px]" onClick={() => setOthersOpen(!othersOpen)}>
+              {othersOpen ? '▾' : '▸'} Other moments in this event {'·'} {others.length}
+            </button>
+            {othersOpen && (
+              <div className={`${GRID} mt-2 !grid-cols-[repeat(auto-fill,minmax(118px,1fr))]`}>
+                {others.map((x) => (
+                  <MomentTile
+                    key={x.id} m={x} used={p.usage[x.id]} currentSceneIndex={p.currentSceneIndex}
+                    selected={m?.id === x.id} onSelect={() => p.onPreview(x.id)} onSeen={p.onSeen}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {m && (

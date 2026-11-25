@@ -1,7 +1,7 @@
 // Pure decision logic for the two drawers and the pool of Board v3 (no React, no DOM).
 // Tested in tests/unit/web/board-drawer.test.ts; ported from mockups/scene-board-v3.html.
 import {
-  alternatives, isHero, isOut, poolOrder, recTime, slotFor, usage,
+  alternatives, isHero, isOut, otherInEvent, poolOrder, recTime, slotFor, usage,
   type PoolMoment, type PoolPanel, type UsageEntry,
 } from './pool';
 
@@ -37,7 +37,7 @@ export function decisionFor(i: {
 }
 
 /**
- * Options grid: the moment in the story first, then similar shots (stars first); a candidate panel lists its candidates
+ * Options grid: the moment in the story first, then similar shots (by look, nearest first); a candidate panel lists its candidates
  * first; an empty panel with nothing shown lists the scene's event (stars first, then time).
  */
 export function optionList<T extends PoolMoment>(o: {
@@ -60,6 +60,13 @@ export function optionList<T extends PoolMoment>(o: {
   }
   if (o.shown && !opts.some((x) => x.id === o.shown!.id)) opts.unshift(o.shown);
   return opts;
+}
+
+/** Collapsed "other moments in this event" of the panel drawer: event moments not among the options, by time. */
+export function otherOptions<T extends PoolMoment>(o: { options: T[]; base: T | null; moments: T[] }): T[] {
+  if (!o.base) return [];
+  const have = new Set(o.options.map((x) => x.id));
+  return (otherInEvent(o.base, o.moments) as T[]).filter((x) => !have.has(x.id));
 }
 
 /* ---------- moment drawer ---------- */

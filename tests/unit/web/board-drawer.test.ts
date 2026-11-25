@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  decisionFor, storyLink, optionList, starTarget, starLabel, rangeLabel, playLabel, storyMark, poolView,
+  decisionFor, storyLink, optionList, otherOptions, starTarget, starLabel, rangeLabel, playLabel, storyMark, poolView,
   panelPosition, isValidTrim, transcriptView, shakeMarks, shakeLine, shakeFitLine, jitterLine, shakeHint, type DrawerTree, type ShakeInfo,
 } from '../../../web/src/board/drawer.js';
 import type { PoolMoment } from '../../../web/src/board/pool.js';
@@ -78,18 +78,21 @@ describe('storyLink (the one link from the moment drawer into the story)', () =>
 });
 
 describe('optionList (options grid of the panel drawer)', () => {
-  const m1 = mo(1, { rec: 10 }), m2 = mo(2, { rec: 5 }), m3 = mo(3, { rec: 1, user_tier: 'hero' });
+  const m1 = mo(1, { rec: 10, similar_ids: [3, 2] }), m2 = mo(2, { rec: 5, similar_ids: [1, 3] }), m3 = mo(3, { rec: 1, user_tier: 'hero' });
   const other = mo(4, { rec: 2, role: 'x' }), rej = mo(5, { rec: 3, status: 'rejected' });
   const all = [m1, m2, m3, other, rej];
-  it('the current moment first, then alternatives (stars first)', () => {
+  it('the current moment first, then similar moments nearest first (no stars rule)', () => {
     expect(optionList({ current: m1, shown: m1, candidateIds: [], moments: all, eventId: 1 }).map((m) => m.id)).toEqual([1, 3, 2]);
   });
   it('candidate panel: candidates first (in order), then the rest', () => {
     const r = optionList({ current: m2, shown: m2, candidateIds: [2, 1], moments: all, eventId: 1 });
     expect(r.map((m) => m.id)).toEqual([2, 1, 3]);
   });
-  it('an empty panel previewing a moment: options are that moment and its alternatives', () => {
+  it('an empty panel previewing a moment: options are that moment and its similar moments', () => {
     expect(optionList({ current: null, shown: m1, candidateIds: [], moments: all, eventId: 1 }).map((m) => m.id)).toEqual([1, 3, 2]);
+  });
+  it('a moment without similar_ids (missing fingerprint) shows only itself', () => {
+    expect(optionList({ current: m3, shown: m3, candidateIds: [], moments: all, eventId: 1 }).map((m) => m.id)).toEqual([3]);
   });
   it('an empty panel with nothing shown: the scene event, stars first then time, no out moments', () => {
     const r = optionList({ current: null, shown: null, candidateIds: [], moments: [...all, mo(6, { ev: 2 })], eventId: 1 });
@@ -98,6 +101,16 @@ describe('optionList (options grid of the panel drawer)', () => {
   it('a shown moment that is not among the options (e.g. opened from elsewhere) is put first', () => {
     const far = mo(7, { role: 'zzz' });
     expect(optionList({ current: m1, shown: far, candidateIds: [], moments: [...all, far], eventId: 1 })[0].id).toBe(7);
+  });
+});
+
+describe('otherOptions (collapsed "other moments in this event" of the panel drawer)', () => {
+  const m1 = mo(1, { rec: 10, similar_ids: [2] }), m2 = mo(2, { rec: 5 }), m3 = mo(3, { rec: 1 }), m4 = mo(4, { rec: 2, ev: 2 });
+  it('event moments that are not in the options, by time; nothing when there is no base moment', () => {
+    const moments = [m1, m2, m3, m4];
+    const opts = optionList({ current: m1, shown: m1, candidateIds: [], moments, eventId: 1 });
+    expect(otherOptions({ options: opts, base: m1, moments }).map((m) => m.id)).toEqual([3]);
+    expect(otherOptions({ options: [], base: null, moments })).toEqual([]);
   });
 });
 

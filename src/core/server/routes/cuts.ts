@@ -308,8 +308,9 @@ export function createCutRoutes(db: Database.Database, options: CutRoutesOptions
       includeRejected: c.req.query('include_rejected') === '1',
       includeHidden: c.req.query('include_hidden') === '1',
     });
+    const similar = svc.similarIds(pid);
     return c.json({
-      data: rows.map((m) => ({ ...m, thumbnail: thumbNear(m.clip_id, (m.start_sec + m.end_sec) / 2), clip: clipInfo(m.clip_id) })),
+      data: rows.map((m) => ({ ...m, similar_ids: similar.get(m.id) ?? [], thumbnail: thumbNear(m.clip_id, (m.start_sec + m.end_sec) / 2), clip: clipInfo(m.clip_id) })),
     });
   });
 

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { setup } from './_helpers.js';
+import { setup, setLook } from './_helpers.js';
 import {
   readBoardSelection, writeBoardSelection, selectionFile, parseSelection, checkSelection, resolveBoardContext,
   type BoardSelection,
@@ -80,38 +80,42 @@ describe('board selection file + context', () => {
     });
   });
 
-  describe('alternatives', () => {
-    it('same event + role + shot, not rejected/hidden, stars first then recording time', () => {
-      const set = (id: number, role: string | null, shot: string | null, tier = 'solid') =>
-        t.db.prepare('UPDATE highlights SET role = ?, shot = ?, tier = ? WHERE id = ?').run(role, shot, tier, id);
-      const more = t.addMoments(clip, [{ start_sec: 25, end_sec: 28 }, { start_sec: 1, end_sec: 1.8 }]);
-      set(ms[0], 'action', 'wide'); set(ms[1], 'action', 'wide'); set(ms[2], 'action', 'wide');
-      set(more[0], 'action', 'wide'); set(more[1], 'action', 'close');
-      t.db.prepare("UPDATE highlights SET user_tier = 'hero' WHERE id = ?").run(ms[2]);
+  describe('alternatives (similar by look, SM2)', () => {
+    it('same event, fresh fingerprint, above the line, not rejected/hidden; nearest first; missing/stale/other event out', () => {
+      const more = t.addMoments(clip, [{ start_sec: 25, end_sec: 28 }, { start_sec: 1, end_sec: 1.8 }, { start_sec: 28.5, end_sec: 29.5 }]);
+      // ms[0] angle 0; ms[2] nearly identical, ms[1] close, more[1] different shot, more[0] rejected, more[2] no fingerprint
+      const angle: Record<number, number> = { [ms[0]]: 0, [ms[1]]: 0.4, [ms[2]]: 0.1, [more[0]]: 0.05, [more[1]]: 1.5 };
+      setLook(t.db, [...ms, more[0], more[1]], (id) => angle[id]!);
       t.db.prepare("UPDATE highlights SET status = 'rejected' WHERE id = ?").run(more[0]);
       expect(t.svc.alternatives(ms[0])).toEqual([ms[2], ms[1]]);
+      // stale after a re-trim: drops out of the list
+      t.db.prepare('UPDATE highlights SET end_sec = 7 WHERE id = ?').run(ms[1]);
+      expect(t.svc.alternatives(ms[0])).toEqual([ms[2]]);
       // a hidden clip's moments and another event's moments are out
       const c2 = t.addClip().id;
       t.db.prepare('UPDATE clips SET event_id = 1, hidden = 1 WHERE id = ?').run(c2);
-      const h = t.addMoments(c2, [{}])[0]; set(h, 'action', 'wide');
+      const h = t.addMoments(c2, [{}])[0]!;
       const c3 = t.addClip().id;
       t.db.prepare("INSERT INTO events (project_id, name, source, sort_order) VALUES (?, 'Town', 'folder', 1)").run(t.projectId);
       t.db.prepare('UPDATE clips SET event_id = 2 WHERE id = ?').run(c3);
-      const e = t.addMoments(c3, [{}])[0]; set(e, 'action', 'wide');
-      expect(t.svc.alternatives(ms[0])).toEqual([ms[2], ms[1]]);
+      const e = t.addMoments(c3, [{}])[0]!;
+      setLook(t.db, [h, e]);
+      expect(t.svc.alternatives(ms[0])).toEqual([ms[2]]);
     });
-    it('orders by recording time across clips, null role/shot match each other, unknown moment -> []', () => {
-      const c2 = t.addClip().id;
-      t.db.prepare("UPDATE clips SET event_id = 1, recorded_at = '2026-01-01T09:00:00Z' WHERE id = ?").run(c2);
-      const early = t.addMoments(c2, [{ start_sec: 3, end_sec: 5 }])[0];
-      expect(t.svc.alternatives(ms[0])).toEqual([early, ms[1], ms[2]]);
+    it('no fingerprint -> nothing similar; unknown moment -> []; similarIds covers every moment of the project', () => {
+      expect(t.svc.alternatives(ms[0])).toEqual([]);
       expect(t.svc.alternatives(99999)).toEqual([]);
+      setLook(t.db, [ms[0], ms[1]]);
+      const all = t.svc.similarIds(t.projectId);
+      expect(all.get(ms[0])).toEqual([ms[1]]);
+      expect(all.get(ms[2])).toEqual([]);
     });
   });
 
   describe('resolveBoardContext', () => {
     it('resolves cut, scene, panel with its moment, drawer, preview and the focused moment', () => {
       t.db.prepare("UPDATE highlights SET role = 'action', shot = 'wide', description = 'wave' WHERE clip_id = ?").run(clip);
+      setLook(t.db, ms, (id) => (id === ms[2] ? 0.2 : 0));
       const p = t.svc.addPanel(sceneId, { intent: 'Arrival shot', momentId: ms[0] }).id;
       t.svc.addPanel(sceneId, { intent: 'second' });
       const ctx = resolveBoardContext(t.db, { ...sel({ panel_id: p, drawer: 'panel', preview_moment_id: ms[1] }), updated_at: 'T' });

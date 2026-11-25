@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  effectiveTier, isHero, similarKey, recTime, poolOrder, alternatives, slotFor, usage, fades, loopStep, seekState, loopSeekTarget,
+  effectiveTier, isHero, similarKey, recTime, poolOrder, alternatives, otherInEvent, slotFor, usage, fades, loopStep, seekState, loopSeekTarget,
   type PoolMoment, type PoolTree,
 } from '../../../web/src/board/pool.js';
 
@@ -70,13 +70,28 @@ describe('poolOrder', () => {
   it('empty', () => expect(poolOrder([])).toEqual({ heroes: [], rest: [], out: [] }));
 });
 
-describe('alternatives', () => {
-  it('same key, not self, not out; stars first then time', () => {
+describe('alternatives (similar_ids, SM2)', () => {
+  it('follows similar_ids in order; out moments and unknown ids are dropped; no similar_ids -> none', () => {
     const ms = [
-      mo(1, { rec: 10 }), mo(2, { rec: 5 }), mo(3, { rec: 1, user_tier: 'hero' }), mo(4, { rec: 2, role: 'x' }),
-      mo(5, { rec: 3, status: 'rejected' }), mo(6, { rec: 4, hidden: true }), mo(7, { rec: 20, tier: 'hero' }),
+      mo(1, { rec: 10, similar_ids: [7, 3, 5, 6, 99, 2] }), mo(2, { rec: 5 }), mo(3, { rec: 1, user_tier: 'hero' }),
+      mo(5, { rec: 3, status: 'rejected' }), mo(6, { rec: 4, hidden: true }), mo(7, { rec: 20 }), mo(8, { rec: 2 }),
     ];
-    expect(alternatives(ms[0], ms).map((m) => m.id)).toEqual([3, 7, 2]);
+    expect(alternatives(ms[0], ms).map((m) => m.id)).toEqual([7, 3, 2]);
+    expect(alternatives(ms[1], ms)).toEqual([]);
+  });
+  it('role/shot labels and stars play no part', () => {
+    const ms = [mo(1, { similar_ids: [2] }), mo(2, { role: 'other', shot: 'close' }), mo(3, { tier: 'hero' })];
+    expect(alternatives(ms[0], ms).map((m) => m.id)).toEqual([2]);
+  });
+});
+
+describe('otherInEvent', () => {
+  it('same event, not self, not out, not similar; by recording time', () => {
+    const ms = [
+      mo(1, { rec: 10, similar_ids: [2] }), mo(2, { rec: 5 }), mo(3, { rec: 30 }), mo(4, { rec: 20, tier: 'hero' }),
+      mo(5, { rec: 1, ev: 2 }), mo(6, { rec: 2, status: 'rejected' }),
+    ];
+    expect(otherInEvent(ms[0], ms).map((m) => m.id)).toEqual([4, 3]);
   });
 });
 

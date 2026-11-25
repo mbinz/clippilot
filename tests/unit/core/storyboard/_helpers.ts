@@ -35,3 +35,13 @@ export function setup() {
   };
   return { db, svc: new StoryboardService(db), projectId, addClip, addMoments };
 }
+
+/** Gives moments a fresh look fingerprint: `vecs` maps moment id -> unit vector angle (rad) in 2-d; others get angle 0. */
+export function setLook(db: Database.Database, ids: number[], angleOf: (id: number) => number = () => 0): void {
+  const up = db.prepare('UPDATE highlights SET look_vec = ?, look_model = ?, look_start_sec = start_sec, look_end_sec = end_sec WHERE id = ?');
+  for (const id of ids) {
+    const a = angleOf(id);
+    const v = new Float32Array([Math.cos(a), Math.sin(a)]);
+    up.run(Buffer.from(v.buffer), 'test', id);
+  }
+}

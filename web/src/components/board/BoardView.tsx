@@ -3,7 +3,7 @@ import { fetchProjects } from '../../api/client';
 import { useBoard } from '../../board/useBoard';
 import { cutLength, fmtClock, sceneLength, toChoose } from '../../board/logic';
 import { starTarget, storyLink } from '../../board/drawer';
-import { alternatives, usage as usageOfTree } from '../../board/pool';
+import { alternatives, otherInEvent, usage as usageOfTree } from '../../board/pool';
 import type { BoardMoment, BoardPanel, BoardScene, PM } from '../../board/types';
 import { BoardToolbar } from './BoardToolbar';
 import { SceneNav } from './SceneNav';
@@ -21,7 +21,7 @@ import { btnGhost, intentFrom } from './ui';
 
 type Open =
   | { kind: 'panel'; slot: number; preview: number | null }
-  | { kind: 'moment'; mid: number; similar: boolean }
+  | { kind: 'moment'; mid: number; othersOpen: boolean }
   | null;
 
 interface Props {
@@ -144,7 +144,7 @@ export function BoardView({ projectId }: Props) {
     setOpen({ kind: 'panel', slot: id, preview: preview ?? null });
   };
   const openMoment = (mid: number) =>
-    setOpen(open?.kind === 'moment' && open.mid === mid ? null : { kind: 'moment', mid, similar: false });
+    setOpen(open?.kind === 'moment' && open.mid === mid ? null : { kind: 'moment', mid, othersOpen: false });
 
   // Keyboard: ⌘Z / ⇧⌘Z (not while typing), Esc closes the drawer.
   const kb = useRef({ undo: board.undo, redo: board.redo, closeDrawer, escape: () => {} });
@@ -342,7 +342,7 @@ export function BoardView({ projectId }: Props) {
                 const r = await actions.deletePanel(selPanel.panel.id, panelNo(selPanel));
                 if (r) closeDrawer();
               }}
-              onReview={(mid) => setOpen({ kind: 'moment', mid, similar: false })}
+              onReview={(mid) => setOpen({ kind: 'moment', mid, othersOpen: false })}
               onPanel={(id) => openPanel(id)}
               onSeen={(id) => setSeen(id, true)}
             />
@@ -358,11 +358,12 @@ export function BoardView({ projectId }: Props) {
               sceneName={scene.name}
               story={storyLink(selMoment, { scenes }, pms, scene.id)}
               similar={alternatives(selMoment, pms) as PM[]}
-              similarOpen={open.similar}
-              onToggleSimilar={() => setOpen({ ...open, similar: !open.similar })}
+              others={otherInEvent(selMoment, pms) as PM[]}
+              othersOpen={open.othersOpen}
+              onToggleOthers={() => setOpen({ ...open, othersOpen: !open.othersOpen })}
               onClose={closeDrawer}
-              onSelect={(mid) => setOpen({ kind: 'moment', mid, similar: open.similar })}
-              onOpenMoment={(mid) => setOpen({ kind: 'moment', mid, similar: false })}
+              onSelect={(mid) => setOpen({ kind: 'moment', mid, othersOpen: open.othersOpen })}
+              onOpenMoment={(mid) => setOpen({ kind: 'moment', mid, othersOpen: false })}
               onFinder={() => revealClip(selMoment.clip_id).catch((err) => toast(err instanceof Error ? err.message : String(err)))}
               onStar={() => {
                 const t = starTarget(selMoment);

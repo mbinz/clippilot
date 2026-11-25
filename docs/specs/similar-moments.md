@@ -62,6 +62,7 @@ moments → 4 groups, largest 10) and miss retakes that got a different label; n
   this event · N" (by time); PanelDrawer `optionList`: current, similar, collapsed others. Missing fingerprint → hidden.
 - Tests first: ranking/threshold/event-only/out-excluded/missing → empty on synthetic vectors; `optionList` +
   `alternatives` with `similar_ids`. Browser check on Odeceixe by the planner, then the user's feedback round.
+- **Result (2026-11-25):** done. `LOOK_THRESHOLD` 0.80, `TIME_BOOST` 0.05, `TIME_BOOST_WINDOW_SEC` 300 (Odeceixe: ~5 similar per moment, 48 of 171 pairs above the line); `similar_ids` on `GET /projects/:id/moments`; `StoryboardService.alternatives`/`similarIds` (so critic context + board selection follow, label match still in `poolOrder`/`slotFor`/`rules.ts` until SM3). Similar section is open (hidden when empty), "Other moments in this event" collapsed. Visual check pending (user).
 
 **SM3 — look groups everywhere.**
 - Pure average-linkage clustering per event at `LOOK_THRESHOLD` → `look_group` per moment (null = alone / no

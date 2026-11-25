@@ -22,9 +22,12 @@ interface Props {
   eventName: string;
   sceneName: string;
   story: StoryLink;
+  /** Similar by look, nearest first (empty = none or no fingerprint: section hidden). */
   similar: PM[];
-  similarOpen: boolean;
-  onToggleSimilar: () => void;
+  /** Rest of the event, by time (collapsed). */
+  others: PM[];
+  othersOpen: boolean;
+  onToggleOthers: () => void;
   onClose: () => void;
   onSelect: (momentId: number) => void;
   onOpenMoment: (momentId: number) => void;
@@ -227,12 +230,12 @@ export function MomentDrawer(p: Props) {
         )}
       </div>
 
-      <div className="mt-4 border-t border-bd-line pt-3">
-        <div className="flex items-center gap-2">
-          <button className={link} onClick={p.onToggleSimilar}>{p.similarOpen ? '▾' : '▸'} Similar moments {'·'} {p.similar.length}</button>
-          <span className={kbd}>{kindLabel(m)}</span>
-        </div>
-        {p.similarOpen && (
+      {p.similar.length > 0 && (
+        <div className="mt-4 border-t border-bd-line pt-3">
+          <div className="flex items-center gap-2">
+            <b className="text-[11px] font-semibold uppercase tracking-[.07em] text-bd-muted">Similar moments {'·'} {p.similar.length}</b>
+            <span className={kbd}>{kindLabel(m)}</span>
+          </div>
           <div className={`${GRID} mt-2 !grid-cols-[repeat(auto-fill,minmax(118px,1fr))]`}>
             {p.similar.map((x) => (
               <MomentTile
@@ -241,8 +244,24 @@ export function MomentDrawer(p: Props) {
               />
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {p.others.length > 0 && (
+        <div className="mt-4 border-t border-bd-line pt-3">
+          <button className={link} onClick={p.onToggleOthers}>{p.othersOpen ? '▾' : '▸'} Other moments in this event {'·'} {p.others.length}</button>
+          {p.othersOpen && (
+            <div className={`${GRID} mt-2 !grid-cols-[repeat(auto-fill,minmax(118px,1fr))]`}>
+              {p.others.map((x) => (
+                <MomentTile
+                  key={x.id} m={x} used={p.usage[x.id]} currentSceneIndex={p.currentSceneIndex}
+                  selected={false} onSelect={() => p.onOpenMoment(x.id)} onSeen={p.onSeen}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {!(out && clip.hidden) && (
         <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-bd-line pt-3">

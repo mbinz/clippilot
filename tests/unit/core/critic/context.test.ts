@@ -1,3 +1,4 @@
+import { setLook } from '../storyboard/_helpers.js';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -158,6 +159,7 @@ describe('buildContext: richer moments', () => {
     const [a3] = f.addMoments(f.clipA.id, [{ start_sec: 20, end_sec: 22 }]);
     f.db.prepare("UPDATE highlights SET shot = 'wide', role = 'action', jitter_score = 0.1, jitter_max_px = 2, camera_motion = 1, frame_change = 0.01, motion_start_sec = 10, motion_end_sec = 14 WHERE id IN (?, ?, ?)").run(b2, b3, a3);
     f.svc.addPanel(f.svc.getCut(f.cut.id)!.scenes[0]!.id, { intent: 'used', momentId: a3!, source: 'ai' });
+    setLook(f.db, [f.a1, f.b1, b2!, b3!, a3!]);
     const alts = (await ctxOf(f)).panels[0]!.moment!.alternatives;
     const ids = alts.map((a) => a.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -176,6 +178,7 @@ describe('buildContext: richer moments', () => {
     const { f } = rich();
     const extra = f.addMoments(f.clipB.id, Array.from({ length: 7 }, (_, i) => ({ start_sec: 10 + i * 2, end_sec: 11 + i * 2 })));
     f.db.prepare(`UPDATE highlights SET shot = 'wide', role = 'action' WHERE id IN (${extra.join(',')})`).run();
+    setLook(f.db, [f.a1, f.b1, ...extra]);
     const real = f.svc.listMoments.bind(f.svc);
     const svc = Object.create(f.svc) as typeof f.svc;
     svc.listMoments = (...a) => real(...a).map((r) => ({
