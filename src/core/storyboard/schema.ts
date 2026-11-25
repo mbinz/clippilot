@@ -23,6 +23,8 @@ const DraftPanelSchema = z.object({
   start_sec: z.number().optional(),
   end_sec: z.number().optional(),
   speed: z.number().optional(),
+  /** Cut this clip-time stretch (a shake) out of the moment: it keeps the part before, a sibling panel gets the part after. */
+  cut_out: z.tuple([z.number(), z.number()]).optional(),
 }).refine((p) => !(p.moment_id !== undefined && p.candidates !== undefined), {
   message: 'use either moment_id or candidates, not both',
   path: ['candidates'],

@@ -7,6 +7,7 @@ import { speedAllowed } from '../analyze/highlights.js';
 import { HighlightRepository } from '../../db/repositories/highlight.repository.js';
 import { BriefSchema, BriefStateSchema, formatIssues, type Draft } from './schema.js';
 import { applyDraft as applyDraftImpl } from './draft.js';
+import type { DraftWarning } from './rules.js';
 import * as ops from './history.js';
 import { defaultSpeed } from './range.js';
 import { isTier, tierRankSql, type Tier } from '../tiers.js';
@@ -413,7 +414,7 @@ export class StoryboardService {
   }
 
   /** Validate and apply a draft in one transaction; throws DraftValidationError listing every problem. */
-  applyDraft(cutId: number, draft: Draft | unknown, opts: { mode: 'replace' | 'append' }): { scenes: number; panels: number } {
+  applyDraft(cutId: number, draft: Draft | unknown, opts: { mode: 'replace' | 'append' }): { scenes: number; panels: number; warnings: DraftWarning[] } {
     return applyDraftImpl(this.db, this, cutId, draft, opts);
   }
 

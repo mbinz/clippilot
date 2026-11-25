@@ -78,7 +78,7 @@ describe('applyDraft', () => {
         ] },
       ],
     }, { mode: 'replace' });
-    expect(res).toEqual({ scenes: 2, panels: 4 });
+    expect(res).toEqual({ scenes: 2, panels: 4, warnings: [] });
 
     const tree = t.svc.getCut(cutId)!;
     expect(tree.scenes.map((s) => s.name)).toEqual(['Arrival', 'Beach']);

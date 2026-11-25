@@ -2,8 +2,10 @@ import type Database from 'better-sqlite3';
 import type { Clip } from '../../types/clip.js';
 import type { HighlightRecord } from '../../db/repositories/highlight.repository.js';
 import { speedAllowed } from '../analyze/highlights.js';
-import { DraftSchema, DraftValidationError, formatIssues, type Draft } from './schema.js';
-import { MIN_PANEL_SEC, type StoryboardService } from './service.js';
+import { BriefSchema, DraftSchema, DraftValidationError, formatIssues, type Draft } from './schema.js';
+import { MIN_CUT_PART_SEC, MIN_PANEL_SEC, type StoryboardService } from './service.js';
+import { HighlightRepository } from '../../db/repositories/highlight.repository.js';
+import { draftWarnings, type DraftWarning } from './rules.js';
 
 export const KEPT_SCENE_NAME = 'Kept';
 const SPEEDS = [1, 0.5, 0.25];
@@ -25,6 +27,7 @@ export function validateDraft(db: Database.Database, projectId: number | null, d
     return { m, clip };
   };
 
+  const repo = new HighlightRepository(db);
   draft.scenes.forEach((scene, si) => {
     if (scene.event_id !== undefined) {
       const ev = db.prepare('SELECT project_id FROM events WHERE id = ?').get(scene.event_id) as { project_id: number } | undefined;
@@ -32,6 +35,7 @@ export function validateDraft(db: Database.Database, projectId: number | null, d
     }
     scene.panels.forEach((panel, pi) => {
       const where = `scenes.${si}.panels.${pi}`;
+      if (panel.cut_out && panel.moment_id === undefined) errors.push(`${where}.cut_out: needs a moment_id`);
       if (panel.candidates) {
         if (new Set(panel.candidates).size !== panel.candidates.length) errors.push(`${where}.candidates: duplicate moment ids`);
         for (const id of new Set(panel.candidates)) usable(`${where}.candidates`, id);
@@ -45,6 +49,15 @@ export function validateDraft(db: Database.Database, projectId: number | null, d
         errors.push(`${where}: range ${start}-${end} is outside the clip duration (${found.clip.duration_sec} s)`);
       } else if (end - start < MIN_PANEL_SEC) {
         errors.push(`${where}: range ${start}-${end} is shorter than ${MIN_PANEL_SEC} s`);
+      }
+      if (panel.cut_out) {
+        const reasons = repo.protectionReasons(found.m.id);
+        const [from, to] = panel.cut_out;
+        if (reasons.length) errors.push(`${where}.cut_out: moment ${found.m.id} is protected (${reasons.join(', ')}); only you can change it`);
+        else if (from < start || to > end) errors.push(`${where}.cut_out: ${from}-${to} must be inside the moment range ${start}-${end}`);
+        else if (to <= from) errors.push(`${where}.cut_out: must start before it ends`);
+        else if (from - start < MIN_CUT_PART_SEC - 1e-9) errors.push(`${where}.cut_out: must leave at least ${MIN_CUT_PART_SEC} s before the cut`);
+        else if (end - to < MIN_CUT_PART_SEC - 1e-9) errors.push(`${where}.cut_out: must leave at least ${MIN_CUT_PART_SEC} s after the cut`);
       }
       if (panel.speed !== undefined) {
         if (!SPEEDS.includes(panel.speed)) errors.push(`${where}: invalid speed ${panel.speed} (use 1, 0.5 or 0.25)`);
@@ -65,7 +78,7 @@ export function applyDraft(
   cutId: number,
   raw: unknown,
   opts: { mode: 'replace' | 'append' },
-): { scenes: number; panels: number } {
+): { scenes: number; panels: number; warnings: DraftWarning[] } {
   const cut = svc.getCut(cutId);
   if (!cut) throw new Error(`Cut ${cutId} not found`);
   const parsed = DraftSchema.safeParse(raw);
@@ -94,11 +107,14 @@ export function applyDraft(
       if (sd.notes !== undefined) db.prepare('UPDATE scenes SET notes = ? WHERE id = ?').run(sd.notes, scene.id);
       if (!created.has(sd.name)) created.set(sd.name, scene.id);
       for (const pd of sd.panels) {
-        svc.addPanel(scene.id, {
+        const panel = svc.addPanel(scene.id, {
           intent: pd.intent, momentId: pd.moment_id, candidates: pd.candidates,
           startSec: pd.start_sec, endSec: pd.end_sec, speed: pd.speed, source: 'ai',
         });
         panels++;
+        if (pd.cut_out) {
+          panels += svc.cutOutMoment(pd.moment_id!, pd.cut_out[0], pd.cut_out[1], { ai: true, cutId, panelId: panel.id }).panels.length;
+        }
       }
     }
 
@@ -115,6 +131,8 @@ export function applyDraft(
       }
       for (const scene of oldScenes) svc.deleteScene(scene.id);
     }
-    return { scenes: draft.scenes.length, panels };
+    const brief = cut.brief ? BriefSchema.safeParse(cut.brief) : null;
+    const warnings = draftWarnings(draft, svc.listMoments(cut.cut.project_id), brief?.success ? brief.data : null);
+    return { scenes: draft.scenes.length, panels, warnings };
   })();
 }
