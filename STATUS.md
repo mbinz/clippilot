@@ -1793,6 +1793,24 @@ moments; shakes in the middle of a moment 0 vs 3 (no splits / jump cuts); shake 
 the jolt but ±0.2 s → fit trims ≤ 0.2 s); kept 0 vs 1; sentence cuts 0 vs 4. Found on the way: **`ingest` does not run
 `analyze` automatically** although `--skip-analysis` and the skill say so (deferred fix).
 
+**W2 — zoom-aware subject-motion filter (user report + planner spec, 2026-11-25).** Scene 5 panel 1 of "Acceptance"
+(C0611, moment 325, 3.0–7.4 s) still shows a shake at its end: 7.08–7.44 s jolts (all patches agree), 7.56–7.84 s a fast
+zoom (border patches move apart radially, up to ±17 px = beyond the ±16 px search), 7.96–8.32 s jolts. The W1 filter
+compares patches with their *median shift*, so the zoom reads as subject motion (disagreement 0.88 ≥ 0.5) and the whole
+1.3 s candidate is dropped — although the user had judged exactly this candidate (93@7.06) "yes".
+Fix: per frame, fit a **similarity camera model** (shift tx, ty + zoom s + rotation r; least squares) to the textured
+border patches' shake residual vectors (patch centres: x 0.16 / 0.5 / 0.84, y 0.215 / 0.785, middle row 0.5; y scaled by
+the frame's aspect); disagreement = Σ median |patch residual − model prediction| ÷ Σ mean |prediction| over the candidate.
+Keep when disagreement < **0.4** or peak ≥ 60 %/s. Prototype (`exports/wackler-eval/eval_sim.py` on `all4.json`): P 0.83 /
+R 0.93 — same as the W1 rule — and 93@7.06 goes from 0.88 (dropped) to 0.24 (kept).
+- Change `src/core/motion/curve.ts` (subject filter / disagreement) only; stored `disagreement` = the new value; ≥ 4
+  textured patches for the fit (else all 8); no new dependency (2×4 normal equations by hand).
+- Tests first: uniform shift → ≈ 0; pure zoom (radial pattern) → ≈ 0 (kept); zoom + shift → ≈ 0; one patch off (subject)
+  → high (dropped); rotation → ≈ 0; low-texture fallback; existing W1 tests still green (update thresholds only where the
+  spec changes them).
+- Done when green; planner re-measures Arrifana (`motion --force`, backup), runs the shake fit, `eval:shakes` ≥ 0.80 / 0.88,
+  and checks panel 1 of scene 5.
+
 **How to run the acceptance test (user)**
 1. Review the decisions [D-1]…[D-19] above (and the implementer decisions in the W1 / C1 / C1b / D1 results).
 2. `cd ~/dev/clippilot && npm run skill:install` (installs the clippilot, cut-critic, review-loop skills and the cut-critic
