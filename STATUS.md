@@ -32,6 +32,13 @@ clip — prototype W0 judged by the user (141 verdicts, 71 % real). **Next sessi
 **2026-11-25:** W0 questions answered; vocabulary: **shake** = single jolt (was "Wackler"), **jitter** = continuous
 handheld micro-movement (S1's "shake" today). Gemini's `shake` issue is dropped (measured instead). **Next: slice J1
 (rename + drop), then W1** (border-patch experiment done: P 0.83 / R 0.93) — all under "W0 — Wackler prototype" below.
+**2026-11-25 (end of session):** built and merged J1 (jitter rename), W1 (shakes), C1–C1d (critics), D1 (draft rules, `--ai`,
+cut-out), C2 (cut-critic agent, review-loop skill), F1 (shake fit + Gemini check), B1 (protection bug), A2 (shake- and
+speech-aware analyze), W2 (zoom-aware filter); 1307 tests. Acceptance loop ran on Arrifana cut "Acceptance" (3 rounds,
+230 → 154 s). From-scratch project `~/Video/ClipPilot Odeceixe` analysed with A2 (no brief/draft yet).
+**Next / open:** score the acceptance run against `acceptance-key.md`; show critic findings on the board (apply/dismiss);
+cut picker on the board (it always opens "Main"); `ingest` should run `analyze` (help text says so, it doesn't); continue
+the Odeceixe pass (brief → draft → loop); user idea: drop the general 2 s / 8 s moment rules; dead S1 code cleanup.
 
 **2026-11-25 (later):** grilling on **learning from human choices** (3 rounds) → PRD roadmap item **2c**, ARCHITECTURE
 decisions 9 (rewritten) + 13 and "Pipeline: who does what"; specs L0–L3 under "Roadmap item 2c" below.
