@@ -1,3 +1,5 @@
+import type { ShakeInfo } from './drawer';
+
 /** Shapes the board gets from the cut / moments routes (see src/core/server/routes/cuts.ts). */
 
 export type Tier = 'hero' | 'solid' | 'filler';
@@ -47,6 +49,9 @@ export interface BoardMoment {
   audio_type: string;
   status: string;
   description: string;
+  /** Measured jitter of the current range (null = not measured) and the shakes inside it (null = clip not measured). */
+  jitter?: { score: number; band: 'locked' | 'stabilize' | 'shaky' } | null;
+  shakes?: ShakeInfo[] | null;
   thumbnail: string | null;
   clip: ClipInfo | null;
 }

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import type { PM } from '../../board/types';
-import { rangeLabel, fmtClock } from '../../board/drawer';
+import { rangeLabel, fmtClock, shakeMarks } from '../../board/drawer';
 import type { UsageEntry } from '../../board/pool';
 import { DrawerPlayer } from './DrawerPlayer';
 import { ClipTimeline } from './ClipTimeline';
@@ -36,6 +36,7 @@ export function ClipPlayer({ moment: m, clipMoments, usage, editable, tone, hint
       <ClipTimeline
         duration={m.clip.duration_sec} moments={clipMoments} currentId={m.id} usage={usage}
         range={trim.range} editable={editable} tone={tone} onRange={trim.live} onRangeCommit={trim.release}
+        shakes={shakeMarks(m.shakes, trim.range, m.clip.duration_sec)}
         playhead={playhead} onPick={onPick} onSeek={(t) => seekRef.current?.(t)}
       />
       <div className="mt-1 flex justify-between gap-2 text-[11px] tabular-nums text-bd-muted">

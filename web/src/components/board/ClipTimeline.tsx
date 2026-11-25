@@ -1,5 +1,6 @@
 import type { PM } from '../../board/types';
 import { isHero, type UsageEntry } from '../../board/pool';
+import type { ShakeMark } from '../../board/drawer';
 
 interface Props {
   duration: number;
@@ -14,6 +15,8 @@ interface Props {
   tone: 'amber' | 'white';
   onRange?: (a: number, b: number) => void;
   onRangeCommit?: () => void;
+  /** Shakes of the selected moment as small ticks (neutral; fainter when low confidence). */
+  shakes?: ShakeMark[];
   /** Playhead position as a fraction of the clip. */
   playhead: number;
   onPick: (momentId: number) => void;
@@ -59,6 +62,13 @@ export function ClipTimeline(p: Props) {
           p.onSeek(((e.clientX - r.left) / r.width) * L);
         }}
       >
+        {p.shakes?.map((k, i) => (
+          <i
+            key={i}
+            className={`pointer-events-none absolute bottom-1 top-1 rounded-[1px] bg-bd-text ${k.low ? 'opacity-30' : 'opacity-80'}`}
+            style={{ left: `${k.left}%`, width: `${k.width}%` }}
+          />
+        ))}
         {p.range && (
           <div
             className={`pointer-events-none absolute bottom-0 top-0 rounded-md border-2 ${rng}`}

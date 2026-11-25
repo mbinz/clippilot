@@ -170,3 +170,53 @@ export function poolView<T extends PoolMoment>(
   const order = poolOrder(unused) as { heroes: T[][]; rest: T[][]; out: T[] };
   return { ...order, inStory: scoped.length - unused.length };
 }
+
+/* ---------- shakes (single jolts measured on the clip) ---------- */
+
+export interface ShakeInfo {
+  start: number;
+  end: number;
+  peak_at: number;
+  /** Peak shake speed, % of frame width per second. */
+  strength: number;
+  jump_pct: number;
+  jump_px: number;
+  confidence: 'high' | 'low';
+  moving_scene: boolean;
+}
+
+export interface ShakeMark { left: number; width: number; low: boolean; at: number }
+
+/** Ticks on the clip timeline (in % of the clip) for the shakes overlapping the visible range `range`. */
+export function shakeMarks(
+  shakes: ShakeInfo[] | null | undefined,
+  range: { a: number; b: number },
+  duration: number,
+): ShakeMark[] {
+  if (!shakes || duration <= 0) return [];
+  return shakes
+    .filter((k) => k.start < range.b && k.end > range.a)
+    .map((k) => ({
+      left: (k.start / duration) * 100,
+      width: Math.max(((k.end - k.start) / duration) * 100, 0.3),
+      low: k.confidence === 'low',
+      at: k.peak_at,
+    }));
+}
+
+const clock1 = (sec: number): string => {
+  const m = Math.floor(sec / 60);
+  return `${m}:${(sec - m * 60).toFixed(1).padStart(4, '0')}`;
+};
+
+/** One quiet line per shake: "Shake 0:04.2 · jump 3 % (58 px) · low confidence — moving scene". */
+export function shakeLine(k: ShakeInfo): string {
+  const pct = k.jump_pct >= 1 ? String(Math.round(k.jump_pct)) : k.jump_pct.toFixed(1);
+  const low = k.confidence === 'low' ? ` · low confidence${k.moving_scene ? ' — moving scene' : ''}` : '';
+  return `Shake ${clock1(k.peak_at)} · jump ${pct} % (${Math.round(k.jump_px)} px)${low}`;
+}
+
+/** The jitter band line of the drawer's motion block, or null when the moment is not measured. */
+export function jitterLine(j: { score: number; band: string } | null | undefined): string | null {
+  return j ? `Jitter ${j.band} · ${j.score.toFixed(2)} %` : null;
+}

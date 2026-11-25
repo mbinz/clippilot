@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   decisionFor, storyLink, optionList, starTarget, starLabel, rangeLabel, playLabel, storyMark, poolView,
-  panelPosition, isValidTrim, transcriptView, type DrawerTree,
+  panelPosition, isValidTrim, transcriptView, shakeMarks, shakeLine, jitterLine, type DrawerTree, type ShakeInfo,
 } from '../../../web/src/board/drawer.js';
 import type { PoolMoment } from '../../../web/src/board/pool.js';
 
@@ -203,5 +203,40 @@ describe('transcriptView (the "Spoken" block of the moment drawer)', () => {
   });
   it('empty segments -> no parts', () => {
     expect(transcriptView([], 0, 5)).toEqual({ parts: [], cut: null });
+  });
+});
+
+describe('shakes in the moment drawer [D-6]', () => {
+  const k = (o: Partial<ShakeInfo> = {}): ShakeInfo => ({
+    start: 4, end: 4.4, peak_at: 4.2, strength: 40, jump_pct: 2.9, jump_px: 58, confidence: 'high', moving_scene: false, ...o,
+  });
+  it('shakeMarks: ticks on the clip timeline for the shakes inside the visible range, in % of the clip', () => {
+    const marks = shakeMarks([k(), k({ start: 20, end: 20.5, peak_at: 20.2 })], { a: 2, b: 8 }, 40);
+    expect(marks).toHaveLength(1);
+    expect(marks[0].left).toBeCloseTo(10, 6);
+    expect(marks[0].width).toBeCloseTo(1, 6);
+    expect(marks[0].low).toBe(false);
+  });
+  it('a shake partly inside the range counts; touching does not; low confidence is flagged; ticks are never invisibly thin', () => {
+    expect(shakeMarks([k({ start: 1.8, end: 2.2 })], { a: 2, b: 8 }, 40)).toHaveLength(1);
+    expect(shakeMarks([k({ start: 1.5, end: 2 })], { a: 2, b: 8 }, 40)).toHaveLength(0);
+    expect(shakeMarks([k({ confidence: 'low' })], { a: 2, b: 8 }, 40)[0].low).toBe(true);
+    expect(shakeMarks([k({ start: 4, end: 4.01 })], { a: 2, b: 8 }, 600)[0].width).toBeGreaterThanOrEqual(0.3);
+  });
+  it('no shakes / unmeasured clip -> no marks', () => {
+    expect(shakeMarks(null, { a: 0, b: 5 }, 10)).toEqual([]);
+    expect(shakeMarks(undefined, { a: 0, b: 5 }, 10)).toEqual([]);
+    expect(shakeMarks([], { a: 0, b: 5 }, 10)).toEqual([]);
+  });
+  it('shakeLine: one quiet line per shake', () => {
+    expect(shakeLine(k())).toBe('Shake 0:04.2 \u00b7 jump 3 % (58 px)');
+    expect(shakeLine(k({ jump_pct: 0.64, jump_px: 12 }))).toBe('Shake 0:04.2 \u00b7 jump 0.6 % (12 px)');
+    expect(shakeLine(k({ confidence: 'low' }))).toBe('Shake 0:04.2 \u00b7 jump 3 % (58 px) \u00b7 low confidence');
+    expect(shakeLine(k({ confidence: 'low', moving_scene: true, peak_at: 75.04 }))).toBe('Shake 1:15.0 \u00b7 jump 3 % (58 px) \u00b7 low confidence \u2014 moving scene');
+  });
+  it('jitterLine: band and score, nothing when not measured', () => {
+    expect(jitterLine({ score: 0.523, band: 'shaky' })).toBe('Jitter shaky \u00b7 0.52 %');
+    expect(jitterLine(null)).toBeNull();
+    expect(jitterLine(undefined)).toBeNull();
   });
 });
