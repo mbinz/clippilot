@@ -310,4 +310,24 @@ describe('fixShakes', () => {
     t.svc.trimMoment(m, 2, 10);
     expect(listed()).toMatchObject({ shake_status: null, shake_note: null });
   });
+
+  it('A2: a moment flagged jolt_at_key_action that overlaps a shake is kept without a Gemini call', async () => {
+    const [m, other] = t.addMoments(clipId, [{ start_sec: 2, end_sec: 10 }, { start_sec: 12, end_sec: 20 }]);
+    t.db.prepare('UPDATE highlights SET jolt_at_key_action = 1 WHERE id IN (?, ?)').run(m, other);
+    putShakes(clipId, [shake(5, 5.3)]);
+    const v = fake('yes');
+    const r = await run(v);
+    expect(v.calls).toHaveLength(0);
+    expect(row(m)).toMatchObject({ shake_status: 'kept', shake_note: 'Key action at the jolt (analysis)', start_sec: 2, end_sec: 10 });
+    expect(r.moments.find((x) => x.moment_id === m)).toMatchObject({ status: 'kept', plan: { kind: 'split' }, reason: 'Key action at the jolt (analysis)' });
+    expect(r.totals).toMatchObject({ kept: 1, clean: 1, gemini_calls: 0 });
+    expect(row(other)).toMatchObject({ shake_status: 'clean' }); // flag without a shake changes nothing
+  });
+  it('A2: without the flag the same moment still goes to the AI check', async () => {
+    t.addMoments(clipId, [{ start_sec: 2, end_sec: 10 }]);
+    putShakes(clipId, [shake(5, 5.3)]);
+    const v = fake('yes');
+    await run(v);
+    expect(v.calls).toHaveLength(1);
+  });
 });

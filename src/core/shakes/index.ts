@@ -6,7 +6,7 @@ import { TranscriptRepository } from '../../db/repositories/transcript.repositor
 import { StoryboardService } from '../storyboard/service.js';
 import { transcriptSentences } from '../transcribe/speech.js';
 import { writeMomentColumns } from '../motion/index.js';
-import { KEPT_NOTES, planShakeFix, type ShakePlan } from './plan.js';
+import { KEPT_NOTES, KEY_ACTION_NOTE, planShakeFix, type ShakePlan } from './plan.js';
 import { askVerdict, buildShakePrompt, segmentBounds, type ShakeVerifier, type Verdict } from './verify.js';
 import { shakeStateOf } from './state.js';
 import path from 'node:path';
@@ -121,6 +121,7 @@ export async function fixShakes(db: Database.Database, o: FixOptions): Promise<F
 
     if (plan.kind === 'clean') { decide('clean', null); continue; }
     if (hl.protectionReasons(m.id).length > 0) { decide('kept', KEPT_NOTES.protected); continue; }
+    if (m.jolt_at_key_action) { decide('kept', KEY_ACTION_NOTE); continue; }
     if (plan.kind === 'kept') { decide('kept', KEPT_NOTES[plan.reason]); continue; }
     if (o.dryRun || !o.verifier) { t.unverified++; continue; }
 

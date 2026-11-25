@@ -146,6 +146,8 @@ Rules when drafting:
   does it for every shake, high or low confidence, and checks with Gemini that the key action survives. Read
   `shake_status` afterwards: `kept` moments still contain a shake (`shake_note` says why: the action is in the shake, no
   clean range, a sentence would be cut, or the moment is protected); swap them for a calmer alternative or tell the user.
+  `jolt_at_key_action: true` on a moment means the analysis saw the key action happen during a camera jolt (the shake fit then
+  keeps it with note "Key action at the jolt (analysis)"): leave it unless a calmer alternative exists.
 - B-roll to cover a shake or a shaky stretch is only a suggestion in chat; do not build overlays.
 - Length: static or silent moments play at most 8 s (aim for 2-3 s). Moments with speech and clear action moments
   (role `action`, `motion.change` >= 0.03 or `motion.camera` >= 2) may run up to about 20 s.

@@ -152,4 +152,10 @@ describe('GeminiClient transport selection', () => {
     expect(generate).not.toHaveBeenCalled();
     expect(t.remove).toHaveBeenCalledTimes(2);
   });
+
+  it('passes the measured-context text on to every generate call', async () => {
+    const generate = vi.fn().mockResolvedValueOnce('nope').mockResolvedValueOnce(validResponse);
+    await new GeminiClient(config, generate).analyzeVideo(proxy, 'Kamerawackler (gemessen): 1.00–1.20 s (stark)');
+    expect(generate.mock.calls.map((c) => c[1])).toEqual(['Kamerawackler (gemessen): 1.00–1.20 s (stark)', 'Kamerawackler (gemessen): 1.00–1.20 s (stark)']);
+  });
 });

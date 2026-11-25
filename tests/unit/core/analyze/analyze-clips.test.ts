@@ -5,6 +5,7 @@ import { ClipRepository } from '../../../../src/db/repositories/clip.repository.
 import { HighlightRepository } from '../../../../src/db/repositories/highlight.repository.js';
 import { analyzeClips } from '../../../../src/core/analyze/index.js';
 import { TranscriptRepository } from '../../../../src/db/repositories/transcript.repository.js';
+import { MotionRepository } from '../../../../src/db/repositories/motion.repository.js';
 import { DEFAULT_CONFIG } from '../../../../src/core/config/defaults.js';
 import type { ClipAnalysisResponse } from '../../../../src/core/analyze/schema.js';
 
@@ -98,5 +99,34 @@ describe('analyzeClips with highlights', () => {
     const a = insertClip();
     await analyzeClips([a], DEFAULT_CONFIG, clipRepo, () => {}, hlRepo, { analyzeVideo: async () => response([]) });
     expect((clipRepo.findById(a.id) as any).analysis_profile_version).toBeNull();
+  });
+
+  it('A2: gives the client a context block from the clip\'s shakes and transcript (only when a motion repo is passed)', async () => {
+    const clip = insertClip();
+    new TranscriptRepository(db).save(clip.id, 'm', { language: 'de', words: [], segments: [{ start: 0.5, end: 2, text: 'Hallo du.' }] });
+    const motion = new MotionRepository(db);
+    motion.save(clip.id, {
+      curve: { fps: 25, width: 320, srcWidth: 1920, dx: new Int8Array(100), dy: new Int8Array(100), change: new Float32Array(100) },
+      medianResidual: 0.1, continuous: false,
+      shakes: [{ start_sec: 1, end_sec: 1.2, peak_sec: 1.1, peak: 5, jump_pct: 1, jump_px: 20, disagreement: 0.1, moving_scene: false, confidence: 'high' }],
+    });
+    const seen: (string | undefined)[] = [];
+    const client = { analyzeVideo: async (_p: string, ctx?: string) => { seen.push(ctx); return response([]); } };
+    await analyzeClips([clip], DEFAULT_CONFIG, clipRepo, () => {}, hlRepo, client, new TranscriptRepository(db), motion);
+    expect(seen[0]).toContain('Kamerawackler (gemessen): 1.00–1.20 s (stark)');
+    expect(seen[0]).toContain('Hallo du.');
+    seen.length = 0;
+    await analyzeClips([clip], DEFAULT_CONFIG, clipRepo, () => {}, hlRepo, client, new TranscriptRepository(db));
+    expect(seen[0]).toBeUndefined();
+  });
+  it('A2: a clip without shake data and transcript gets no context; jolt_at_key_action is stored', async () => {
+    const clip = insertClip();
+    const seen: (string | undefined)[] = [];
+    const client = { analyzeVideo: async (_p: string, ctx?: string) => { seen.push(ctx); return response([
+      { start_sec: 0.5, end_sec: 2.5, description: 'Kiss', tier: 'hero', shot: 'close', role: 'action', jolt_at_key_action: true } as any,
+    ]); } };
+    await analyzeClips([clip], DEFAULT_CONFIG, clipRepo, () => {}, hlRepo, client, new TranscriptRepository(db), new MotionRepository(db));
+    expect(seen[0]).toBeUndefined();
+    expect(hlRepo.findByClip(clip.id)[0]).toMatchObject({ jolt_at_key_action: 1 });
   });
 });

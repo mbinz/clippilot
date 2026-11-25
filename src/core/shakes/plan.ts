@@ -56,6 +56,9 @@ export function planShakeFix(
   return parts.length === 1 ? { kind: 'trim', parts: [parts[0]!] } : { kind: 'split', parts };
 }
 
+/** A2: the analysis flagged the moment's key action as happening during a jolt. */
+export const KEY_ACTION_NOTE = 'Key action at the jolt (analysis)';
+
 export const KEPT_NOTES: Record<ShakeKeptReason | 'protected', string> = {
   no_clean_range: 'No clean range of at least 1 s around the shake',
   speech: 'Cutting out the shake would cut a sentence',

@@ -27,6 +27,8 @@ export const HighlightSchema = z.object({
   slowmo_reason: z.string().default(''),
   audio_keep: z.boolean().default(false),
   audio_type: z.enum(['ambient', 'speech', 'music', 'noise']).default('noise'),
+  /** A2: the moment's key action happens during a measured camera jolt. */
+  jolt_at_key_action: z.boolean().default(false),
 });
 
 export type SlowmoLevel = z.infer<typeof HighlightSchema>['slowmo'];

@@ -1756,7 +1756,8 @@ for rows whose speed differs from `defaultSpeed(suggested_speed, clip fps)` (do 
 migration backfills only proposed moments with a changed speed; confirmed / rejected / unchanged untouched; afterwards
 `protectionReasons` is empty for such a moment. Done when green and the 3 boat moments are unprotected on Arrifana.
 
-**B1 result (2026-11-25):** ✅ migration 026 (1279 tests). Arrifana migrated (backup `clippilot.pre-026.db`): see below.
+**B1 result (2026-11-25):** ✅ migration 026 (1279 tests). Arrifana migrated (backup `clippilot.pre-026.db`): 6 moments got
+`ai_speed`; the 3 boat moments (293, 312, 317) are no longer protected (their findings were not applied — user decision).
 
 **A2 — shake- and speech-aware analysis (user decision 2026-11-25, planner spec).** Today Gemini picks moments blind and
 the shake fit / transcript snap repair them afterwards. New order inside `analyze` for the clips being analysed:
@@ -1782,6 +1783,15 @@ speech snap), 5. shake fit (F1) as the safety net.
 - Done when typecheck + test:all green; planner test run **from scratch** on Praia do Odeceixe (13 clips) in a new project
   `~/Video/ClipPilot Odeceixe` and compares with the Odeceixe moments in the Arrifana project (old prompt): moments with a
   shake inside before the fit, fit actions (fixed / kept / Gemini calls), sentence cuts, total cost.
+
+**A2 result (2026-11-25):** ✅ (1300 tests). `analyze` order: transcribe → motion (also clips without moments) → Gemini with a
+German "Gemessene Daten" block (jolts strong/weak, continuous shake, timed sentences ≤ 1500 chars) → normaliser → shake fit;
+schema flag `jolt_at_key_action` (migration 027) → shake fit keeps such moments without a verify call;
+`ANALYSIS_PROMPT_VERSION = 2` (constant only). From-scratch test: new project `~/Video/ClipPilot Odeceixe` (13 clips;
+ingest 2 min, analyze 3.5 min, 13 + 6 Gemini Flash calls, a few cents). vs the same clips in Arrifana (old prompt): 19 vs 21
+moments; shakes in the middle of a moment 0 vs 3 (no splits / jump cuts); shake only at a boundary 6 vs 0 (Gemini cuts at
+the jolt but ±0.2 s → fit trims ≤ 0.2 s); kept 0 vs 1; sentence cuts 0 vs 4. Found on the way: **`ingest` does not run
+`analyze` automatically** although `--skip-analysis` and the skill say so (deferred fix).
 
 **How to run the acceptance test (user)**
 1. Review the decisions [D-1]…[D-19] above (and the implementer decisions in the W1 / C1 / C1b / D1 results).

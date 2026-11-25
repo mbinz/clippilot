@@ -100,3 +100,22 @@ describe("moment prompt v3", () => {
     expect(USER_PROMPT).not.toMatch(/0 bis 5/);
   });
 });
+
+describe("A2 prompt additions", () => {
+  it("tells the model not to cut inside a jolt or sentence and documents jolt_at_key_action", async () => {
+    const { USER_PROMPT: P, ANALYSIS_PROMPT_VERSION } = await import("../../../../src/core/analyze/prompts.js");
+    expect(P).toMatch(/Wackler/);
+    expect(P).toContain("jolt_at_key_action");
+    expect(P).toMatch(/Satz/);
+    expect(ANALYSIS_PROMPT_VERSION).toBeGreaterThanOrEqual(2);
+  });
+  it("the measured-context block is appended to the request as its own text part (and only when given)", async () => {
+    const { buildRequest } = await import("../../../../src/core/analyze/gemini-client.js");
+    const part = { inlineData: { mimeType: "video/mp4", data: "x" } };
+    const plain = buildRequest("m", part).contents[0]!.parts as any[];
+    expect(plain).toHaveLength(2);
+    const withCtx = buildRequest("m", part, "Kamerawackler (gemessen): 1.00–1.20 s (stark)").contents[0]!.parts as any[];
+    expect(withCtx).toHaveLength(3);
+    expect(withCtx[2].text).toContain("Kamerawackler (gemessen)");
+  });
+});

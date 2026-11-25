@@ -25,6 +25,7 @@ import { migration023 } from './023_motion_curves.js';
 import { migration024 } from './024_split_ai_speed.js';
 import { migration025 } from './025_shake_fit.js';
 import { migration026 } from './026_ai_speed_backfill.js';
+import { migration027 } from './027_jolt_at_key_action.js';
 
 interface Migration {
   version: number;
@@ -59,6 +60,7 @@ const migrations: Migration[] = [
   { version: 24, name: 'split_ai_speed', up: migration024 },
   { version: 25, name: 'shake_fit', up: migration025 },
   { version: 26, name: 'ai_speed_backfill', up: migration026 },
+  { version: 27, name: 'jolt_at_key_action', up: migration027 },
 ];
 
 export function runMigrations(db: Database.Database): void {

@@ -35,17 +35,20 @@ export interface HighlightJson {
   audio_keep: boolean;
   audio_type: string;
   dup_group: number | null;
+  /** A2: the key action happens during a camera jolt. */
+  jolt_at_key_action: boolean;
 }
 
 /** DB records carry `issues` as a JSON string; the CLI emits a real array. */
 export function highlightsToJson(
-  items: Array<Omit<HighlightJson, 'issues' | 'audio_keep' | 'dup_group'> & { issues: string | string[]; audio_keep: boolean | number; dup_group?: number | null }>,
+  items: Array<Omit<HighlightJson, 'issues' | 'audio_keep' | 'dup_group' | 'jolt_at_key_action'> & { issues: string | string[]; audio_keep: boolean | number; dup_group?: number | null; jolt_at_key_action?: boolean | number | null }>,
 ): HighlightJson[] {
-  return items.map(({ id, start_sec, end_sec, description, tier, shot, role, issues, slowmo, slowmo_reason, suggested_speed, audio_keep, audio_type, dup_group }) => ({
+  return items.map(({ id, start_sec, end_sec, description, tier, shot, role, issues, slowmo, slowmo_reason, suggested_speed, audio_keep, audio_type, dup_group, jolt_at_key_action }) => ({
     id, start_sec, end_sec, description, tier, shot, role,
     issues: typeof issues === 'string' ? (parseJson(issues) as string[] | null) ?? [] : issues,
     slowmo, slowmo_reason, suggested_speed,
     audio_keep: Boolean(audio_keep), audio_type, dup_group: dup_group ?? null,
+    jolt_at_key_action: Boolean(jolt_at_key_action),
   }));
 }
 

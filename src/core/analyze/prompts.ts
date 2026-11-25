@@ -1,3 +1,6 @@
+/** Bumped when the analysis prompt changes; clips analysed with an older version keep their data. */
+export const ANALYSIS_PROMPT_VERSION = 2;
+
 export const SYSTEM_PROMPT = `Du bist ein Video-Analyse-Assistent für Reisevideos.
 Analysiere den folgenden Videoclip und antworte ausschließlich in JSON.`;
 
@@ -28,7 +31,8 @@ export const USER_PROMPT = `Analysiere diesen Videoclip. Antworte als JSON mit f
       "slowmo": "none | light | strong",
       "slowmo_reason": "Short reason in English, empty if none",
       "audio_keep": false,
-      "audio_type": "ambient | speech | music | noise"
+      "audio_type": "ambient | speech | music | noise",
+      "jolt_at_key_action": false
     }
   ]
 }
@@ -41,6 +45,7 @@ role: Funktion im Schnitt: "establishing" = zeigt Ort oder Situation zu Beginn e
 issues: nur tatsächlich sichtbare Probleme in genau diesem Moment, sonst leeres Array: "blur" = unscharf; "obstructed" = Sicht verdeckt (Finger, Gegenstand, Person im Bild); "overexposed" = überbelichtet; "underexposed" = unterbelichtet.
 slowmo: beurteile pro Moment, ob er in einem Reise-Montage-Video verlangsamt (Zeitlupe) besser aussähe: "none", "light" oder "strong". Ja (light) bei fließender oder schneller Bewegung mit visuellem Gewinn: Wasser nur mit einem Ereignis (Welle bricht, Spritzer, Tier, Boot), Sport und Action, sanfte Schwenks über Landschaft. "none" bei Sprache, Personen die in die Kamera sprechen, Momenten die vom Ton oder von komischem Timing in Echtzeit leben, und statischen Einstellungen. "strong" nur für kurze, schnelle Action-Spitzen. slowmo_reason: kurze englische Begründung (leer bei "none").
 audio_keep = true nur, wenn der Originalton den Moment trägt (Lachen, eine gesprochene Ansage, ein Wellen-Ereignis wie eine brechende Welle, Live-Musik), sonst false; im Zweifel false. Meer- oder Windrauschen allein = false. audio_type = was hauptsächlich zu hören ist: "ambient" = Umgebungsgeräusche, "speech" = Sprache, "music" = Musik, "noise" = nur Wind, Rauschen oder Störgeräusche.
+Gemessene Daten: Steht unter dem Video ein Block "Gemessene Daten zu diesem Clip", sind das Messwerte (Kamerawackler = einzelne Rucke der Kamera, gesprochene Sätze mit Zeiten). Setze Anfang und Ende eines Moments nie mitten in einen Wackler und nie mitten in einen Satz (Sätze ganz mitnehmen). Bevorzuge Bereiche ohne Wackler. Passiert die Hauptaktion des Moments (z.B. der Kuss, der Sprung, der Spritzer) genau während eines Wacklers, behalte den Moment trotzdem und setze jolt_at_key_action = true; sonst immer false.
 setting und activity: kurze englische Tags in Kleinbuchstaben (lowercase), je 1-3 Wörter (1-3 words), z.B. "marina", "open sea", "dolphin watching". Keine ganzen Sätze, wiederverwendbar über Clips hinweg.
 `;
 
