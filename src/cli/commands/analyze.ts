@@ -1,4 +1,7 @@
+import path from 'node:path';
 import { Command } from 'commander';
+import { lookState } from '../../core/look/stale.js';
+import { createSiglipEmbedder, SIGLIP_MODEL_ID, LOOK_MODEL_DIR } from '../../core/look/siglip.js';
 import chalk from 'chalk';
 import { createDb } from '../../db/connection.js';
 import { runMigrations } from '../../db/migrations/runner.js';
@@ -16,6 +19,7 @@ import { MotionRepository } from '../../db/repositories/motion.repository.js';
 import { transcribeClips, whisperModelAvailable, expandHome, resolveVadModel, vadMissingWarning } from '../../core/transcribe/index.js';
 import { analyzeAware, type AnalyzeSteps } from '../../core/analyze/pipeline.js';
 import { parseClipIds } from '../../core/calibration/sampling.js';
+import { lookSummaryLine } from '../../core/look/index.js';
 import { createProgressBar } from '../formatters/progress.js';
 
 export function registerAnalyzeCommand(parent: Command): void {
@@ -37,12 +41,6 @@ export function registerAnalyzeCommand(parent: Command): void {
       }
       const config = await loadConfig(basePath);
 
-      if (!config.gemini_api_key) {
-        console.error(chalk.red('Error: Gemini API key not configured.'));
-        console.error(chalk.yellow('Set GEMINI_API_KEY environment variable or run: clippilot config set gemini_api_key <key>'));
-        process.exit(1);
-      }
-
       const db = createDb(resolveDbPath(basePath));
       runMigrations(db);
       const clipRepo = new ClipRepository(db);
@@ -60,15 +58,19 @@ export function registerAnalyzeCommand(parent: Command): void {
       }
 
       const pending = clipRepo.findPending(undefined, clipIds);
-      if (pending.length === 0) {
-        console.log(chalk.yellow('No clips pending analysis.'));
-        db.close();
-        return;
-      }
+      // SM1: done clips only need look fingerprints (no AI call, no --force).
+      const pendingIds = new Set(pending.map((c) => c.id));
+      const doneClips = clipRepo.listAll().filter((c) => c.analysis_status === 'done' && !pendingIds.has(c.id) && (!clipIds || clipIds.includes(c.id)));
 
-      console.log(`Found ${pending.length} clips to analyze...`);
+      if (pending.length > 0 && !config.gemini_api_key) {
+        console.error(chalk.red('Error: Gemini API key not configured.'));
+        console.error(chalk.yellow('Set GEMINI_API_KEY environment variable or run: clippilot config set gemini_api_key <key>'));
+        process.exit(1);
+      }
+      if (pending.length === 0) console.log(chalk.yellow('No clips pending analysis.'));
+      else console.log(`Found ${pending.length} clips to analyze...`);
       const bar = createProgressBar('Analyze');
-      bar.start(pending.length, 0, { filename: '' });
+      if (pending.length > 0) bar.start(pending.length, 0, { filename: '' });
 
       try {
         const motionRepo = new MotionRepository(db);
@@ -94,10 +96,15 @@ export function registerAnalyzeCommand(parent: Command): void {
             console.log(`  Measured: ${mo.measured} clips, errors: ${mo.failed} (${mo.shakes.high} shakes, ${mo.shakes.low} low confidence)`);
           },
         };
+        const needsLook = [...clipRepo.findByIds(pending.map((c) => c.id)), ...doneClips].some((c) => c.has_video && highlightRepo.findByClip(c.id).some((h) => lookState(h) !== 'fresh'));
+        const look = needsLook
+          ? { embedder: await createSiglipEmbedder({ onFirstDownload: (size) => console.log(`Downloading the look model (${SIGLIP_MODEL_ID}, ${size}) once to ${LOOK_MODEL_DIR} ...`) }) }
+          : undefined;
         const result = await analyzeAware(clipRepo.findByIds(pending.map((c) => c.id)), config,
           { clips: clipRepo, highlights: highlightRepo, transcripts: transcriptRepo, motion: motionRepo }, steps,
           (current, filename) => { bar.update(current, { filename }); }, undefined,
-          (step, err) => console.error(chalk.yellow(`${step} failed, analysing without it: ${err instanceof Error ? err.message : String(err)}`)));
+          (step, err) => console.error(chalk.yellow(`${step} failed, analysing without it: ${err instanceof Error ? err.message : String(err)}`)),
+          look ? { look, doneClips, onMoment: (c, id, sec) => console.log(`  look ${path.basename(c.file_path)} moment ${id}: ${sec.toFixed(2)} s`) } : undefined);
 
         const projectIds = new Set(pending.map((c) => c.project_id).filter((id): id is number => id !== null));
         for (const projectId of projectIds) {
@@ -109,6 +116,11 @@ export function registerAnalyzeCommand(parent: Command): void {
         console.log(chalk.green('Analysis complete'));
         console.log(`  Analyzed: ${result.success}`);
         console.log(`  Errors: ${result.errors}`);
+        {
+          const l = result.look ?? { created: 0, redone: 0, missing: 0, seconds: 0, moments: 0 };
+          console.log(`  ${lookSummaryLine(l)}`);
+          if (l.moments > 0) console.log(`  look time: ${(l.seconds / l.moments).toFixed(2)} s per moment (${l.moments} moments, ${l.seconds.toFixed(1)} s)`);
+        }
 
         // Safety net: shakes the AI could not avoid (trim / split / keep, AI-checked).
         const analyzed = clipRepo.findByIds(pending.map((c) => c.id));

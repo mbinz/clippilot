@@ -50,6 +50,7 @@ moments → 4 groups, largest 10) and miss retakes that got a different label; n
 - Tests first: frame times; average/normalize; stale rule; analyze fills only missing/stale and never calls Gemini for
   done clips (fake embedder + fake Gemini); migration.
 - Done when typecheck + test:all green; run on `~/Video/ClipPilot Odeceixe` (and Arrifana) with time per moment printed.
+- **Result (2026-11-25):** done on Odeceixe with SigLIP base (`Xenova/siglip-base-patch16-224`, 768-d): 19 new, 0 stale, 0 missing, 0.25 s per moment (software decode); pairwise cosine min/median/max 0.52/0.70/0.99. Migration 028. Arrifana not run.
 
 **SM2 — ranking in the drawers.**
 - `src/core/look/similar.ts` (pure): `score(a, b)` (cosine + time boost), `similarTo(moment, moments)` → same event,

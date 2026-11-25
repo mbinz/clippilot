@@ -43,6 +43,11 @@ export interface HighlightRecord {
   shake_checked_end: number | null;
   /** A2: the analysis says the key action happens during a camera jolt (the shake fit keeps such a moment). 0 / 1. */
   jolt_at_key_action: 0 | 1;
+  /** SM1 look fingerprint (null = missing): normalized Float32 BLOB, its model and the range it was computed for. */
+  look_vec: Buffer | null;
+  look_model: string | null;
+  look_start_sec: number | null;
+  look_end_sec: number | null;
   seen_at: string | null;
   /** Motion measurement (null = never measured); valid only while the range equals `motion_start_sec`..`motion_end_sec`. */
   jitter_score: number | null;
@@ -120,6 +125,11 @@ export class HighlightRepository {
       WHERE c.project_id = ?
       ORDER BY h.clip_id ASC, h.start_sec ASC, h.id ASC
     `);
+  }
+
+  setLook(id: number, vec: Float32Array, model: string, startSec: number, endSec: number): void {
+    this.db.prepare('UPDATE highlights SET look_vec = ?, look_model = ?, look_start_sec = ?, look_end_sec = ? WHERE id = ?')
+      .run(Buffer.from(vec.buffer, vec.byteOffset, vec.byteLength), model, startSec, endSec, id);
   }
 
   /**

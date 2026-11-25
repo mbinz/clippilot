@@ -167,6 +167,6 @@ describe('migration 018 - the moment is the edit', () => {
   it('runs through the normal migration runner on a fresh database', () => {
     const db = new Database(':memory:');
     runMigrations(db);
-    expect(db.prepare('SELECT MAX(version) AS v FROM _migrations').get()).toEqual({ v: 27 });
+    expect(db.prepare('SELECT MAX(version) AS v FROM _migrations').get()).toEqual({ v: 28 });
   });
 });
