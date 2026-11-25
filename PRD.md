@@ -159,8 +159,9 @@ finishing tool; fine cut, timing, mix and grade taste stay manual. Full workflow
       moments**; drawer shows it, search finds spoken words.
    2. **Motion measurement** — per moment, local: shake (locked < 0.02 / stabilize / shaky ≥ 0.4 % of width, project
       config) + stillness; `cut.json` carries the band; resolve-prep reads it instead of measuring.
-      2026-11-24: ✅ per-moment shake/stillness (S1). Next: **per-clip motion curve + single Wackler (jolts)** — marked
-      only, AI-moment boundaries moved out of a Wackler, drafter decides keep / cut out, B-roll cover = suggestion +
+      2026-11-24: ✅ per-moment shake/stillness (S1). Next: **J1** rename S1's "shake" to **jitter** (continuous handheld
+      micro-movement) and drop Gemini's `shake` issue (measured instead), then **per-clip motion curve + single shakes**
+      (jolts, was "Wackler"; ranked by jump distance) — marked only, AI-moment boundaries moved out of a shake, drafter decides keep / cut out, B-roll cover = suggestion +
       Resolve marker (no second track yet). Light-jitter ("locked") calibration deferred.
    3. **Draft rules + board** — shaky moments stay out of drafts unless must-have/★ without a calmer alternative in the
       similar group (named in the draft summary); subtle tile icon, details in the drawer, no auto-reject. Continuous

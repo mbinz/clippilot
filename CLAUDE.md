@@ -22,5 +22,6 @@ AI-assisted ingest + structured analysis of video footage, driven by a CLI that 
 - Surface is CLI-as-skill, not MCP. Every read command emits `--json`.
 - `web/` is the primary human UI (kept). The storyboard view (M4) lands there.
 - Product vocabulary: Project → Cut → Scene → Panel (`stories` = Cut, `story_segments` = Panel in the schema).
+- Motion vocabulary: **jitter** = continuous handheld micro-movement (band locked / stabilize / shaky); **shake** = a single jolt in the footage (never "Wackler").
 - Export must work with **free** DaVinci Resolve and open formats; acceptance project is `~/Video/Portugal`.
 - DaVinci handoff format quirks live in `src/core/export/{edl,fcpxml}`.

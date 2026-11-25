@@ -29,6 +29,9 @@ shake band. User review of shake values: "locked" (0.00) is wrong for Arrifana �
 light jitter; light-jitter calibration **deferred** by the user. Priority instead: finding single **Wackler** (jolts) per
 clip — prototype W0 judged by the user (141 verdicts, 71 % real). **Next session: start with "OPEN — needs the user"
 (section "W0 — Wackler prototype" below), then slice W1.**
+**2026-11-25:** W0 questions answered; vocabulary: **shake** = single jolt (was "Wackler"), **jitter** = continuous
+handheld micro-movement (S1's "shake" today). Gemini's `shake` issue is dropped (measured instead). **Next: slice J1
+(rename + drop), then the border-patch experiment, then W1** — all under "W0 — Wackler prototype" below.
 
 `v0.1.0` — ingest (resumable) / analyze with timestamped highlights / search / summary; OTIO + FCPXML export verified in free Resolve (M1). No story/storyboard workflow yet (M3).
 Solo project, MIT. Run via `tsx`, no compiled binary.
@@ -1446,21 +1449,50 @@ suggestion + resolve-prep marker only, no second track in ClipPilot yet (Q26c). 
   - judging speed at playback rate (×25/fps for 50/100 fps): 0.75 / 0.84 — but the user judged proxies at source speed,
     so this can't be validated with these verdicts.
   - both + "continuously shaky" stricter (median < 5): 0.89 / 0.63 — too many real ones lost.
-- **OPEN — needs the user (next session, before W1):**
-  1. Trade-off for the subject-motion rule: recommend ratio < 0.8 (precision 0.71 → 0.78, loses 12 of 100 real). OK?
-  2. Several spikes in one moment: recommend marking **every** spike separately (no merging) with strength **and** jump
-     distance (px) — the user said the marked one was often not the disturbing one. Is jump distance what makes a
-     Wackler disturbing, or something else (direction, duration)?
-  3. Slow motion (50/100 fps used at 0.5×/0.25×): judge Wackler at playback speed (they look softer slowed down)? The
-     user's verdicts were at source speed.
-  4. Action scenes (high base shake): keep their candidates but mark them "in moving scene" (lower confidence, editor's
-     choice) instead of dropping them?
-  5. Recall is unknown: the user still owes 3–5 Wackler they remember (file + time) to check that real ones are found.
-- **W1 (spec after the answers):** per-clip motion curve in ClipPilot (new table, ~10 values/s + Wackler events with
-  start/end/peak/jump/confidence), derived moment values (S1 columns computed from the curve, no re-decode after trims),
-  `moments list`/`cut show` carry `wacklers` inside the moment, AI-moment boundary nudge out of a Wackler, drawer marks on
-  the clip timeline, `motion` command measures whole clips; verdicts.json becomes a regression fixture (precision/recall
-  on Arrifana). Then roadmap 2b.3 (draft rules + board shake icon).
+- **Answered by the user (2026-11-25):**
+  1. Subject-motion rule: yes, drop candidates with half-disagreement ratio ≥ 0.8 (precision 0.71 → 0.78).
+  2. Several shakes in one moment: mark **every** shake separately; what makes one disturbing is the **jump distance**.
+  3. Slow motion: clear shakes look disturbing at any speed; only border cases may change. Since jump distance (px) does
+     not depend on playback speed, rank by distance at source speed; a border-case shake in a panel the cut plays slowed
+     down gets **lower confidence** (not dropped).
+  4. High-jitter scenes (boat, action): keep their shake candidates, mark them "in moving scene" (lower confidence).
+  5. No remembered examples. Recall gets measured **after W1** instead: a Chrome review page with ~30 near misses
+     (candidates just below the threshold); every "yes" there is a missed shake.
+- **User idea (2026-11-25), not yet tested:** measure camera motion on the **frame border** only (subjects are mostly
+  in the middle; the border shows best whether the frame moves). Planner's take: likely better than left/right halves,
+  but border areas can be sky/water (little texture, unreliable match) or moving water/foreground → measure several
+  border patches separately, camera motion = consensus of the textured ones, patch disagreement = subject motion. To be
+  checked against `verdicts.json` with the prototype before the W1 spec fixes the method.
+
+**J1 — rename shake → jitter, drop Gemini's shake tag (planner spec, 2026-11-25; before W1)**
+Vocabulary decided by the user: a **shake** is a single jolt (was "Wackler"); **jitter** is the continuous handheld
+micro-movement present in every handheld shot. Today the code calls jitter "shake" (S1) → rename first so W1 can use
+"shake" for the events. Gemini's `shake` issue is dropped: a yes/no guess from the proxy, replaced by the measurement.
+- Migration 022: `highlights.shake_score` → `jitter_score`, `shake_max_px` → `jitter_max_px` (`ALTER TABLE … RENAME
+  COLUMN`); remove `"shake"` from every stored `highlights.issues` JSON array. Test on a DB with migration 021 data.
+- Code: `ShakeBand`/`shakeBand`/`ShakeBandConfig` → `JitterBand`/`jitterBand`/`JitterBandConfig`; bands keep their names
+  (`locked` / `stabilize` / `shaky` — they describe the jitter level); config keys `shake_locked_max`/`shake_shaky_min` →
+  `jitter_locked_max`/`jitter_shaky_min` (the user's `~/.clippilot/config.json` has no shake keys → nothing to migrate;
+  no fallback for old keys); `HighlightRecord`, repository, `motion` command texts, `MomentMotion.shake` →
+  `.jitter`.
+- JSON contract: `moments list` / `cut show` / `cut.json` moment field `shake: {score, band}` → `jitter: {score, band}`,
+  no fallback (user decision). **resolve-prep** (`~/dev/clippilot-post`: `src/cut.ts`, `src/stabilize/run.ts`,
+  `src/stabilize/mark.ts`) reads `moment.jitter` in the same session — both repos land together.
+- Analysis: `shake` removed from the issues enum (`analyze/schema.ts`) and the prompt (`analyze/prompts.ts`); remaining
+  issues: blur, obstructed, overexposed, underexposed. `calibrate` (`calibration/sampling.ts`) uses the measured jitter
+  band (`shaky`) instead of the issue tag.
+- Not renamed: the user's 👎 reject reason `shake` (MomentDrawer, review page) — human data, stays as stored.
+- Docs: PRD issues list (line "issues `shake` …"), ARCHITECTURE decision 8, SKILL.md wording.
+- Done when: unit + integration green, typecheck clean, resolve-prep tests green, pilot DB migrated (backup first), the
+  Arrifana `cut show --json` shows `jitter` and no `shake`, resolve-prep still marks the Arrifana cut the same way.
+
+**W1 — per-clip motion curve + shakes (outline; spec after J1 and the border experiment)**
+- Per-clip motion curve in ClipPilot (new table, ~10 values/s) + **shake events** with start/end/peak/**jump distance
+  (px)**/confidence (lower for "in moving scene" and slowed-down border cases); every shake marked separately;
+  subject-motion rule (halves ratio < 0.8, or the border method if it wins); jitter values per moment derived from the
+  curve (no re-decode after trims); `moments list`/`cut show` carry `shakes` inside the moment; AI-moment boundary nudge
+  out of a shake; drawer marks on the clip timeline; `motion` measures whole clips; `verdicts.json` becomes a regression
+  fixture (precision/recall on Arrifana). Then the near-miss recall review, then roadmap 2b.3 (draft rules + board icon).
 - Also open (no decision needed): the "locked" band is misleading until light-jitter calibration — treat Arrifana as all
   handheld (resolve-prep marks every non-shaky clip orange anyway in practice: 5 locked panels are really handheld);
   `clippilot` skill changes (transcribe/speech) not installed globally (`npm run skill:install` = the user's call);
