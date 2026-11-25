@@ -1732,6 +1732,17 @@ Steps per moment (after `motion` has detected the clip's shakes):
 - Done when: typecheck + test:all green; planner runs `shakes fix --dry-run` then the real run on Arrifana (backup first;
   42 of 167 moments contain shakes; ≈ $0.02) and checks the kiss (241) plus 5 fixed and 5 kept moments on the stills.
 
+**F1 result (2026-11-25):** ✅ (1278 tests). `src/core/shakes/{plan,verify,state,index}.ts`, migration 025, `clippilot shakes
+fix`, runs in `motion` / `analyze` (old nudge removed), `splitMoment` for 2+ parts, one undo step per affected cut,
+`shake_status` / `shake_note` everywhere (moments, cut show, critic context, drawer). User decision during review: **no
+2 s minimum for shake-fit parts** — only "clean part ≥ 1.0 s" (and the user is considering dropping the general 2 s / 8 s
+moment rules entirely → open question). Real run on Arrifana (backup `clippilot.pre-025.db`): 167 checked, 121 clean,
+**28 fixed** (16 trims, 12 splits → 12 new sibling moments), **18 kept** (11 "would cut a sentence", 2 "no clean range",
+5 by Gemini), 33 Gemini Flash calls, 2:53. Kiss check on stills: moment 241's kiss is at 8.8–9.8 s, after the shake
+(8.02–8.14) — the trim 8.18–10.0 would keep it, but Gemini kept the range because the description's line "Schön hier!"
+lies before the shake (open: should the check judge the visual action only?); moment 243 — the kiss happens during the
+shake → kept, correct. Implementer notes: undo of one cut's step also removes sibling panels in other cuts.
+
 **How to run the acceptance test (user)**
 1. Review the decisions [D-1]…[D-19] above (and the implementer decisions in the W1 / C1 / C1b / D1 results).
 2. `cd ~/dev/clippilot && npm run skill:install` (installs the clippilot, cut-critic, review-loop skills and the cut-critic
