@@ -1756,6 +1756,8 @@ for rows whose speed differs from `defaultSpeed(suggested_speed, clip fps)` (do 
 migration backfills only proposed moments with a changed speed; confirmed / rejected / unchanged untouched; afterwards
 `protectionReasons` is empty for such a moment. Done when green and the 3 boat moments are unprotected on Arrifana.
 
+**B1 result (2026-11-25):** ✅ migration 026 (1279 tests). Arrifana migrated (backup `clippilot.pre-026.db`): see below.
+
 **A2 — shake- and speech-aware analysis (user decision 2026-11-25, planner spec).** Today Gemini picks moments blind and
 the shake fit / transcript snap repair them afterwards. New order inside `analyze` for the clips being analysed:
 1. transcribe (when the whisper model exists; unchanged code), 2. measure motion curves + detect shakes (W1 code, no moments
