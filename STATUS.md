@@ -1620,6 +1620,15 @@ document every assumption. Each item below is marked [D-n] and referenced from t
   findings JSON format), validates with the same schema (retry malformed JSON up to 3×, like analyze), saves it as critic
   `story`. Gemini client injectable; tests with a fake client.
 
+**C1 result (2026-11-25):** ✅ 3a08c4e (1110 tests). `clippilot critic save|list|show|resolve|summary|context|story`;
+`src/core/critic/{findings,context,strips,preview,story-critic}.ts`. Implementer decisions (review): protected = confirmed /
+rejected / trimmed / speed changed / ★ or a user-placed panel (not "used by a panel"); reviews in `.clippilot/reviews/`
+with `resolutions` per finding; strips sample the source range (labels = clip time), last frame = end − 1 frame; preview
+labels are sharp PNG overlays (local ffmpeg has no drawtext), 854×480 letterboxed, 25 fps, `.clippilot/previews/cut-<id>.mp4`;
+`critic story --round n`; cost estimate adds the > 200 k token price tier. Planner check on Arrifana: `critic context` 37
+panels in 57 s, strips correct (3 protected). Deferred: 429/503 backoff for the story call, chunked preview for 100+
+panels, prices in config. Open (→ D1): an `--ai` trim must keep the moment unprotected (move the ai range too).
+
 **C2 — critic agents + review loop skill (planner, 2026-11-25; after C1 + D1)** — written by the planner (prompts/skills,
 no production code): `.claude/agents/cut-critic.md` [D-10], `.claude/skills/cut-critic/SKILL.md` (rules: static ≈ 2–3 s,
 speech / clear action longer; cut-off sentences; shakes / shaky moments with calmer alternatives; last panel of a scene
