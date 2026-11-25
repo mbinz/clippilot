@@ -6,7 +6,7 @@ import { HighlightRepository } from '../../../src/db/repositories/highlight.repo
 describe('migration 026 - backfill ai_speed for AI draft speeds', () => {
   it('marks only proposed moments whose speed differs from the default as AI speed', () => {
     const { db, addClip, addMoments } = setup();
-    const clip = addClip({ fps: 25 });
+    const clip = addClip({ fps: 50 }).id;
     const [changed, confirmed, rejected, unchanged, withAi] = addMoments(clip, [
       { suggested_speed: 0.5 }, { suggested_speed: 0.5 }, { suggested_speed: 0.5 }, { suggested_speed: 0.5 }, { suggested_speed: 0.5 },
     ]);
