@@ -1497,6 +1497,12 @@ micro-movement present in every handheld shot. Today the code calls jitter "shak
 - Done when: unit + integration green, typecheck clean, resolve-prep tests green, pilot DB migrated (backup first), the
   Arrifana `cut show --json` shows `jitter` and no `shake`, resolve-prep still marks the Arrifana cut the same way.
 
+**J1 result (2026-11-25):** ✅ ClipPilot 733dbc2 (1048 tests), resolve-prep 3e00bb0 (114 tests). Migration 022 renames
+`shake_score`/`shake_max_px` → `jitter_score`/`jitter_max_px` and strips `shake` from stored issues; the analysis schema now
+drops unknown issue values instead of failing the clip (planner addition: a retired tag must not cost a retry). Pilot DB
+migrated (backup `clippilot.pre-022.db`); Arrifana had 0 stored `shake` issues; `cut show` bands for all 37 panels identical
+before/after, no `shake` key left. resolve-prep reads `moment.jitter`, old `shake` key = unmeasured.
+
 **W1 — per-clip motion curve + shakes (outline; spec after J1)**
 - Per-clip motion curve in ClipPilot (new table, ~10 values/s) + **shake events** with start/end/peak/**jump distance
   (px)**/confidence (lower for "in moving scene" and slowed-down border cases); every shake marked separately;

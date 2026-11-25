@@ -49,7 +49,7 @@ finishing.
    - **tier** `hero | solid | filler`
    - **shot** `wide | medium | close | detail`
    - **role** `establishing | action | reaction | detail | transition`
-   - **issues** `shake | blur | obstructed | overexposed | underexposed` (shake also measured in code)
+   - **issues** `blur | obstructed | overexposed | underexposed` (shake/jitter are measured in code, not asked — J1)
    - **slow-mo** suggestion (`none | light | strong` + reason) → suggested speed gated by source fps in code
    - **audio worth keeping** yes/no + type `ambient | speech | music | noise`
    - **duplicate group** — the same moment in another clip / take
