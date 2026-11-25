@@ -53,7 +53,7 @@ export function jitterScore(shifts: Shift[], fps: number, frameWidth: number): {
 }
 
 /** Moving-average path (window 0.5 s, shrinking symmetrically at the ends) of the accumulated shifts. */
-function smoothedPath(shifts: Shift[], fps: number): { raw: { x: number; y: number }[]; avg: { x: number; y: number }[] } {
+export function smoothedPath(shifts: Shift[], fps: number): { raw: { x: number; y: number }[]; avg: { x: number; y: number }[] } {
   const n = shifts.length;
   const raw: { x: number; y: number }[] = [];
   let ax = 0, ay = 0;
@@ -85,18 +85,23 @@ export function frameChange(frames: Uint8Array[], w: number, h: number, shifts: 
   let total = 0, count = 0;
   for (let i = 0; i + 1 < frames.length; i++) {
     const { dx, dy } = shifts[i] ?? { dx: 0, dy: 0 };
-    const prev = frames[i], cur = frames[i + 1];
-    const x0 = Math.max(0, -dx), x1 = Math.min(w, w - dx);
-    const y0 = Math.max(0, -dy), y1 = Math.min(h, h - dy);
-    let s = 0;
-    for (let y = y0; y < y1; y++) {
-      const pr = y * w, cr = (y + dy) * w + dx;
-      for (let x = x0; x < x1; x++) s += Math.abs(prev[pr + x] - cur[cr + x]);
-    }
-    const n = Math.max(0, (x1 - x0) * (y1 - y0));
-    if (n > 0) { total += s / n / 255; count++; }
+    const c = pairChange(frames[i], frames[i + 1], w, h, dx, dy);
+    if (c !== null) { total += c; count++; }
   }
   return count === 0 ? 0 : total / count;
+}
+
+/** Mean absolute luma difference (0-1) of one frame pair after compensating (dx, dy); null when nothing overlaps. */
+export function pairChange(prev: Uint8Array, cur: Uint8Array, w: number, h: number, dx: number, dy: number): number | null {
+  const x0 = Math.max(0, -dx), x1 = Math.min(w, w - dx);
+  const y0 = Math.max(0, -dy), y1 = Math.min(h, h - dy);
+  let s = 0;
+  for (let y = y0; y < y1; y++) {
+    const pr = y * w, cr = (y + dy) * w + dx;
+    for (let x = x0; x < x1; x++) s += Math.abs(prev[pr + x] - cur[cr + x]);
+  }
+  const n = Math.max(0, (x1 - x0) * (y1 - y0));
+  return n > 0 ? s / n / 255 : null;
 }
 
 export type JitterBand = 'locked' | 'stabilize' | 'shaky';
