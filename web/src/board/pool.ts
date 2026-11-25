@@ -108,12 +108,12 @@ export function usage(tree: PoolTree): Record<number, UsageEntry> {
   return u;
 }
 
-/** Seen tiles fade in the background; in-story, hovered or selected tiles never do. */
+/** Unseen tiles are greyed out (seen ones show in colour); in-story, hovered or selected tiles never are. */
 export function fades(
   _m: PoolMoment,
   s: { inStory: boolean; seen: boolean; hovered: boolean; selected: boolean },
 ): boolean {
-  return s.seen && !s.inStory && !s.hovered && !s.selected;
+  return !s.seen && !s.inStory && !s.hovered && !s.selected;
 }
 
 /** Player time correction: while not `free`, loop back to `a` at/after `b` or when well before `a`. */

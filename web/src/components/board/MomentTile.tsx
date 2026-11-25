@@ -17,7 +17,7 @@ interface Props {
   onSeen: (id: number) => void;
 }
 
-/** One moment tile (pool and drawer grids): ★, ⚠, ≈ (shaky / shake), bold in-story frame + panel badge, faded when seen. */
+/** One moment tile (pool and drawer grids): ★, ⚠, ≈ (shaky / shake), bold in-story frame + panel badge, greyed out until seen. */
 export function MomentTile({ m, used, currentSceneIndex, selected, onSelect, onSeen }: Props) {
   const out = isOut(m);
   const shake = shakeHint(m);

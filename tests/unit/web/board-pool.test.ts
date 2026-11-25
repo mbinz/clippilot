@@ -114,10 +114,10 @@ describe('slotFor / usage', () => {
 });
 
 describe('fades', () => {
-  const base = { inStory: false, seen: true, hovered: false, selected: false };
+  const base = { inStory: false, seen: false, hovered: false, selected: false };
   it.each([
     [{}, true],
-    [{ seen: false }, false],
+    [{ seen: true }, false],
     [{ inStory: true }, false],
     [{ hovered: true }, false],
     [{ selected: true }, false],
