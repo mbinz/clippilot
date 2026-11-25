@@ -1,0 +1,67 @@
+---
+name: review-loop
+description: Use when the user wants Claude to review and improve a ClipPilot cut ("review the cut", "critique and fix the draft", "run the critics", "Review-Loop", "mach den Schnitt besser") — runs the cut critic (sub-agent) and the story critic (Gemini), applies the must/should findings as AI edits (undoable on the board), max 3 rounds, and reports a short change list. Needs the clippilot skill's CLI.
+---
+
+# Review loop — critics review, Claude applies, the user decides
+
+Two critics look at the cut; **only you (Claude) edit**, and only what the critics proposed. Critics never edit.
+Everything you change is an AI edit: undoable on the board (Cmd+Z, one step per command) and still marked as an AI pick.
+
+Run every command in the project directory (the folder containing `.clippilot/`). If `clippilot` is not on PATH use
+`npx tsx ~/dev/clippilot/bin/clippilot.ts`.
+
+## 0. Before round 1
+
+1. `clippilot cut show --json` → cut id, panel count, brief state. The brief must be `confirmed`; if not, stop and ask the
+   user to confirm it first (clippilot skill, "Brief first").
+2. `clippilot motion --json` (fast when already measured; it fills jitter + shakes for new moments). Not optional: the
+   cut critic needs `jitter` and `shakes`.
+3. **Cost.** `clippilot critic story --json` renders the preview and prints `{estimate_usd, …}` (exit code 2 = estimate
+   only, nothing spent). Tell the user: "Story critic (Gemini) ≈ $X per run, 2 runs (round 1 and the last round) ≈ $2X.
+   OK?" and **wait for their yes**. Without a yes, run the loop with the cut critic only and say so.
+
+## 1. One round (r = 1, 2, 3)
+
+1. **Cut critic:** spawn the `cut-critic` sub-agent (Agent tool, `subagent_type: "cut-critic"`) with: project directory,
+   cut id, round r, output dir `.clippilot/reviews/work-r<r>`. It saves its findings and returns the file name.
+2. **Story critic** (round 1 and the final round only, and only with the user's cost OK):
+   `clippilot critic story --cut <id> --yes --round <r> --json`.
+3. Read both: `clippilot critic show <file> --json` (or `latest`). Merge findings that target the same panel with the
+   same kind; when they disagree, the cut critic's concrete numbers win for trims, the story critic wins for order /
+   scene membership / repetition.
+4. **Apply** every `must` and `should` finding that is **not protected**, one command per finding, always with `--ai`
+   where the verb has it:
+
+   | kind | command |
+   |---|---|
+   | `trim` {start_sec, end_sec} | `clippilot moment trim <moment_id> <start> <end> --ai` |
+   | `cut_out` {from, to} | `clippilot moment cut-out <moment_id> <from> <to> --ai` |
+   | `speed` {speed} | `clippilot moment speed <moment_id> <speed> --ai` |
+   | `replace` {moment_id} | `clippilot panel place <panel_id> <new moment_id> --ai` |
+   | `remove` | `clippilot panel delete <panel_id>` |
+   | `reorder` {position} | `clippilot panel move <panel_id> <same scene id> <position>` |
+   | `move_scene` {to_scene_id, position} | `clippilot panel move <panel_id> <to_scene_id> <position>` (end = panel count of that scene + 1) |
+   | `other` / no proposal | don't apply; list it for the user |
+
+   After each command record the outcome: `clippilot critic resolve <file> <finding id> applied` (or `skipped --note
+   "<why>"` when the command failed or the proposal no longer fits, e.g. the panel was already removed).
+   Protected findings: `clippilot critic resolve <file> <id> protected` — never apply them, list them for the user.
+   Nits: leave unresolved, list them.
+5. **Stop** when the round produced no unprotected `must`/`should`, or after round 3. Otherwise next round (the cut
+   critic sees the changed cut; tell it the round number).
+
+Never: edit a protected panel or moment; apply a nit; invent changes no critic proposed; run `cut apply` (it would
+replace the draft); spend on the story critic without the user's OK.
+
+## 2. Report (in chat, short)
+
+`clippilot critic summary --json` gives per round the counts and the applied change lines. Write:
+
+- One line per round: "Round 1: 6 applied (3 must, 3 should), 1 protected, 2 nits".
+- The applied changes, one line each, by panel label ("S2·P3 trim 12.0–15.5 s — speech no longer cut").
+- **For you to decide** (protected findings and nits), one line each with the critic's reason.
+- Total length before → after vs the brief's target.
+- "Everything is undoable on the board (Cmd+Z) — each change is one step."
+
+Then stop and let the user look at the board / preview. Don't export unless asked.

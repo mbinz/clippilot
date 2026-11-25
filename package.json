@@ -16,7 +16,7 @@
     "web:dev": "cd web && npx vite",
     "web:build": "cd web && npm run build",
     "ui": "tsx bin/clippilot.ts ui",
-    "skill:install": "mkdir -p ~/.claude/skills/clippilot && cp .claude/skills/clippilot/SKILL.md ~/.claude/skills/clippilot/SKILL.md && echo 'Skill installed. Use /clippilot in any Claude Code session.'",
+    "skill:install": "for k in clippilot cut-critic review-loop; do mkdir -p ~/.claude/skills/$k && cp .claude/skills/$k/SKILL.md ~/.claude/skills/$k/SKILL.md; done && mkdir -p ~/.claude/agents && cp .claude/agents/cut-critic.md ~/.claude/agents/cut-critic.md && echo 'Skills clippilot, cut-critic, review-loop + agent cut-critic installed.'",
     "eval:shakes": "tsx scripts/eval-shakes.ts"
   },
   "keywords": [
