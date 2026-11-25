@@ -104,17 +104,24 @@ Workflow:
 2. **Brief first.** Write `{target_sec, audience, mood, must_have:[{moment_id?, text}], ending, notes?}` to a file and run
    `clippilot cut brief --set-file brief.json` (state `proposed`). Show it to the user and **wait for their ok**; only then
    `clippilot cut brief --confirm`. Do not draft before the brief is confirmed.
-3. Draft JSON `{scenes:[{name, event_id?, notes?, panels:[{intent, moment_id? | candidates?: [2-5 ids], start_sec?, end_sec?, speed?}]}]}`
+3. Draft JSON `{scenes:[{name, event_id?, notes?, panels:[{intent, moment_id? | candidates?: [2-5 ids], start_sec?, end_sec?, speed?, cut_out?: [from, to]}]}]}`
    and run `clippilot cut apply --file draft.json` (add `--append` to add scenes instead of replacing). All ids are
-   validated at once; fix every reported error and re-run. Replace keeps panels the user placed.
+   validated at once; fix every reported error and re-run. Replace keeps panels the user placed. `cut_out: [from, to]`
+   (clip seconds, needs `moment_id`, inside the moment, both remaining parts at least 1 s, moment not user-touched) cuts a
+   stretch such as a shake out of the moment: the moment keeps the part before, a sibling moment with its own panel right
+   behind plays the part after. The apply result carries `warnings` (see "Draft warnings" below).
 4. `clippilot cut show --json` to read the result back; summarise it for the user (totals, gaps).
 5. Hand off: `clippilot export --cut <id> --format otio --output <abs path>` (see the verbs table).
 
 Edit verbs: `scene add|rename|move|delete|set-event`, `panel add|move|delete|intent|place|pick`,
 `moment reject|unreject <id>`, `moment trim <id> <in> <out>`, `moment speed <id> <1|0.5|0.25>` (needs enough source fps),
-`moment star|unstar <id>`, `moment reset <id>` (back to the analysis range and default speed), `clip hide|unhide <id>`.
-`panel place` and `panel pick` confirm the moment; so do `moment trim` and `moment speed` (and every panel using the
-moment becomes the user's). There is no `panel trim` / `panel speed` any more: edit the moment. In a draft,
+`moment cut-out <id> <from> <to>`, `moment star|unstar <id>`, `moment reset <id>` (back to the analysis range and default
+speed), `clip hide|unhide <id>`.
+`panel place` and `panel pick` confirm the moment; so do `moment trim`, `moment speed` and `moment cut-out` (and every
+panel using the moment becomes the user's). **Edits you make yourself in the review loop use `--ai`** (`moment trim |
+speed | cut-out ... --ai`, `panel place <panel> <moment> --ai`): nothing is confirmed, the moment stays an AI pick the
+user can still see as such and later rounds may change. `--ai` is refused on a moment that is protected (confirmed,
+rejected, trimmed, speed changed, ★) and on a panel the user placed. Without `--ai` the verbs are the user's decisions. There is no `panel trim` / `panel speed` any more: edit the moment. In a draft,
 `start_sec` / `end_sec` / `speed` on a panel are written to its moment (without confirming it).
 
 **The board is live (M8).** When the user has the board open, "this panel", "that moment", "here" mean their current
@@ -128,6 +135,19 @@ Rules when drafting:
 - Respect `audio_keep`: do not slow down or replace a moment whose audio matters.
 - Use `candidates` when two or three moments fit equally; leave a `gap` rather than forcing a poor shot.
 - Moments the user marked `confirmed` or placed themselves are decisions: do not move them without asking.
+- Read `jitter` and `shakes` on every row. **Avoid band `shaky`** when a calmer moment of the same `dup_group` exists
+  (calmer = not `shaky`, no `high`-confidence shake). A shake (`shakes` entry with `confidence: high`) inside an otherwise
+  good moment: decide keep or `cut_out: [start, end]` of the shake (use the shake's `start` / `end`; the parts left must
+  be at least 1 s). Low-confidence shakes are usually camera moves in moving scenes: leave them.
+- B-roll to cover a shake or a shaky stretch is only a suggestion in chat; do not build overlays.
+- Length: static or silent moments play at most 8 s (aim for 2-3 s). Moments with speech and clear action moments
+  (role `action`, `motion.change` >= 0.03 or `motion.camera` >= 2) may run up to about 20 s.
+
+Draft warnings: `cut apply` never refuses for these, it reports `warnings: [{panel: {scene, panel}, moment_id, type,
+message, alternatives?}]` (scene / panel numbers are 1-based in the draft). `shaky_alternative`: a shaky moment is used
+although the listed `alternatives` are calmer: swap it. `shaky_kept`: a shaky moment is kept because it is a ★ or a brief
+must-have and nothing calmer exists: **name every one of them in your draft summary to the user**. `too_long`: shorten
+(trim / `cut_out`) or justify it. Warnings are advice, nothing is rejected or changed automatically.
 
 ## How to "chat with material"
 
@@ -175,6 +195,7 @@ JSON-encoded text columns:
   - `role`: `establishing` | `action` | `reaction` | `detail` | `transition`
   - `issues`: array of `blur` | `obstructed` | `overexposed` | `underexposed` (empty when clean; camera jitter is not an issue tag, it is measured: `jitter` on `moments list` / `cut show` rows)
   - `jitter`: `{score, band}` measured by `clippilot motion` (continuous handheld micro-movement; band `locked` | `stabilize` | `shaky`), `null` when not measured
+  - `shakes`: single jolts inside the moment's range, `[{start, end, peak_at, strength, jump_pct, jump_px, confidence: high|low, moving_scene}]`, `null` when the clip is not measured
   - `slowmo` / `suggested_speed`: whether slow motion suits the moment and the playback speed derived from fps
 
 `analysis_status` of `done` means

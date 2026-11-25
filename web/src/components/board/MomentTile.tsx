@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { PM } from '../../board/types';
 import { fades, isHero, isOut } from '../../board/pool';
-import { storyMark } from '../../board/drawer';
+import { shakeHint, storyMark } from '../../board/drawer';
 import type { UsageEntry } from '../../board/pool';
 import { VideoThumb, stopHoverPlayback } from './VideoThumb';
 
@@ -17,9 +17,10 @@ interface Props {
   onSeen: (id: number) => void;
 }
 
-/** One moment tile (pool and drawer grids): ★, ⚠, bold in-story frame + panel badge, faded when seen. */
+/** One moment tile (pool and drawer grids): ★, ⚠, ≈ (shaky / shake), bold in-story frame + panel badge, faded when seen. */
 export function MomentTile({ m, used, currentSceneIndex, selected, onSelect, onSeen }: Props) {
   const out = isOut(m);
+  const shake = shakeHint(m);
   const mark = storyMark(used, currentSceneIndex);
   const faded = fades(m, { inStory: !!mark, seen: !!m.seen, hovered: false, selected });
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -63,6 +64,9 @@ export function MomentTile({ m, used, currentSceneIndex, selected, onSelect, onS
       {isHero(m) && <span className="pointer-events-none absolute left-1.5 top-[3px] z-[4] text-[13px] [text-shadow:0_1px_4px_#000]" title="★">{'★'}</span>}
       {m.issues.length > 0 && (
         <span className="pointer-events-none absolute right-1.5 top-1 z-[4] text-[11px] text-bd-bad [text-shadow:0_1px_4px_#000]" title={m.issues.join(', ')}>{'⚠'}</span>
+      )}
+      {shake && (
+        <span className="pointer-events-none absolute bottom-[5px] right-1.5 z-[4] text-[12px] leading-none text-bd-text [text-shadow:0_1px_4px_#000]" title={shake}>{'≈'}</span>
       )}
       {mark && (
         <span

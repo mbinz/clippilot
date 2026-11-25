@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   decisionFor, storyLink, optionList, starTarget, starLabel, rangeLabel, playLabel, storyMark, poolView,
-  panelPosition, isValidTrim, transcriptView, shakeMarks, shakeLine, jitterLine, type DrawerTree, type ShakeInfo,
+  panelPosition, isValidTrim, transcriptView, shakeMarks, shakeLine, jitterLine, shakeHint, type DrawerTree, type ShakeInfo,
 } from '../../../web/src/board/drawer.js';
 import type { PoolMoment } from '../../../web/src/board/pool.js';
 
@@ -238,5 +238,26 @@ describe('shakes in the moment drawer [D-6]', () => {
     expect(jitterLine({ score: 0.523, band: 'shaky' })).toBe('Jitter shaky \u00b7 0.52 %');
     expect(jitterLine(null)).toBeNull();
     expect(jitterLine(undefined)).toBeNull();
+  });
+});
+
+describe('shakeHint (the small tile icon)', () => {
+  const k = (confidence: 'high' | 'low'): ShakeInfo => ({ start: 1, end: 1.4, peak_at: 1.2, strength: 40, jump_pct: 3, jump_px: 58, confidence, moving_scene: false });
+  it('nothing for a calm or unmeasured moment', () => {
+    expect(shakeHint({ jitter: { score: 0.3, band: 'locked' }, shakes: [] })).toBeNull();
+    expect(shakeHint({ jitter: { score: 1, band: 'stabilize' }, shakes: [k('low')] })).toBeNull();
+    expect(shakeHint({ jitter: null, shakes: null })).toBeNull();
+    expect(shakeHint({})).toBeNull();
+  });
+  it('a shaky band shows the icon with the jitter line', () => {
+    expect(shakeHint({ jitter: { score: 3.2, band: 'shaky' }, shakes: [] })).toBe('Shaky \u00b7 Jitter shaky \u00b7 3.20 %');
+  });
+  it('a high-confidence shake shows the icon with the shake line (low confidence does not)', () => {
+    expect(shakeHint({ jitter: { score: 0.5, band: 'locked' }, shakes: [k('low'), k('high')] })).toBe(`Shake \u00b7 ${shakeLine(k('high'))}`);
+  });
+  it('shaky and shake: both lines', () => {
+    const h = shakeHint({ jitter: { score: 3.2, band: 'shaky' }, shakes: [k('high')] })!;
+    expect(h).toContain('Jitter shaky');
+    expect(h).toContain('Shake 0:01.2');
   });
 });

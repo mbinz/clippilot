@@ -220,3 +220,15 @@ export function shakeLine(k: ShakeInfo): string {
 export function jitterLine(j: { score: number; band: string } | null | undefined): string | null {
   return j ? `Jitter ${j.band} · ${j.score.toFixed(2)} %` : null;
 }
+
+/**
+ * Tooltip of the small neutral icon on a tile, or null when there is none: the moment's jitter band is `shaky` or it
+ * contains a high-confidence shake (details live in the drawer).
+ */
+export function shakeHint(m: { jitter?: { score: number; band: string } | null; shakes?: ShakeInfo[] | null }): string | null {
+  const shaky = m.jitter?.band === 'shaky';
+  const high = (m.shakes ?? []).filter((k) => k.confidence === 'high');
+  if (!shaky && high.length === 0) return null;
+  const lines = [shaky ? jitterLine(m.jitter) : null, ...high.map(shakeLine)].filter((l): l is string => l !== null);
+  return `${shaky ? 'Shaky' : 'Shake'} \u00b7 ${lines.join(' \u00b7 ')}`;
+}
