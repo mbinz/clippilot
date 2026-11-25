@@ -99,7 +99,7 @@ export function registerAnalyzeCommand(parent: Command): void {
           }
         }
 
-        // Shake and stillness of every moment that is not measured yet.
+        // Jitter and stillness of every moment that is not measured yet.
         const analyzed = clipRepo.findByIds(pending.map((c) => c.id));
         console.log('Measuring motion...');
         const mo = await measureClips(analyzed, { highlights: highlightRepo }, { cfg: config });

@@ -167,7 +167,8 @@ JSON-encoded text columns:
   - `tier`: `hero` (would open or anchor a scene) | `solid` (good usable shot) | `filler` (only to fill a gap)
   - `shot`: `wide` | `medium` | `close` | `detail`
   - `role`: `establishing` | `action` | `reaction` | `detail` | `transition`
-  - `issues`: array of `shake` | `blur` | `obstructed` | `overexposed` | `underexposed` (empty when clean)
+  - `issues`: array of `blur` | `obstructed` | `overexposed` | `underexposed` (empty when clean; camera jitter is not an issue tag, it is measured: `jitter` on `moments list` / `cut show` rows)
+  - `jitter`: `{score, band}` measured by `clippilot motion` (continuous handheld micro-movement; band `locked` | `stabilize` | `shaky`), `null` when not measured
   - `slowmo` / `suggested_speed`: whether slow motion suits the moment and the playback speed derived from fps
 
 `analysis_status` of `done` means

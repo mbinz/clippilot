@@ -7,6 +7,9 @@ import { resolveDbPath } from '../../utils/fs.js';
 import { ClipRepository } from '../../db/repositories/clip.repository.js';
 import { HighlightRepository, type HighlightRecord } from '../../db/repositories/highlight.repository.js';
 import { cameraKey, detectReasons, sampleCalibrationClips, type SampleCandidate } from '../../core/calibration/sampling.js';
+import { isMeasured } from '../../core/motion/index.js';
+import { jitterBand } from '../../core/motion/motion.js';
+import { loadConfig } from '../../core/config/manager.js';
 import path from 'node:path';
 import { resolveProject } from './resolve-project.js';
 
@@ -35,7 +38,8 @@ export function registerCalibrateCommand(parent: Command): void {
     .option('--n <count>', 'Number of clips', '8')
     .option('--seed <int>', 'PRNG seed (default: number of rounds so far)')
     .option('--project <name>', 'Project name (default: the only project)')
-    .action((options) => {
+    .action(async (options) => {
+      const config = await loadConfig(process.cwd());
       const db = createDb(resolveDbPath(process.cwd()));
       runMigrations(db);
       try {
@@ -54,7 +58,9 @@ export function registerCalibrateCommand(parent: Command): void {
             file_name: path.basename(c.file_path),
             scene_hint: c.scene_hint,
             camera: cameraKey(c.resolution, c.fps),
-            reasons: detectReasons(c, momentsByClip.get(c.id) ?? []),
+            reasons: detectReasons(c, (momentsByClip.get(c.id) ?? []).map((h) => ({
+              jitter_band: isMeasured(h) ? jitterBand(h.jitter_score!, config) : null,
+            }))),
           }));
         const n = Number.parseInt(options.n, 10);
         const seed = options.seed !== undefined ? Number.parseInt(options.seed, 10) : calib.roundCount();

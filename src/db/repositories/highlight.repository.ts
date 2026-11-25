@@ -33,8 +33,8 @@ export interface HighlightRecord {
   user_tier: Tier | null;
   seen_at: string | null;
   /** Motion measurement (null = never measured); valid only while the range equals `motion_start_sec`..`motion_end_sec`. */
-  shake_score: number | null;
-  shake_max_px: number | null;
+  jitter_score: number | null;
+  jitter_max_px: number | null;
   camera_motion: number | null;
   frame_change: number | null;
   motion_start_sec: number | null;
@@ -120,7 +120,7 @@ export class HighlightRepository {
 
   /** Store a motion measurement with the range it was measured on. Touches nothing else (not an edit). */
   setMotion(id: number, m: { score: number; maxPx: number; camera: number; change: number }, startSec: number, endSec: number): void {
-    this.db.prepare(`UPDATE highlights SET shake_score = ?, shake_max_px = ?, camera_motion = ?, frame_change = ?,
+    this.db.prepare(`UPDATE highlights SET jitter_score = ?, jitter_max_px = ?, camera_motion = ?, frame_change = ?,
       motion_start_sec = ?, motion_end_sec = ? WHERE id = ?`).run(m.score, m.maxPx, m.camera, m.change, startSec, endSec, id);
   }
 

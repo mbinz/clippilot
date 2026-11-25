@@ -1,3 +1,5 @@
+import type { JitterBand } from '../motion/motion.js';
+
 export interface SampleCandidate {
   clip_id: number;
   file_name: string;
@@ -40,22 +42,14 @@ function peopleText(c: HardnessInput): string {
 }
 
 export interface MomentInput {
-  /** JSON array string (DB record) or array. */
-  issues: string | string[];
-}
-
-function hasShake(m: MomentInput): boolean {
-  let issues: unknown = m.issues;
-  if (typeof issues === 'string') {
-    try { issues = JSON.parse(issues); } catch { return false; }
-  }
-  return Array.isArray(issues) && issues.includes('shake');
+  /** Measured jitter band of the moment's current range; null/undefined when not measured (or stale). */
+  jitter_band?: JitterBand | null;
 }
 
 export function detectReasons(clip: HardnessInput, moments: MomentInput[]): string[] {
   const reasons: string[] = [];
   if (PEOPLE_RE.test(peopleText(clip))) reasons.push('people');
-  if (moments.some(hasShake)) reasons.push('shaky');
+  if (moments.some((m) => m.jitter_band === 'shaky')) reasons.push('shaky');
   if (clip.duration_sec >= 20) reasons.push('long');
   if (moments.length === 0) reasons.push('no_highlights');
   return reasons;

@@ -81,13 +81,20 @@ describe('ClipAnalysisResponseSchema highlights', () => {
 });
 
 describe('HighlightSchema tags', () => {
+  it('has no shake issue: unknown values (shake, noisy) are dropped instead of failing validation', () => {
+    expect(HighlightSchema.parse({ ...MOMENT, issues: ['shake', 'blur', 'noisy'] }).issues).toEqual(['blur']);
+    expect(HighlightSchema.parse({ ...MOMENT, issues: ['shake'] }).issues).toEqual([]);
+    const whole = ClipAnalysisResponseSchema.parse({ scenes: [], clip_summary: 's', highlights: [{ ...MOMENT, issues: ['shake'] }] });
+    expect(whole.highlights[0].issues).toEqual([]);
+  });
+
   it('accepts every tier, shot, role and issue value', () => {
     for (const tier of ['hero', 'solid', 'filler']) expect(HighlightSchema.parse({ ...MOMENT, tier }).tier).toBe(tier);
     for (const shot of ['wide', 'medium', 'close', 'detail']) expect(HighlightSchema.parse({ ...MOMENT, shot }).shot).toBe(shot);
     for (const role of ['establishing', 'action', 'reaction', 'detail', 'transition']) {
       expect(HighlightSchema.parse({ ...MOMENT, role }).role).toBe(role);
     }
-    const issues = ['shake', 'blur', 'obstructed', 'overexposed', 'underexposed'];
+    const issues = ['blur', 'obstructed', 'overexposed', 'underexposed'];
     expect(HighlightSchema.parse({ ...MOMENT, issues }).issues).toEqual(issues);
   });
 
@@ -95,7 +102,6 @@ describe('HighlightSchema tags', () => {
     expect(() => HighlightSchema.parse({ ...MOMENT, tier: 'epic' })).toThrow();
     expect(() => HighlightSchema.parse({ ...MOMENT, shot: 'macro' })).toThrow();
     expect(() => HighlightSchema.parse({ ...MOMENT, role: 'intro' })).toThrow();
-    expect(() => HighlightSchema.parse({ ...MOMENT, issues: ['noisy'] })).toThrow();
   });
 
   it('requires tier, shot and role', () => {

@@ -11,6 +11,10 @@ export const SceneSchema = z.object({
   visual_keywords: z.array(z.string()),
 });
 
+/** Unknown issue values (e.g. a retired tag) are dropped instead of failing the whole clip's validation. */
+const ISSUES = ['blur', 'obstructed', 'overexposed', 'underexposed'] as const;
+type Issue = (typeof ISSUES)[number];
+
 export const HighlightSchema = z.object({
   start_sec: z.number(),
   end_sec: z.number(),
@@ -18,7 +22,7 @@ export const HighlightSchema = z.object({
   tier: z.enum(['hero', 'solid', 'filler']),
   shot: z.enum(['wide', 'medium', 'close', 'detail']),
   role: z.enum(['establishing', 'action', 'reaction', 'detail', 'transition']),
-  issues: z.array(z.enum(['shake', 'blur', 'obstructed', 'overexposed', 'underexposed'])).default([]),
+  issues: z.array(z.string()).transform((l) => l.filter((i): i is Issue => (ISSUES as readonly string[]).includes(i))).default([]),
   slowmo: z.enum(['none', 'light', 'strong']).default('none'),
   slowmo_reason: z.string().default(''),
   audio_keep: z.boolean().default(false),

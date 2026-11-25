@@ -99,13 +99,13 @@ export function frameChange(frames: Uint8Array[], w: number, h: number, shifts: 
   return count === 0 ? 0 : total / count;
 }
 
-export type ShakeBand = 'locked' | 'stabilize' | 'shaky';
+export type JitterBand = 'locked' | 'stabilize' | 'shaky';
 
-export interface ShakeBandConfig { shake_locked_max: number; shake_shaky_min: number }
+export interface JitterBandConfig { jitter_locked_max: number; jitter_shaky_min: number }
 
-export function shakeBand(score: number, cfg: ShakeBandConfig): ShakeBand {
-  if (score < cfg.shake_locked_max) return 'locked';
-  if (score >= cfg.shake_shaky_min) return 'shaky';
+export function jitterBand(score: number, cfg: JitterBandConfig): JitterBand {
+  if (score < cfg.jitter_locked_max) return 'locked';
+  if (score >= cfg.jitter_shaky_min) return 'shaky';
   return 'stabilize';
 }
 

@@ -13,7 +13,7 @@ import { resolveProject } from './resolve-project.js';
 export function registerMotionCommand(parent: Command, inject: Pick<MotionOptions, 'source' | 'exists'> = {}): void {
   parent
     .command('motion')
-    .description('Measure shake and stillness of every moment (read-only: never changes ranges, status or source)')
+    .description('Measure jitter and stillness of every moment (read-only: never changes ranges, status or source)')
     .option('--project <name>', 'Project name (default: the only project)')
     .option('--force', 'Measure moments that are already measured', false)
     .option('--json', 'Emit JSON (progress lines go to stderr)')

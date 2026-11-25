@@ -38,7 +38,7 @@ function seedClip(db: Database.Database, hash: string, location?: string) {
 
 function seedMoments(db: Database.Database, clipId: number) {
   new HighlightRepository(db).replaceForClip(clipId, [
-    { start_sec: 1, end_sec: 3, description: 'wave', tier: 'hero', shot: 'wide', role: 'action', issues: ['shake'] },
+    { start_sec: 1, end_sec: 3, description: 'wave', tier: 'hero', shot: 'wide', role: 'action', issues: ['obstructed'] },
     { start_sec: 5, end_sec: 6, description: 'gull', tier: 'filler', shot: 'close', role: 'detail' },
   ]);
 }
@@ -131,7 +131,7 @@ describe('Clip API Routes', () => {
       const body = await (await app.request('/')).json();
       const first = body.data.find((c: any) => c.id === clip.id);
       expect(first.highlights).toMatchObject([
-        { start_sec: 1, end_sec: 3, tier: 'hero', shot: 'wide', role: 'action', issues: ['shake'] },
+        { start_sec: 1, end_sec: 3, tier: 'hero', shot: 'wide', role: 'action', issues: ['obstructed'] },
         { start_sec: 5, end_sec: 6, tier: 'filler', shot: 'close', role: 'detail', issues: [] },
       ]);
       expect(body.data.find((c: any) => c.id !== clip.id).highlights).toEqual([]);

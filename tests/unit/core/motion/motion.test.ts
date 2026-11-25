@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { globalShift, jitterScore, cameraMotion, frameChange, shakeBand, measureFrames } from '../../../../src/core/motion/motion.js';
+import { globalShift, jitterScore, cameraMotion, frameChange, jitterBand, measureFrames } from '../../../../src/core/motion/motion.js';
 
 function noise(w: number, h: number, seed = 1): Uint8Array {
   let s = seed;
@@ -62,7 +62,7 @@ describe('cameraMotion', () => {
     const s = Array.from({ length: 100 }, () => ({ dx: 2, dy: 0 }));
     expect(cameraMotion(s, fps, 320)).toBeCloseTo((2 * fps / 320) * 100, 4);
   });
-  it('ignores high-frequency shake (moving average removes it)', () => {
+  it('ignores high-frequency jitter (moving average removes it)', () => {
     const s = Array.from({ length: 100 }, (_, i) => ({ dx: i % 2 ? -3 : 3, dy: 0 }));
     expect(cameraMotion(s, fps, 320)).toBeLessThan(5);
   });
@@ -90,15 +90,15 @@ describe('frameChange', () => {
   });
 });
 
-describe('shakeBand', () => {
-  const cfg = { shake_locked_max: 0.02, shake_shaky_min: 0.4 };
+describe('jitterBand', () => {
+  const cfg = { jitter_locked_max: 0.02, jitter_shaky_min: 0.4 };
   it('locked below the lower bound, shaky from the upper bound, stabilize between', () => {
-    expect(shakeBand(0, cfg)).toBe('locked');
-    expect(shakeBand(0.0199, cfg)).toBe('locked');
-    expect(shakeBand(0.02, cfg)).toBe('stabilize');
-    expect(shakeBand(0.399, cfg)).toBe('stabilize');
-    expect(shakeBand(0.4, cfg)).toBe('shaky');
-    expect(shakeBand(3, cfg)).toBe('shaky');
+    expect(jitterBand(0, cfg)).toBe('locked');
+    expect(jitterBand(0.0199, cfg)).toBe('locked');
+    expect(jitterBand(0.02, cfg)).toBe('stabilize');
+    expect(jitterBand(0.399, cfg)).toBe('stabilize');
+    expect(jitterBand(0.4, cfg)).toBe('shaky');
+    expect(jitterBand(3, cfg)).toBe('shaky');
   });
 });
 

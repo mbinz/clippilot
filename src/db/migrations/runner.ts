@@ -20,6 +20,7 @@ import { migration018 } from './018_moment_edit.js';
 import { migration019 } from './019_transcripts.js';
 import { migration020 } from './020_transcript_raw.js';
 import { migration021 } from './021_motion.js';
+import { migration022 } from './022_jitter.js';
 
 interface Migration {
   version: number;
@@ -49,6 +50,7 @@ const migrations: Migration[] = [
   { version: 19, name: 'transcripts', up: migration019 },
   { version: 20, name: 'transcript_raw', up: migration020 },
   { version: 21, name: 'motion', up: migration021 },
+  { version: 22, name: 'jitter', up: migration022 },
 ];
 
 export function runMigrations(db: Database.Database): void {

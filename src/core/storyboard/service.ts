@@ -10,7 +10,7 @@ import * as ops from './history.js';
 import { defaultSpeed } from './range.js';
 import { isTier, tierRankSql, type Tier } from '../tiers.js';
 import { speechForRange, type SpeechCut } from '../transcribe/speech.js';
-import { shakeBand, type ShakeBand, type ShakeBandConfig } from '../motion/motion.js';
+import { jitterBand, type JitterBand, type JitterBandConfig } from '../motion/motion.js';
 import { isMeasured } from '../motion/index.js';
 import { DEFAULT_CONFIG } from '../config/defaults.js';
 import type { TranscriptSegment, TranscriptWord } from '../transcribe/whisper.js';
@@ -27,9 +27,9 @@ export interface MomentSpeech {
   speech_cut: SpeechCut;
 }
 
-/** Measured shake and stillness of a moment's current range; both null when not measured or stale (trimmed since). */
+/** Measured jitter and stillness of a moment's current range; both null when not measured or stale (trimmed since). */
 export interface MomentMotion {
-  shake: { score: number; band: ShakeBand } | null;
+  jitter: { score: number; band: JitterBand } | null;
   motion: { camera: number; change: number } | null;
 }
 
@@ -99,7 +99,7 @@ export interface MomentRow {
   /** Spoken words inside the range (null = clip not transcribed) and which boundary cuts a sentence. */
   speech: string | null;
   speech_cut: SpeechCut;
-  shake: MomentMotion['shake'];
+  jitter: MomentMotion['jitter'];
   motion: MomentMotion['motion'];
 }
 
@@ -109,13 +109,13 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 export class StoryboardService {
   constructor(
     private db: Database.Database,
-    private shakeCfg: ShakeBandConfig = DEFAULT_CONFIG,
+    private jitterCfg: JitterBandConfig = DEFAULT_CONFIG,
   ) {}
 
   private motionOf(m: HighlightRecord): MomentMotion {
-    if (!isMeasured(m)) return { shake: null, motion: null };
+    if (!isMeasured(m)) return { jitter: null, motion: null };
     return {
-      shake: { score: m.shake_score!, band: shakeBand(m.shake_score!, this.shakeCfg) },
+      jitter: { score: m.jitter_score!, band: jitterBand(m.jitter_score!, this.jitterCfg) },
       motion: { camera: m.camera_motion ?? 0, change: m.frame_change ?? 0 },
     };
   }

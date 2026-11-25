@@ -13,7 +13,7 @@ const data: ReviewData = {
       fps: 50,
       highlights: [
         { highlight_id: 11, start_sec: 3, end_sec: 5, description: 'first', tier: 'hero', shot: 'wide', role: 'establishing', issues: [], slowmo: 'none', slowmo_reason: '', suggested_speed: 1 },
-        { highlight_id: 12, start_sec: 10, end_sec: 12, description: 'second', tier: 'solid', shot: 'close', role: 'action', issues: ['shake', 'blur'], slowmo: 'light', slowmo_reason: 'waves rolling in', suggested_speed: 0.5 },
+        { highlight_id: 12, start_sec: 10, end_sec: 12, description: 'second', tier: 'solid', shot: 'close', role: 'action', issues: ['obstructed', 'blur'], slowmo: 'light', slowmo_reason: 'waves rolling in', suggested_speed: 0.5 },
         { highlight_id: 13, start_sec: 20, end_sec: 22, description: 'third', tier: 'filler', shot: 'detail', role: 'transition', issues: [], slowmo: 'strong', slowmo_reason: 'big splash', suggested_speed: 0.25 },
       ],
     },
@@ -179,7 +179,7 @@ describe('review page v2', () => {
     expect(p.doc.querySelector(`${card(0)} .shotrole`)?.textContent).toBe('wide · establishing');
     expect(p.doc.querySelector(`${card(2)} .shotrole`)?.textContent).toBe('detail · transition');
     expect(p.all(`${card(0)} .issue`)).toHaveLength(0);
-    expect(p.all(`${card(1)} .issue`).map((e) => e.textContent)).toEqual(['shake', 'blur']);
+    expect(p.all(`${card(1)} .issue`).map((e) => e.textContent)).toEqual(['obstructed', 'blur']);
   });
 
   it('shows a slow-mo badge with reason only when suggested_speed < 1', () => {

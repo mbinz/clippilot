@@ -87,12 +87,12 @@ describe('HighlightRepository', () => {
   it('round-trips tier, shot, role and issues; defaults shot/role to null and issues to []', () => {
     const clip = clips.insert(makeClip());
     repo.replaceForClip(clip.id, [
-      { ...item(1, 2, 'tagged', 'hero'), shot: 'wide', role: 'establishing', issues: ['shake', 'blur'] },
+      { ...item(1, 2, 'tagged', 'hero'), shot: 'wide', role: 'establishing', issues: ['obstructed', 'blur'] },
       item(5, 6, 'plain'),
     ]);
     const [a, b] = repo.findByClip(clip.id);
     expect(a).toMatchObject({ tier: 'hero', shot: 'wide', role: 'establishing' });
-    expect(JSON.parse(a.issues)).toEqual(['shake', 'blur']);
+    expect(JSON.parse(a.issues)).toEqual(['obstructed', 'blur']);
     expect(b).toMatchObject({ tier: 'solid', shot: null, role: null, issues: '[]' });
   });
 

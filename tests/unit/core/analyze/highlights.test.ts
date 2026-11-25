@@ -8,7 +8,7 @@ const h = (start_sec: number, end_sec: number, tier: 'hero' | 'solid' | 'filler'
   tier,
   shot: 'medium' as const,
   role: 'action' as const,
-  issues: [] as ('shake' | 'blur')[],
+  issues: [] as ('obstructed' | 'blur')[],
 });
 
 describe('normalizeHighlights', () => {
@@ -100,8 +100,8 @@ describe('normalizeHighlights speed', () => {
 
 describe('normalizeHighlights tags', () => {
   it('carries tier, shot, role and issues through', () => {
-    const out = normalizeHighlights([{ ...h(1, 3, 'hero'), shot: 'close' as const, role: 'reaction' as const, issues: ['shake', 'blur'] }], 13);
-    expect(out[0]).toMatchObject({ tier: 'hero', shot: 'close', role: 'reaction', issues: ['shake', 'blur'] });
+    const out = normalizeHighlights([{ ...h(1, 3, 'hero'), shot: 'close' as const, role: 'reaction' as const, issues: ['obstructed', 'blur'] }], 13);
+    expect(out[0]).toMatchObject({ tier: 'hero', shot: 'close', role: 'reaction', issues: ['obstructed', 'blur'] });
     expect((out[0] as Record<string, unknown>).quality).toBeUndefined();
   });
 });

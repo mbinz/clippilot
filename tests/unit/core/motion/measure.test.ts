@@ -14,7 +14,7 @@ function noise(seed: number): Uint8Array {
   for (let i = 0; i < a.length; i++) { s = (s * 1103515245 + 12345) & 0x7fffffff; a[i] = (s >> 16) & 255; }
   return a;
 }
-/** Static scene: every frame identical, so shake 0 and band locked. */
+/** Static scene: every frame identical, so jitter 0 and band locked. */
 const staticSource = (calls: { file: string; startSec: number; durationSec: number; fps: number }[]): FrameSource => async (req) => {
   calls.push(req);
   const f = noise(1);
@@ -27,7 +27,7 @@ describe('migration 021', () => {
     const c = t.addClip();
     const [m] = t.addMoments(c.id, [{}]);
     const row = t.db.prepare('SELECT * FROM highlights WHERE id = ?').get(m) as Record<string, unknown>;
-    for (const k of ['shake_score', 'shake_max_px', 'camera_motion', 'frame_change', 'motion_start_sec', 'motion_end_sec']) {
+    for (const k of ['jitter_score', 'jitter_max_px', 'camera_motion', 'frame_change', 'motion_start_sec', 'motion_end_sec']) {
       expect(row).toHaveProperty(k, null);
     }
   });
@@ -63,7 +63,7 @@ describe('measureClips', () => {
       { file: '/v/c1.mp4', startSec: 10, durationSec: 4, fps: 30 },
     ]);
     const m = highlights.findByClip(c.id).find((h) => h.id === a)!;
-    expect(m).toMatchObject({ shake_score: 0, motion_start_sec: 2, motion_end_sec: 6 });
+    expect(m).toMatchObject({ jitter_score: 0, motion_start_sec: 2, motion_end_sec: 6 });
     expect(isMeasured(m)).toBe(true);
     expect(b).toBeGreaterThan(0);
   });
@@ -96,7 +96,7 @@ describe('measureClips', () => {
     const before = db.prepare('SELECT id, clip_id, start_sec, end_sec, status, tier, user_tier, speed, ai_start_sec, ai_end_sec FROM highlights').all();
     await run();
     expect(db.prepare('SELECT id, clip_id, start_sec, end_sec, status, tier, user_tier, speed, ai_start_sec, ai_end_sec FROM highlights').all()).toEqual(before);
-    expect(highlights.findByClip(c.id)[0].shake_score).toBe(0);
+    expect(highlights.findByClip(c.id)[0].jitter_score).toBe(0);
   });
 
   it('falls back to the proxy when the original is missing, and fails when both are', async () => {
@@ -107,7 +107,7 @@ describe('measureClips', () => {
       { cfg, source: staticSource(calls), exists: (p) => p === '/p/c1.mp4' });
     expect(r.measured).toBe(1);
     expect(calls[0].file).toMatch(/p\/c1\.mp4$/);
-    db.prepare('UPDATE highlights SET shake_score = NULL').run();
+    db.prepare('UPDATE highlights SET jitter_score = NULL').run();
     const r2 = await measureClips(clips.listByProject(t.projectId), { highlights }, { cfg, source: staticSource(calls), exists: () => false });
     expect(r2).toMatchObject({ measured: 0, failed: 1 });
     expect(r2.errors[0].message).toMatch(/Neither the original nor the proxy/);

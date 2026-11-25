@@ -30,7 +30,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   whisper_vad_model: path.join(clippilotHome, 'models', 'ggml-silero-v5.1.2.bin'),
   whisper_vad_threshold: 0.15,
   whisper_vad_pad_ms: 200,
-  shake_locked_max: 0.02,
-  shake_shaky_min: 0.4,
+  jitter_locked_max: 0.02,
+  jitter_shaky_min: 0.4,
   languages: ['de', 'en'],
 };

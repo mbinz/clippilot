@@ -11,7 +11,7 @@ const base = {
   ai_scenes: null as string | null, ai_visual_keywords: null as string | null,
   duration_sec: 10,
 };
-const moments = (n: number, issues: string[] = []) => Array.from({ length: n }, () => ({ issues: JSON.stringify(issues) }));
+const moments = (n: number, band: 'locked' | 'stabilize' | 'shaky' | null = null) => Array.from({ length: n }, () => ({ jitter_band: band }));
 
 describe('detectReasons', () => {
   it('flags people from scene description, case-insensitive', () => {
@@ -30,12 +30,12 @@ describe('detectReasons', () => {
     expect(detectReasons({ ...base, ai_scenes: scenes, ai_visual_keywords: JSON.stringify(['skyline', 'manhattan']) }, moments(1))).toEqual([]);
   });
 
-  it('flags shaky when any moment has the shake issue, not for other issues or none', () => {
-    expect(detectReasons(base, [...moments(1), ...moments(1, ['blur', 'shake'])])).toEqual(['shaky']);
-    expect(detectReasons(base, moments(2, ['blur', 'obstructed']))).toEqual([]);
+  it('flags shaky when any moment is measured in the shaky jitter band, not for other bands or unmeasured', () => {
+    expect(detectReasons(base, [...moments(1), ...moments(1, 'shaky')])).toEqual(['shaky']);
+    expect(detectReasons(base, moments(2, 'stabilize'))).toEqual([]);
+    expect(detectReasons(base, moments(2, 'locked'))).toEqual([]);
     expect(detectReasons(base, moments(1))).toEqual([]);
-    expect(detectReasons(base, [{ issues: ['shake'] }])).toEqual(['shaky']);
-    expect(detectReasons(base, [{ issues: 'not json' }])).toEqual([]);
+    expect(detectReasons(base, [{}])).toEqual([]);
   });
 
   it('flags long at >= 20 s and no_highlights at 0', () => {
@@ -46,7 +46,7 @@ describe('detectReasons', () => {
 
   it('combines reasons in a stable order', () => {
     const scenes = JSON.stringify([{ description_en: 'child laughing', setting: 'a', activity: 'b' }]);
-    expect(detectReasons({ ai_scenes: scenes, ai_visual_keywords: null, duration_sec: 30 }, moments(1, ['shake'])))
+    expect(detectReasons({ ai_scenes: scenes, ai_visual_keywords: null, duration_sec: 30 }, moments(1, 'shaky')))
       .toEqual(['people', 'shaky', 'long']);
   });
 });

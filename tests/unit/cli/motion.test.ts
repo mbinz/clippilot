@@ -84,10 +84,10 @@ describe('clippilot motion', () => {
     expect(JSON.parse(out.join('\n'))).toMatchObject({ measured: 2, skipped: 0 });
   });
 
-  it('uses the shake thresholds from the config', async () => {
+  it('uses the jitter thresholds from the config', async () => {
     seed();
     fs.mkdirSync(path.join(dir, 'home'), { recursive: true });
-    fs.writeFileSync(path.join(dir, 'home', 'config.json'), JSON.stringify({ shake_locked_max: 0 }));
+    fs.writeFileSync(path.join(dir, 'home', 'config.json'), JSON.stringify({ jitter_locked_max: 0 }));
     await run('motion', '--json');
     expect(JSON.parse(out.join('\n')).bands).toEqual({ locked: 0, stabilize: 2, shaky: 0 });
   });

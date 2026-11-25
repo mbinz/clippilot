@@ -33,9 +33,10 @@ describe("USER_PROMPT", () => {
     expect(USER_PROMPT).toMatch(/"shot"/);
     expect(USER_PROMPT).toMatch(/"role"/);
     expect(USER_PROMPT).toMatch(/"issues"/);
-    for (const w of ['hero', 'solid', 'filler', 'wide', 'medium', 'close', 'detail', 'establishing', 'action', 'reaction', 'transition', 'shake', 'blur', 'obstructed', 'overexposed', 'underexposed']) {
+    for (const w of ['hero', 'solid', 'filler', 'wide', 'medium', 'close', 'detail', 'establishing', 'action', 'reaction', 'transition', 'blur', 'obstructed', 'overexposed', 'underexposed']) {
       expect(USER_PROMPT).toContain(w);
     }
+    expect(USER_PROMPT).not.toMatch(/shake|verwackelt/i);
     expect(USER_PROMPT).not.toMatch(/technical_quality|editorial_value|suggested_use|"quality"|Bewertungsskala/);
   });
 });
