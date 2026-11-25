@@ -99,11 +99,17 @@ export function previewSegments(tree: CutTree, clipOf: (clipId: number) => Previ
 
 export interface CostEstimate { input_tokens: number; output_tokens: number; estimate_usd: number }
 
-/** Gemini 2.5 Pro list price: $1.25 / M in and $10 / M out up to 200k input tokens, $2.50 / $15 above; video ~300 tokens/s incl. audio. */
+// Gemini 3.1 Pro preview list price, checked 2026-11-25. USD per million tokens; video ~300 tokens/s incl. audio.
+const PRICE_IN_USD_PER_M = 2.0;
+const PRICE_OUT_USD_PER_M = 12.0;
+const PRICE_IN_LONG_USD_PER_M = 4.0; // input above LONG_CONTEXT_TOKENS
+const PRICE_OUT_LONG_USD_PER_M = 18.0;
+const LONG_CONTEXT_TOKENS = 200_000;
+
 export function estimateCost(o: { duration_sec: number; prompt_chars: number; output_tokens?: number }): CostEstimate {
   const input = Math.round(o.duration_sec * 300 + o.prompt_chars / 4);
   const output = o.output_tokens ?? 4000;
-  const [pin, pout] = input <= 200_000 ? [1.25, 10] : [2.5, 15];
+  const [pin, pout] = input <= LONG_CONTEXT_TOKENS ? [PRICE_IN_USD_PER_M, PRICE_OUT_USD_PER_M] : [PRICE_IN_LONG_USD_PER_M, PRICE_OUT_LONG_USD_PER_M];
   return { input_tokens: input, output_tokens: output, estimate_usd: r3((input * pin + output * pout) / 1e6) };
 }
 

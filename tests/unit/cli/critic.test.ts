@@ -166,7 +166,7 @@ describe('critic story [D-11]', () => {
     const r = await run({ client, render: fakeRender }, 'story', '--json');
     expect(process.exitCode).toBe(2);
     expect(client.review).not.toHaveBeenCalled();
-    expect(r).toMatchObject({ duration_sec: 8, model: 'gemini-2.5-pro' });
+    expect(r).toMatchObject({ duration_sec: 8, model: 'gemini-3.1-pro-preview' });
     expect(r.estimate_usd).toBeGreaterThan(0);
     expect(fs.realpathSync(r.preview)).toBe(fs.realpathSync(path.join(dir, '.clippilot', 'previews', `cut-${ids.cut}.mp4`)));
     expect(fs.existsSync(r.preview)).toBe(true);
@@ -183,6 +183,15 @@ describe('critic story [D-11]', () => {
     expect(r).toMatchObject({ round: 2, findings: 1, protected: 0 });
     const stored = await run({}, 'show', r.file, '--json');
     expect(stored).toMatchObject({ critic: 'story', cut_id: ids.cut, round: 2 });
+  });
+
+  it('with --yes and a 404 model-not-found names the model and points at story_critic_model', async () => {
+    const client = { review: vi.fn(async () => { throw Object.assign(new Error('models/gemini-3.1-pro-preview is not found'), { status: 404 }); }) };
+    await run({ client, render: fakeRender }, 'story', '--yes', '--json');
+    expect(process.exitCode).toBe(1);
+    const msg = errs.join('\n');
+    expect(msg).toMatch(/gemini-3\.1-pro-preview/);
+    expect(msg).toMatch(/story_critic_model/);
   });
 
   it('with --yes and no API key (and no injected client) fails before spending anything', async () => {

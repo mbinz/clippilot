@@ -62,7 +62,7 @@ on success. Always pass `--json` so output is parseable.
 | `clippilot critic list [--cut id] --json` / `critic show <file\|latest> --json` | Stored reviews of the cut / one review with its resolutions. |
 | `clippilot critic resolve <file> <finding id> applied\|skipped\|protected [--note t]` | Record what happened to a finding. |
 | `clippilot critic summary [--cut id] --json` | Per round: counts by severity and resolution, plus the applied changes one line each. |
-| `clippilot critic story [--cut id] [--round n] [--yes] --json` | Story critic (gemini-2.5-pro) on a 480p preview of the cut. Without `--yes` only prints `{estimate_usd, duration_sec, preview}` and exits 2; show the estimate to the user, rerun with `--yes` only after their OK. |
+| `clippilot critic story [--cut id] [--round n] [--yes] --json` | Story critic (gemini-3.1-pro-preview) on a 480p preview of the cut. Without `--yes` only prints `{estimate_usd, duration_sec, preview}` and exits 2; show the estimate to the user, rerun with `--yes` only after their OK. |
 | `clippilot proxies rebuild [--project <name>] [--only-bad] [--json]` | Playback is skippy/freezes: re-encode proxies to yuv420p with 1 s keyframes (sequential; `--only-bad` skips proxies already yuv420p; reports clips whose original is missing). |
 | `clippilot similar <id>` | User asks "what other takes of this exist" or "any duplicates of clip N". |
 | `clippilot mark-best <id> [--group <gid>]` | User picks the best take among similar clips. Defaults to all groups containing the clip. |

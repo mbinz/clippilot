@@ -78,17 +78,19 @@ describe('previewSegments', () => {
 });
 
 describe('estimateCost [D-11]', () => {
-  it('prices video at ~300 tokens/s plus prompt text at $1.25 / M in and $10 / M out', () => {
+  it('prices video at ~300 tokens/s plus prompt text at $2 / M in and $12 / M out', () => {
     const e = estimateCost({ duration_sec: 600, prompt_chars: 4000, output_tokens: 4000 });
     expect(e.input_tokens).toBe(600 * 300 + 1000);
     expect(e.output_tokens).toBe(4000);
-    expect(e.estimate_usd).toBeCloseTo(181000 * 1.25 / 1e6 + 4000 * 10 / 1e6, 3);
+    expect(e.estimate_usd).toBeCloseTo(181000 * 2 / 1e6 + 4000 * 12 / 1e6, 3);
   });
 
   it('uses the long-context price above 200k input tokens', () => {
     const short = estimateCost({ duration_sec: 600, prompt_chars: 0, output_tokens: 0 });
     const long = estimateCost({ duration_sec: 1000, prompt_chars: 0, output_tokens: 0 });
-    expect(long.estimate_usd).toBeCloseTo(300000 * 2.5 / 1e6, 3);
-    expect(short.estimate_usd).toBeCloseTo(180000 * 1.25 / 1e6, 3);
+    expect(long.estimate_usd).toBeCloseTo(300000 * 4 / 1e6, 3);
+    expect(short.estimate_usd).toBeCloseTo(180000 * 2 / 1e6, 3);
+    const longOut = estimateCost({ duration_sec: 1000, prompt_chars: 0, output_tokens: 1_000_000 });
+    expect(longOut.estimate_usd).toBeCloseTo(300000 * 4 / 1e6 + 18, 3);
   });
 });

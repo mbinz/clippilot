@@ -135,7 +135,7 @@ export function registerCriticCommands(parent: Command, inject: CriticInject = {
     }));
 
   critic.command('story')
-    .description('Story critic: render a 480p preview of the cut and have gemini-2.5-pro review it. Without --yes only prints the cost estimate (exit 2)')
+    .description('Story critic: render a 480p preview of the cut and have gemini-3.1-pro-preview review it. Without --yes only prints the cost estimate (exit 2)')
     .option(...cutOpt).option(...projectOpt)
     .option('--yes', 'Spend the money: upload the preview and run the review', false)
     .option('--round <n>', 'Review round recorded in the findings', '1')
@@ -168,7 +168,17 @@ export function registerCriticCommands(parent: Command, inject: CriticInject = {
       })();
       const round = Number(o.round);
       if (!Number.isInteger(round) || round < 1) throw new Error(`Invalid round "${o.round}"`);
-      const findings = await runStoryCritic({ client, model: config.story_critic_model, preview: previewPath, tree, hl: c.hl, round });
+      let findings;
+      try {
+        findings = await runStoryCritic({ client, model: config.story_critic_model, preview: previewPath, tree, hl: c.hl, round });
+      } catch (e) {
+        const err = e as { status?: number; code?: number; message?: string };
+        const msg = err.message ?? String(e);
+        if (err.status === 404 || err.code === 404 || /\b404\b|not found|no longer available/i.test(msg)) {
+          throw new Error(`Story critic model "${config.story_critic_model}" was not found or is unavailable (${msg}). Set another model with story_critic_model in the config (clippilot config set story_critic_model <model>).`);
+        }
+        throw e;
+      }
       const saved = c.store.save(findings);
       const result = { ...base, file: saved.file, round, findings: findings.findings.length, protected: findings.findings.filter((f) => f.protected).length };
       if (o.json) print(result);
