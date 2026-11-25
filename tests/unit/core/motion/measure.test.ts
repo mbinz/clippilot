@@ -137,4 +137,15 @@ describe('measureClips (per whole clip)', () => {
     await run({ force: true });
     expect(highlights.findById(a)).toMatchObject({ shake_status: null, shake_note: null, shake_checked_start: null });
   });
+
+  it('A2: withoutMoments measures clips that have no moments yet (analysis measures before the AI picks moments)', async () => {
+    const c = t.addClip({ fps: 25 });
+    const none = await run();
+    expect(none).toMatchObject({ measured: 0 });
+    const r = await measureClips(clips.listByProject(t.projectId), { highlights, motion }, {
+      cfg, source, measurer, exists: () => true, withoutMoments: true,
+    });
+    expect(r).toMatchObject({ measured: 1, failed: 0 });
+    expect(motion.getShakes(c.id)).toHaveLength(1);
+  });
 });

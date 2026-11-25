@@ -30,7 +30,7 @@ export interface VideoTransport {
   remove(name: string): Promise<void>;
 }
 
-export function buildRequest(model: string, videoPart: VideoPart) {
+export function buildRequest(model: string, videoPart: VideoPart, context?: string) {
   return {
     model,
     contents: [
@@ -39,6 +39,7 @@ export function buildRequest(model: string, videoPart: VideoPart) {
         parts: [
           videoPart,
           { text: USER_PROMPT },
+          ...(context ? [{ text: context }] : []),
         ],
       },
     ],
@@ -75,25 +76,25 @@ export class GeminiClient {
   private ai: GoogleGenAI;
   private model: string;
 
-  private generate: (part: VideoPart) => Promise<string>;
+  private generate: (part: VideoPart, context?: string) => Promise<string>;
   private transport: VideoTransport;
   private fileSize: (path: string) => Promise<number>;
 
   constructor(
     config: AppConfig,
-    generate?: (part: VideoPart) => Promise<string>,
+    generate?: (part: VideoPart, context?: string) => Promise<string>,
     transport?: VideoTransport,
     fileSize?: (path: string) => Promise<number>,
   ) {
     this.ai = new GoogleGenAI({ apiKey: config.gemini_api_key });
     this.model = config.gemini_model;
-    this.generate = generate ?? ((part) => this.generateViaApi(part));
+    this.generate = generate ?? ((part, context) => this.generateViaApi(part, context));
     this.transport = transport ?? this.apiTransport();
     this.fileSize = fileSize ?? (async (p) => (await stat(p)).size);
   }
 
-  private async generateViaApi(part: VideoPart): Promise<string> {
-    const response = await this.ai.models.generateContent(buildRequest(this.model, part));
+  private async generateViaApi(part: VideoPart, context?: string): Promise<string> {
+    const response = await this.ai.models.generateContent(buildRequest(this.model, part, context));
     return response.text ?? '';
   }
 
@@ -101,13 +102,13 @@ export class GeminiClient {
     return createApiTransport(this.ai);
   }
 
-  async analyzeVideo(proxyPath: string): Promise<ClipAnalysisResponse> {
+  async analyzeVideo(proxyPath: string, context?: string): Promise<ClipAnalysisResponse> {
     const size = await this.fileSize(proxyPath);
     if (Math.ceil(size / 3) * 4 <= INLINE_MAX_BYTES) {
       const videoBuffer = await readFile(proxyPath);
       return this.analyzeWithPart({
         inlineData: { mimeType: 'video/mp4', data: videoBuffer.toString('base64') },
-      });
+      }, context);
     }
 
     let uploadedName: string | null = null;
@@ -115,7 +116,7 @@ export class GeminiClient {
       const file = await this.transport.upload(proxyPath);
       uploadedName = file.name;
       await this.transport.waitActive(file.name);
-      return await this.analyzeWithPart({ fileData: { fileUri: file.uri, mimeType: file.mimeType } });
+      return await this.analyzeWithPart({ fileData: { fileUri: file.uri, mimeType: file.mimeType } }, context);
     } catch (err) {
       if (err instanceof GeminiApiError) throw err;
       throw new GeminiApiError(`File upload failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -130,7 +131,7 @@ export class GeminiClient {
     }
   }
 
-  private async analyzeWithPart(part: VideoPart): Promise<ClipAnalysisResponse> {
+  private async analyzeWithPart(part: VideoPart, context?: string): Promise<ClipAnalysisResponse> {
     let lastError: Error | null = null;
     let attemptsMade = 0;
     let parseAttempts = 0;
@@ -139,7 +140,7 @@ export class GeminiClient {
       attemptsMade++;
       let text: string;
       try {
-        text = await this.generate(part);
+        text = await this.generate(part, context);
       } catch (err: any) {
         lastError = err;
 

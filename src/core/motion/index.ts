@@ -31,6 +31,8 @@ export interface MotionOptions {
   cfg: JitterBandConfig;
   /** Measure clips that already have a curve. */
   force?: boolean;
+  /** Also measure clips that have no moments yet (analysis measures before the AI picks moments). */
+  withoutMoments?: boolean;
   source?: ClipFrameSource;
   measurer?: CurveMeasurer;
   /** File existence check (injectable for tests). */
@@ -69,7 +71,8 @@ export async function measureClips(clips: Clip[], deps: MotionDeps, opts: Motion
     measured: 0, skipped: 0, failed: 0, shakes: { high: 0, low: 0 },
     bands: { locked: 0, stabilize: 0, shaky: 0 }, errors: [],
   };
-  const work = clips.filter((c) => !c.hidden && c.has_video && deps.highlights.findByClip(c.id).some((m) => m.status !== 'rejected'));
+  const work = clips.filter((c) => !c.hidden && c.has_video
+    && (opts.withoutMoments || deps.highlights.findByClip(c.id).some((m) => m.status !== 'rejected')));
   let done = 0;
   for (const clip of work) {
     try {

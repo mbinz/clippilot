@@ -33,6 +33,7 @@ export interface NormalizedHighlight {
   suggested_speed: number;
   audio_keep: boolean;
   audio_type: NonNullable<HighlightResponse['audio_type']>;
+  jolt_at_key_action: boolean;
 }
 
 /**
@@ -122,6 +123,7 @@ export function normalizeHighlights(
         suggested_speed: suggestedSpeed(slowmo, fps),
         audio_keep: h.audio_keep ?? false,
         audio_type: h.audio_type ?? 'noise',
+        jolt_at_key_action: h.jolt_at_key_action ?? false,
       };
     });
 }

@@ -10,9 +10,11 @@ import { transcriptSentences } from '../transcribe/speech.js';
 import type { TranscriptSegment, TranscriptWord } from '../transcribe/whisper.js';
 import type { TranscriptRepository } from '../../db/repositories/transcript.repository.js';
 import type { ClipAnalysisResponse } from './schema.js';
+import type { MotionRepository } from '../../db/repositories/motion.repository.js';
+import { buildMeasuredContext } from './context.js';
 
 export interface AnalysisClient {
-  analyzeVideo(path: string): Promise<ClipAnalysisResponse>;
+  analyzeVideo(path: string, context?: string): Promise<ClipAnalysisResponse>;
 }
 
 export interface AnalyzeResult {
@@ -39,6 +41,7 @@ export async function analyzeClips(
   highlightRepo?: HighlightRepository,
   client: AnalysisClient = new GeminiClient(config),
   transcriptRepo?: TranscriptRepository,
+  motionRepo?: MotionRepository,
 ): Promise<AnalyzeResult> {
   const limiter = pLimit(config.analysis_parallelism);
   let success = 0;
@@ -52,7 +55,7 @@ export async function analyzeClips(
 
       try {
         clipRepo.updateAnalysisStatus(clip.id, 'analyzing');
-        const analysis = await client.analyzeVideo(videoPath);
+        const analysis = await client.analyzeVideo(videoPath, measuredContext(clip.id, transcriptRepo, motionRepo) ?? undefined);
         clipRepo.updateAnalysis(clip.id, analysisToDbFields(analysis));
         highlightRepo?.replaceForClip(
           clip.id,
@@ -77,4 +80,14 @@ export async function analyzeClips(
 
 function speechOf(t?: { segments: TranscriptSegment[]; words: TranscriptWord[] } | null) {
   return t ? transcriptSentences(t.segments, t.words) : [];
+}
+
+/** A2: the measured-context block for a clip (null without a motion repo, or when nothing is known). */
+function measuredContext(clipId: number, transcripts?: TranscriptRepository, motion?: MotionRepository): string | null {
+  if (!motion) return null;
+  return buildMeasuredContext({
+    shakes: motion.getShakes(clipId),
+    continuous: motion.getCurve(clipId)?.continuous ?? false,
+    sentences: speechOf(transcripts?.get(clipId)),
+  });
 }

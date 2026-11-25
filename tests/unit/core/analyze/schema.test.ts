@@ -67,7 +67,7 @@ const MOMENT = { start_sec: 2.5, end_sec: 6, description: 'Wave crashes on rocks
 describe('ClipAnalysisResponseSchema highlights', () => {
   it('parses a response with highlights and defaults issues/slowmo', () => {
     const result = ClipAnalysisResponseSchema.parse({ ...VALID_RESPONSE, highlights: [MOMENT] });
-    expect(result.highlights).toEqual([{ ...MOMENT, issues: [], slowmo: 'none', slowmo_reason: '', audio_keep: false, audio_type: 'noise' }]);
+    expect(result.highlights).toEqual([{ ...MOMENT, issues: [], slowmo: 'none', slowmo_reason: '', audio_keep: false, audio_type: 'noise', jolt_at_key_action: false }]);
   });
 
   it('defaults highlights to [] when missing', () => {
@@ -142,5 +142,13 @@ describe('HighlightSchema missing description', () => {
   it('defaults a missing description to an empty string', () => {
     const { description: _d, ...rest } = MOMENT;
     expect(HighlightSchema.parse(rest).description).toBe('');
+  });
+});
+
+describe('HighlightSchema jolt_at_key_action (A2)', () => {
+  const base = { start_sec: 1, end_sec: 5, tier: 'solid', shot: 'wide', role: 'action' };
+  it('defaults to false and accepts true', () => {
+    expect(HighlightSchema.parse(base).jolt_at_key_action).toBe(false);
+    expect(HighlightSchema.parse({ ...base, jolt_at_key_action: true }).jolt_at_key_action).toBe(true);
   });
 });

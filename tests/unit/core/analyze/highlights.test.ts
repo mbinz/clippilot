@@ -208,3 +208,11 @@ describe('normalizeHighlights with a transcript', () => {
     expect(out.map((x) => [x.start_sec, x.end_sec])).toEqual([[1, 20], [20, 22]]);
   });
 });
+
+describe('normalizeHighlights jolt_at_key_action (A2)', () => {
+  it('passes the flag through (default false)', () => {
+    const base = { start_sec: 1, end_sec: 5, description: 'x', tier: 'solid', shot: 'wide', role: 'action' } as const;
+    const out = normalizeHighlights([{ ...base, jolt_at_key_action: true }, { ...base, start_sec: 10, end_sec: 14 }], 30);
+    expect(out.map((h) => h.jolt_at_key_action)).toEqual([true, false]);
+  });
+});

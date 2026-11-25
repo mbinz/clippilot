@@ -41,6 +41,8 @@ export interface HighlightRecord {
   shake_note: string | null;
   shake_checked_start: number | null;
   shake_checked_end: number | null;
+  /** A2: the analysis says the key action happens during a camera jolt (the shake fit keeps such a moment). 0 / 1. */
+  jolt_at_key_action: 0 | 1;
   seen_at: string | null;
   /** Motion measurement (null = never measured); valid only while the range equals `motion_start_sec`..`motion_end_sec`. */
   jitter_score: number | null;
@@ -65,6 +67,7 @@ export interface InsertHighlight {
   suggested_speed?: number;
   audio_keep?: boolean;
   audio_type?: AudioType;
+  jolt_at_key_action?: boolean;
 }
 
 /** Edits that make a moment the user's own: moved range, changed speed, a ★. */
@@ -196,10 +199,11 @@ export class HighlightRepository {
         if (len > 0 && keptRanges.some((k) =>
           Math.min(h.end_sec, k.end_sec) - Math.max(h.start_sec, k.start_sec) >= len / 2)) continue;
         const suggested = h.suggested_speed ?? 1;
-        this.stmtInsert.run(clipId, h.start_sec, h.end_sec, h.description, h.tier,
+        const ins = this.stmtInsert.run(clipId, h.start_sec, h.end_sec, h.description, h.tier,
           h.shot ?? null, h.role ?? null, JSON.stringify(h.issues ?? []),
           h.slowmo ?? 'none', h.slowmo_reason ?? '', suggested,
           h.audio_keep ? 1 : 0, h.audio_type ?? 'noise', defaultSpeed(suggested, fps));
+        if (h.jolt_at_key_action) this.db.prepare('UPDATE highlights SET jolt_at_key_action = 1 WHERE id = ?').run(ins.lastInsertRowid);
       }
     })();
   }
