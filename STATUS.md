@@ -1651,6 +1651,12 @@ start and speech per panel. [D-16] Planner made 3 paid story-critic runs on Arri
 404): 168 s preview, 53 k input tokens, ~87 s per run. The real run found the user's own case (panel 54 belongs to the cliff
 scene, `move_scene` to scene 6) plus repetitions and cut-off speech; findings only, nothing applied.
 
+**C1c result (2026-11-25):** ✅ (1182 tests). After a cut-critic trial run on Arrifana "Main" (sonnet sub-agent, 3.5 min, 15
+findings: 2 must / 11 should / 2 nit, 3 protected, all strips read; its feedback: no sentence times, no fps, alternatives
+always empty, band meanings unclear) `critic context` now carries per moment `clip_fps`, `clip_event`, `slowmo`,
+`suggested_speed`, `sentences` (±3 s, exact clip times), `alternatives` (similar + dup group, not in the cut, with jitter
+band + high-shake count) and a strip `note` for the intentionally dropped still; the cut-critic skill was updated to match.
+
 **C2 — critic agents + review loop skill (planner, 2026-11-25; after C1 + D1)** — written by the planner (prompts/skills,
 no production code): `.claude/agents/cut-critic.md` [D-10], `.claude/skills/cut-critic/SKILL.md` (rules: static ≈ 2–3 s,
 speech / clear action longer; cut-off sentences; shakes / shaky moments with calmer alternatives; last panel of a scene
