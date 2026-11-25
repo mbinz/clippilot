@@ -1585,6 +1585,17 @@ document every assumption. Each item below is marked [D-n] and referenced from t
 - Done when: typecheck + test:all green; planner runs `motion --force` on Arrifana: run time, band counts vs S1
   (19 / 75 / 73; ≤ 5 % changed [D-4]), eval P ≥ 0.80 / R ≥ 0.88 (prototype 0.83 / 0.93), drawer checked in the browser.
 
+**W1 result (2026-11-25):** ✅ w1-shakes (1177 tests after merging main). `src/core/motion/curve.ts` (port of the prototype),
+migration 023 (`motion_curves`, `shakes`), `motion` measures whole clips once and derives moment values from the stored
+curve (trims need no decode), `shakes` on `moments list` / `cut show`, drawer ticks + lines, `npm run eval:shakes`.
+Implementer decisions (review): [D-17] the boundary nudge uses **high-confidence** shakes only; verdict fixture stores
+`{verdict, end}`; old S1 per-moment code (`globalShift`, `measureFrames`) left as dead code (cleanup later). Planner run on
+Arrifana (backup `clippilot.pre-023.db`): 100 clips in 10.8 min, 0 failed; 113 shakes (64 high / 49 low); bands 19 / 76 / 72
+vs S1 19 / 75 / 73 (1 of 167 changed; per-moment jitter differs most where S1's ±8 px search saturated, p95 Δ 0.66);
+eval P 0.83 / R 0.92 (2 new unjudged); 6 unprotected moments nudged (ends moved 0.07–0.5 s). Drawer checked in the browser
+(C0513: ticks at 0.5 / 1.1 s, "Shake 0:00.5 · jump 1 % (46 px)"). Panel drawer shows the ticks, the text lines only in the
+moment drawer.
+
 **D1 — draft rules + board icon (planner spec, 2026-11-25; after W1)** — PRD 2b.3.
 - `cut apply` result gains `warnings: [{panel (scene/panel index), moment_id, type, message, alternatives?: [moment ids]}]`
   per [D-7]; pure `draftWarnings(draft, moments, brief)` with tests (calmer alternative in dup group, ★ / must-have kept,
