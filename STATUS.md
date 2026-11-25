@@ -27,6 +27,9 @@ Order agreed 2026-11-25. Each line: theme — what — spec.
 
 ### Next
 - [ ] **Board fixes, part 3** — critic findings on the board (apply / dismiss) — grill first, no spec yet
+- [ ] **Board editing** — UI feedback round 1 (2026-11-25): editable panel strip, more panels on screen, choose another
+  moment (similar under panel / details under panel / side-by-side compare), create a moment. Raw — sequence against
+  this list, then grill → mockup → build; plan together with part 3 — [feedback](docs/specs/board-editing.md)
 - [x] **Learning from edits** L1 who made each edit (`operations.actor`, `--ai` on scene/panel verbs) — done 2026-11-25,
   ahead of L0 so this week's board edits are recorded
 - [ ] **Learning from edits, part 1b** — L0 instructions in one folder. Note: skills aren't in the repo (only
