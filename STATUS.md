@@ -1696,8 +1696,9 @@ faults + the user's 2 real cases (42 panels, 235.7 s vs target 165 s). Key (don'
    story-critic cost (≈ $0.15 per run, 2 runs) and waits for your OK; then up to 3 rounds; change list in chat.
 4. Look at the board (cut "Acceptance"; every change is one undo step) and score against the key: ≥ 8 of 11 found, few
    false alarms (PRD 2b.7).
-5. To reset: copy `.clippilot/clippilot.pre-acceptance.db` over `.clippilot/clippilot.db` (board closed). Note that the
-   backup predates migrations 024 (runs again automatically) — nothing else is lost.
+5. To reset and re-run: copy `.clippilot/clippilot.acceptance-start.db` over `.clippilot/clippilot.db` (board closed; also
+   delete `clippilot.db-wal` / `-shm`). That is the state right before the test (Acceptance seeded, all migrations).
+   `clippilot.pre-acceptance.db` = before the Acceptance cut existed.
 
 - Also open (no decision needed): the "locked" band is misleading until light-jitter calibration — treat Arrifana as all
   handheld (resolve-prep marks every non-shaky clip orange anyway in practice: 5 locked panels are really handheld);
