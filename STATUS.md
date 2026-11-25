@@ -1740,7 +1740,7 @@ moment rules entirely → open question). Real run on Arrifana (backup `clippilo
 **28 fixed** (16 trims, 12 splits → 12 new sibling moments), **18 kept** (11 "would cut a sentence", 2 "no clean range",
 5 by Gemini), 33 Gemini Flash calls, 2:53. Kiss check on stills: moment 241's kiss is at 8.8–9.8 s, after the shake
 (8.02–8.14) — the trim 8.18–10.0 would keep it, but Gemini kept the range because the description's line "Schön hier!"
-lies before the shake (open: should the check judge the visual action only?); moment 243 — the kiss happens during the
+lies before the shake — user decision: keep it, Gemini judges speech + action ("it will never be perfect"); moment 243 — the kiss happens during the
 shake → kept, correct. Implementer notes: undo of one cut's step also removes sibling panels in other cuts.
 
 **How to run the acceptance test (user)**
