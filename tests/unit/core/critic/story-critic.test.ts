@@ -77,7 +77,7 @@ describe('runStoryCritic', () => {
     const client = fake([good(f)]);
     const r = await runStoryCritic({ client, model: 'm', preview: '/p.mp4', tree: f.svc.getCut(f.cut.id)!, hl: new HighlightRepository(f.db), round: 2 });
     expect(r).toMatchObject({ critic: 'story', cut_id: f.cut.id, round: 2 });
-    expect(r.findings[0]).toMatchObject({ id: 'F1', panel_id: f.p2.id, protected: true });
+    expect(r.findings[0]).toMatchObject({ id: 'F1', panel_id: f.p2.id, protected: true, label: 'S1·P2' });
   });
 
   it('accepts a bare array of findings', async () => {

@@ -184,3 +184,23 @@ describe('buildContext: richer moments', () => {
     expect(ctx.panels[0]!.strip!.note).toBeUndefined();
   });
 });
+
+describe('brief_check [C1d]', () => {
+  it('reports target vs played length and whether each must-have moment is in the cut', async () => {
+    const f = fixture();
+    f.svc.setBrief(f.cut.id, {
+      target_sec: 16, audience: 'family', mood: 'calm', ending: 'x',
+      must_have: [{ moment_id: f.a1, text: 'the wave' }, { moment_id: f.a2, text: 'sand' }, { text: 'a sunset' }],
+    }, 'confirmed');
+    const ctx = await buildContext(f.svc, new HighlightRepository(f.db), f.cut.id, out, { grab });
+    // a1: 4 s at speed 0.5 = 8 s played
+    expect(ctx.brief_check).toEqual({
+      target_sec: 16, total_sec: 8, delta_pct: -50,
+      must_have: [
+        { moment_id: f.a1, text: 'the wave', in_cut: true, panel_id: f.p1.id },
+        { moment_id: f.a2, text: 'sand', in_cut: false, panel_id: null },
+        { text: 'a sunset', moment_id: null, in_cut: null, panel_id: null },
+      ],
+    });
+  });
+});

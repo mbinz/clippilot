@@ -86,9 +86,18 @@ export interface ContextPanel {
   strip_error?: string;
 }
 
+export interface BriefCheck {
+  target_sec: number;
+  total_sec: number;
+  delta_pct: number;
+  must_have: { moment_id: number | null; text: string; in_cut: boolean | null; panel_id: number | null }[];
+}
+
 export interface CriticContext {
   cut: { id: number; name: string; brief_state: string; totals: unknown };
   brief: unknown;
+  /** Target vs played length and whether the must-haves made it into the cut; null while the cut has no brief. */
+  brief_check: BriefCheck | null;
   out_dir: string;
   panels: ContextPanel[];
 }
@@ -190,9 +199,19 @@ export async function buildContext(
     }
   }
 
+  const brief = tree.brief as { target_sec?: number; must_have?: { moment_id?: number; text: string }[] } | null;
+  const brief_check: BriefCheck | null = brief && typeof brief.target_sec === 'number' && brief.target_sec > 0 ? {
+    target_sec: brief.target_sec, total_sec: tree.totals.duration_sec,
+    delta_pct: Math.round(((tree.totals.duration_sec - brief.target_sec) / brief.target_sec) * 1000) / 10,
+    must_have: (brief.must_have ?? []).map((h) => {
+      if (h.moment_id === undefined) return { moment_id: null, text: h.text, in_cut: null, panel_id: null };
+      const panel = flat.find((p) => p.state === 'filled' && p.moment_id === h.moment_id);
+      return { moment_id: h.moment_id, text: h.text, in_cut: panel !== undefined, panel_id: panel?.id ?? null };
+    }),
+  } : null;
   const ctx: CriticContext = {
     cut: { id: tree.cut.id, name: tree.cut.name, brief_state: tree.brief_state, totals: tree.totals },
-    brief: tree.brief, out_dir: outDir, panels,
+    brief: tree.brief, brief_check, out_dir: outDir, panels,
   };
   await fs.writeFile(path.join(outDir, 'context.json'), JSON.stringify(ctx, null, 2));
   return ctx;

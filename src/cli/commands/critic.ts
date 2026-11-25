@@ -98,7 +98,21 @@ export function registerCriticCommands(parent: Command, inject: CriticInject = {
   critic.command('show <file>')
     .description('Show a stored review with its resolutions (a file name, a path, or "latest")')
     .option('--json', 'Emit JSON (output is always JSON)')
-    .action((file: string) => withCtx((c) => { print(c.store.load(file)); }));
+    .action((file: string) => withCtx((c) => {
+      const review = c.store.load(file);
+      const tree = c.svc.getCut(review.cut_id);
+      // `position` in a proposal is 1-based; `panel move` takes 0-based. Derived here so the loop cannot get it wrong.
+      const findings = review.findings.map((f) => {
+        const pr = f.proposal;
+        if (pr?.position !== undefined) return { ...f, cli_position: pr.position - 1 };
+        if (f.kind === 'move_scene' && pr?.to_scene_id !== undefined) {
+          const target = tree?.scenes.find((s) => s.id === pr.to_scene_id);
+          if (target) return { ...f, cli_position: target.panels.length };
+        }
+        return f;
+      });
+      print({ ...review, findings });
+    }));
 
   critic.command('resolve <file> <finding> <resolution>')
     .description(`Record what happened to a finding: ${RESOLUTIONS.join(' | ')}`)

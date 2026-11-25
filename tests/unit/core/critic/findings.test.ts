@@ -5,7 +5,7 @@ import path from 'node:path';
 import { setup } from '../storyboard/_helpers.js';
 import { HighlightRepository } from '../../../../src/db/repositories/highlight.repository.js';
 import {
-  FindingsFileSchema, validateAgainstCut, ReviewStore, panelLabels,
+  FindingsFileSchema, validateAgainstCut, parseFindings, ReviewStore, panelLabels,
 } from '../../../../src/core/critic/findings.js';
 
 const finding = (o: Record<string, unknown> = {}) => ({
@@ -234,5 +234,61 @@ describe('structured proposals', () => {
     store.resolve(saved.file, 'F1', 'applied');
     expect(store.summary(1)[0]!.applied).toEqual(['cut trim: out at 3.0']);
     fs.rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('stable labels [C1d]', () => {
+  it('parseFindings stamps label S<scene>·P<panel>, S<scene> for scene-only findings, null otherwise (a critic-written label is ignored)', () => {
+    const f = fixture();
+    const tree = f.svc.getCut(f.cut.id)!;
+    const r = parseFindings(file([
+      finding({ id: 'a', panel_id: f.p2.id, label: 'bogus' }),
+      finding({ id: 'b', kind: 'other', scene_id: f.sc2.id }),
+      finding({ id: 'c', kind: 'other' }),
+    ], { cut_id: f.cut.id }), tree, new HighlightRepository(f.db));
+    expect(r.errors).toEqual([]);
+    expect(r.file!.findings.map((x) => x.label)).toEqual(['S2·P1', 'S2', null]);
+  });
+
+  it('summary prefers the stored label over the recomputed one; old files fall back, deleted panels say so', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'clippilot-labels-'));
+    try {
+      const store = new ReviewStore(dir);
+      const parsed = (fs_: unknown[]) => FindingsFileSchema.parse(file(fs_));
+      const r = store.save(parsed([
+        finding({ id: 'a', kind: 'remove', panel_id: 5, label: 'S1·P1' }),
+        finding({ id: 'b', kind: 'remove', panel_id: 6 }),
+        finding({ id: 'c', kind: 'remove', panel_id: 7 }),
+      ]));
+      for (const id of ['a', 'b', 'c']) store.resolve(r.file, id, 'applied');
+      expect(store.summary(1, new Map([[5, 'S9·P9'], [6, 'S2·P2']]))[0]!.applied).toEqual([
+        'S1·P1 remove: too long', 'S2·P2 remove: too long', 'panel 7 (deleted) remove: too long',
+      ]);
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+});
+
+describe('summary de-duplication [C1d]', () => {
+  it('shows an applied change once when both critics fixed the same panel with the same kind; counts stay per critic', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'clippilot-dedup-'));
+    try {
+      const store = new ReviewStore(dir);
+      const parsed = (o: Record<string, unknown>, fs_: unknown[]) => FindingsFileSchema.parse(file(fs_, o));
+      const a = store.save(parsed({ critic: 'cut' }, [
+        finding({ id: 'a', kind: 'remove', panel_id: 5, label: 'S1·P1' }),
+        finding({ id: 'x', kind: 'trim', panel_id: 6, label: 'S1·P2' }),
+      ]), new Date('2026-11-25T10:00:00Z'));
+      const b = store.save(parsed({ critic: 'story' }, [
+        finding({ id: 'b', severity: 'should', kind: 'remove', panel_id: 5, label: 'S1·P1' }),
+        finding({ id: 'y', kind: 'reorder', panel_id: 6, label: 'S1·P2' }),
+      ]), new Date('2026-11-25T10:05:00Z'));
+      for (const id of ['a', 'x']) store.resolve(a.file, id, 'applied');
+      for (const id of ['b', 'y']) store.resolve(b.file, id, 'applied');
+      const s = store.summary(1)[0]!;
+      expect(s.applied).toEqual(['S1·P1 remove: too long (both critics)', 'S1·P2 trim: too long', 'S1·P2 reorder: too long']);
+      expect(s.distinct_changes).toBe(3);
+      expect(s.by_resolution.applied).toBe(4);
+      expect(s.by_severity).toEqual({ must: 3, should: 1, nit: 0 });
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
   });
 });

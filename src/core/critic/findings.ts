@@ -42,6 +42,8 @@ export const FindingSchema = z.object({
   proposal: ProposalSchema.optional(),
   /** Always recomputed from the database on save; whatever a critic writes here is ignored. */
   protected: z.boolean().default(false),
+  /** Stamped at save time (`S2·P3`, `S2` or null); whatever a critic writes here is ignored. Stays correct after panels move. */
+  label: z.string().nullable().optional(),
 });
 export type Finding = z.infer<typeof FindingSchema>;
 
@@ -66,6 +68,12 @@ export function panelLabels(tree: CutTree): Map<number, string> {
   const labels = new Map<number, string>();
   tree.scenes.forEach((s, si) => s.panels.forEach((p, pi) => labels.set(p.id, `S${si + 1}·P${pi + 1}`)));
   return labels;
+}
+
+function labelOf(f: Finding, tree: CutTree, labels: Map<number, string>): string | null {
+  if (f.panel_id !== undefined) return labels.get(f.panel_id) ?? null;
+  const si = f.scene_id === undefined ? -1 : tree.scenes.findIndex((s) => s.id === f.scene_id);
+  return si >= 0 ? `S${si + 1}` : null;
 }
 
 /** Whether a tool must leave the subject of a finding alone: its moment is the user's, or its panel was placed by them. */
@@ -150,6 +158,7 @@ export function validateAgainstCut(
   }
   const sceneOfPanel = new Map<number, (typeof tree.scenes)[number]>();
   for (const sc of tree.scenes) for (const p of sc.panels) sceneOfPanel.set(p.id, sc);
+  const labels = panelLabels(tree);
   const seen = new Set<string>();
   for (const f of file.findings) {
     if (seen.has(f.id)) errors.push(`duplicate finding id "${f.id}"`);
@@ -169,7 +178,7 @@ export function validateAgainstCut(
   }
   return {
     errors,
-    file: { ...file, findings: file.findings.map((f) => ({ ...f, protected: isProtected(f, panels, hl) })) },
+    file: { ...file, findings: file.findings.map((f) => ({ ...f, protected: isProtected(f, panels, hl), label: labelOf(f, tree, labels) })) },
   };
 }
 
@@ -191,6 +200,8 @@ export interface RoundSummary {
   by_resolution: Record<Resolution | 'open', number>;
   /** One line per applied finding: "<panel label> <kind>: <readable proposal or message>". */
   applied: string[];
+  /** Applied changes after merging the same panel + kind fixed by both critics. */
+  distinct_changes: number;
 }
 
 const t1 = (n: number) => n.toFixed(1);
@@ -271,11 +282,12 @@ export class ReviewStore {
   /** Per round (oldest first) of a cut: counts and the applied changes. `labels` names panels in the change list. */
   summary(cutId: number, labels: Map<number, string> = new Map()): RoundSummary[] {
     const rounds = new Map<number, RoundSummary>();
+    const seenChange = new Map<string, { index: number; critics: Set<string>; merged: boolean }>();
     for (const { file, review } of this.list(cutId).reverse()) {
       const r = rounds.get(review.round) ?? {
         round: review.round, files: [], findings: 0,
         by_severity: { must: 0, should: 0, nit: 0 },
-        by_resolution: { applied: 0, skipped: 0, protected: 0, open: 0 }, applied: [],
+        by_resolution: { applied: 0, skipped: 0, protected: 0, open: 0 }, applied: [], distinct_changes: 0,
       };
       rounds.set(review.round, r);
       r.files.push(file);
@@ -285,12 +297,23 @@ export class ReviewStore {
         const res = review.resolutions[f.id];
         r.by_resolution[res?.status ?? 'open']++;
         if (res?.status === 'applied') {
-          const where = f.panel_id !== undefined ? (labels.get(f.panel_id) ?? `panel ${f.panel_id}`)
+          const where = f.label ? f.label
+            : f.panel_id !== undefined ? (labels.get(f.panel_id) ?? `panel ${f.panel_id} (deleted)`)
             : f.moment_id !== undefined ? `moment ${f.moment_id}` : f.scene_id !== undefined ? `scene ${f.scene_id}` : 'cut';
-          r.applied.push(`${where} ${f.kind}: ${describeProposal(f.proposal) ?? f.message}`);
+          const line = `${where} ${f.kind}: ${describeProposal(f.proposal) ?? f.message}`;
+          const key = f.panel_id === undefined ? null : `${review.round}|${f.panel_id}|${f.kind}`;
+          const prev = key === null ? undefined : seenChange.get(key);
+          if (prev && !prev.critics.has(review.critic)) {
+            prev.critics.add(review.critic);
+            if (!prev.merged) { r.applied[prev.index] += ' (both critics)'; prev.merged = true; }
+          } else {
+            r.applied.push(line);
+            if (key !== null && !prev) seenChange.set(key, { index: r.applied.length - 1, critics: new Set([review.critic]), merged: false });
+          }
         }
       }
     }
+    for (const r of rounds.values()) r.distinct_changes = r.applied.length;
     return [...rounds.values()].sort((a, b) => a.round - b.round);
   }
 }

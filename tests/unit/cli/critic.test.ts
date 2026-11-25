@@ -137,6 +137,22 @@ describe('critic save / list / show / resolve / summary', () => {
     expect(process.exitCode).toBe(1);
   });
 
+  it('stores a stable label per finding at save time', async () => {
+    const saved = await run({}, 'save', '--file', findingsFile(), '--json');
+    const shown = await run({}, 'show', saved.file, '--json');
+    expect(shown.findings.map((f: any) => f.label)).toEqual(['S1·P1', 'S1·P2']);
+  });
+
+  it('show adds cli_position (0-based) next to the 1-based position; move_scene without a position appends', async () => {
+    const saved = await run({}, 'save', '--file', findingsFile({}, [
+      { id: 'R', severity: 'should', kind: 'reorder', panel_id: ids.p2, message: 'first', proposal: { position: 1 } },
+      { id: 'M', severity: 'should', kind: 'move_scene', panel_id: ids.p1, message: 'to end', proposal: { to_scene_id: ids.scene } },
+      { id: 'N', severity: 'nit', kind: 'remove', panel_id: ids.p1, message: 'x' },
+    ]), '--json');
+    const shown = await run({}, 'show', saved.file, '--json');
+    expect(shown.findings.map((f: any) => f.cli_position)).toEqual([0, 2, undefined]);
+  });
+
   it('show latest returns the newest review', async () => {
     await run({}, 'save', '--file', findingsFile({ round: 1 }), '--json');
     await run({}, 'save', '--file', findingsFile({ round: 2 }), '--json');
