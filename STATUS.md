@@ -1503,13 +1503,132 @@ drops unknown issue values instead of failing the clip (planner addition: a reti
 migrated (backup `clippilot.pre-022.db`); Arrifana had 0 stored `shake` issues; `cut show` bands for all 37 panels identical
 before/after, no `shake` key left. resolve-prep reads `moment.jitter`, old `shake` key = unmeasured.
 
-**W1 — per-clip motion curve + shakes (outline; spec after J1)**
-- Per-clip motion curve in ClipPilot (new table, ~10 values/s) + **shake events** with start/end/peak/**jump distance
-  (px)**/confidence (lower for "in moving scene" and slowed-down border cases); every shake marked separately;
-  subject-motion rule (border-patch disagreement < 0.5, peaks ≥ 60 %/s always kept — see border experiment); jitter values per moment derived from the
-  curve (no re-decode after trims); `moments list`/`cut show` carry `shakes` inside the moment; AI-moment boundary nudge
-  out of a shake; drawer marks on the clip timeline; `motion` measures whole clips; `verdicts.json` becomes a regression
-  fixture (precision/recall on Arrifana). Then the near-miss recall review, then roadmap 2b.3 (draft rules + board icon).
+**Autonomous run 2026-11-25 — decisions & assumptions for the user to review before the acceptance test.**
+The user asked: carry on through W1, 2b.3–2b.6 (draft rules, cut critic, story critic, review loop) without stopping,
+document every assumption. Each item below is marked [D-n] and referenced from the specs.
+- [D-1] Shake "jump distance" = largest distance of the camera path from its 0.5 s moving average inside the shake, in % of
+  frame width (`jump_pct`) and in source pixels (`jump_px` = jump_pct × source width / 100). Ranking/strength in the UI uses it.
+- [D-2] Confidence `low` when the clip is a "moving scene" (median shake residual ≥ 4 %/s) or the patch disagreement is
+  0.3–0.5, unless the peak is ≥ 60 %/s; and at output time, a shake whose peak is < 1.5 × the clip threshold in a moment
+  played slowed down (speed < 1). Everything else `high`. Thresholds from the prototype data, not separately validated.
+- [D-3] Clips with median residual > 8 %/s stay "continuously shaky": no shake search (their jitter band is `shaky` anyway).
+- [D-4] Motion is measured once per **whole clip** (clips with at least one non-rejected moment, not hidden); moment jitter /
+  camera motion / frame change are derived from the stored per-frame arrays for any range → trims never need a re-decode.
+  The centre shift switches from S1's ±8 px search to the prototype's coarse-to-fine ±16 px; bands are re-checked against
+  S1 on Arrifana (stop and report if > 5 % of moments change band).
+- [D-5] AI-moment boundary nudge: only unprotected moments; a start inside a shake moves to the shake's end, an end to its
+  start; skipped if the moment would get shorter than 2 s or would newly cut a sentence. Reported as a count.
+- [D-6] Board: one small neutral icon on a tile (no new colour) when the moment's jitter band is `shaky` or it contains a
+  high-confidence shake; details only in the drawer; shakes as small ticks on the drawer's clip timeline.
+- [D-7] Draft rules are enforced as **warnings** from `cut apply` (never errors, never auto-reject): shaky moment used
+  although a calmer moment exists in its dup group → `shaky_alternative`; shaky moment kept because it is ★ / a brief
+  must-have with no calmer alternative → `shaky_kept` (the drafter must name these in the draft summary). Length: a moment
+  > 8 s gets `too_long` unless it carries speech or is an action moment (role `action`, frame change ≥ 0.03 or camera motion
+  ≥ 2 %/s), which may run to 20 s.
+- [D-8] Cutting a shake out = draft panel field `cut_out: [from, to]` → the moment is trimmed to before the shake and a
+  sibling moment (same clip, copied tags, `split_of`) after it gets its own panel right behind; same as CLI
+  `moment cut-out <id> <from> <to>`. Both stay AI decisions (not confirmed) when done by the drafter/loop.
+- [D-9] Edits Claude makes in the review loop use `--ai` on the moment verbs (trim / speed / cut-out): the moment stays
+  unconfirmed (an AI pick, visually distinct, still changeable by later rounds). Without `--ai` the verbs behave as today
+  (user decision → confirmed/protected).
+- [D-10] Cut critic = Claude sub-agent `cut-critic` (model **sonnet**, reads per-panel still strips) + skill with the rules;
+  input from `clippilot critic context`; it writes findings JSON and saves it with `clippilot critic save`. It never edits.
+- [D-11] Story critic = `clippilot critic story`: 480p preview from proxies (keep-audio panels full volume, others −18 dB
+  bed, no music, small burned-in panel label "S2·P3" top-left so findings can name panels), sent to **gemini-2.5-pro**
+  (config `story_critic_model`) with the brief and the panel list. Without `--yes` it only prints the cost estimate
+  (Gemini 2.5 Pro list price: $1.25 / M input tokens ≤ 200 k, $10 / M output; video ≈ 300 tokens/s incl. audio) — the
+  loop shows that estimate to the user and needs their OK once per loop (covering up to 3 rounds).
+- [D-12] Findings JSON (both critics): `{critic, cut_id, round, findings: [{id, severity: must|should|nit, kind, panel_id?,
+  moment_id?, scene_id?, message, proposal?, protected}]}`, kinds `trim | replace | remove | reorder | move_scene | speed |
+  cut_out | other`; stored in `.clippilot/reviews/<timestamp>-<critic>-r<round>.json`; `critic resolve` records applied /
+  skipped / protected per finding so the change list can be printed (`critic summary`).
+- [D-13] Loop: max 3 rounds; apply must + should that are not protected; nits are listed, not applied; protected items are
+  listed for the user; stops early when a round has no must/should. Story critic runs in round 1 and in the last round
+  only (cost), cut critic every round.
+- [D-14] Acceptance prep: the planner copies the Arrifana cut "Main" into a cut "Acceptance" and seeds ~10 faults
+  (key in `~/Video/ClipPilot Arrifana/.clippilot/reviews/acceptance-key.md`, not in the repo, so the user can stay blind).
+  The user's two real cases (chapter-2 clip belonging to chapter 1; last clip of chapter 1 holds a static image too long)
+  are part of it.
+
+**W1 — per-clip motion curve + shakes (planner spec, 2026-11-25)** — test-first. Algorithm = the prototype
+(`~/Video/ClipPilot Arrifana/exports/wackler-eval/measure3.mts`, `detect.py`, `evaluate.py`), see "Border experiment".
+- Pure code `src/core/motion/curve.ts` (+ tests): per frame pair on 320 px gray frames: centre shift (coarse half-res ±8
+  → full-res ±1 refine, i.e. ±16 px), 8 border-patch shifts + patch texture (mean gradient), frame change (mean abs luma diff
+  after compensating the centre shift, as S1 `frameChange`). `shakeResidual(shifts, fps, w)` = |velocity smoothed ~0.08 s −
+  velocity averaged 0.5 s| in % width/s. `detectShakes(...)`: threshold hi = max(3 × clip median, 12), grow while > hi/2,
+  merge gaps < 0.25 s, drop > 2 s, no search when median > 8 [D-3]; subject-motion filter: keep if patch disagreement < 0.5
+  (textured patches ≥ 4, at least 3 else all patches) or peak ≥ 60 %/s; jump distance [D-1]; confidence [D-2].
+- Derivation (pure): `momentMotion(curve, start, end)` → jitter score + max px (S1 formula on the stored centre shifts),
+  camera motion, frame change — for any range, no decode [D-4].
+- Storage: migration 023: `motion_curves (clip_id PK → clips, fps, frames, width, src_width, dx BLOB (Int8), dy BLOB (Int8),
+  change BLOB (Float32), median_residual, continuous INTEGER, measured_at)` and `shakes (id PK, clip_id → clips, start_sec,
+  end_sec, peak_sec, peak, jump_pct, jump_px, disagreement, moving_scene INTEGER, confidence)`.
+- `clippilot motion [--project] [--force] [--json]`: decodes whole clips without a curve (all with `--force`; same ffmpeg
+  decode as S1, no hwaccel, frame count checked against `nb_read_packets` — fail the clip on mismatch), stores curve +
+  shakes, then (re)writes the highlights jitter/motion columns for every moment from the curve, then the boundary nudge
+  [D-5]. Reports clips measured / failed, shakes (high / low), moments nudged, band counts. Sequential decode is fine;
+  report the run time.
+- Reads: `moments list --json` rows, `cut show --json` moments and candidates carry `jitter` (derived from the curve when the
+  stored columns are stale, e.g. after a trim) and `shakes: [{start, end, peak_at, strength, jump_pct, jump_px, confidence,
+  moving_scene}] | null` (overlapping the moment's current range, clip time; null = clip not measured; confidence applies
+  the slow-motion rule of [D-2] with the moment's speed).
+- Drawer [D-6]: shakes as small ticks on `ClipTimeline` (moment drawer), one quiet line per shake in the moment's range
+  ("Shake 0:04.2 · jump 3 % (58 px) · low confidence — moving scene"), jitter band shown in the same block.
+- Eval: `npm run eval:shakes -- <project dir>` (not part of test:all) compares detected shakes with
+  `tests/fixtures/shakes/arrifana-verdicts.json` (the user's 141 verdicts, keys `<file name>@<start>`; match = overlap) and
+  prints precision / recall plus the number of unjudged detections.
+- Tests first: residual (static 0, constant pan 0, single jolt peaks), detection (threshold, grow, merge, max duration,
+  continuous clip), subject filter (agreeing patches kept, disagreeing dropped, strong peak kept, low-texture fallback),
+  jump distance, confidence rules incl. slow motion, momentMotion equals S1 `jitterScore` on the same shifts, migration,
+  `motion` CLI with an injected frame source (curve stored, columns written, nudge applied to unprotected only, protected
+  untouched), JSON shapes, drawer pure helper (marks inside the visible range).
+- Done when: typecheck + test:all green; planner runs `motion --force` on Arrifana: run time, band counts vs S1
+  (19 / 75 / 73; ≤ 5 % changed [D-4]), eval P ≥ 0.80 / R ≥ 0.88 (prototype 0.83 / 0.93), drawer checked in the browser.
+
+**D1 — draft rules + board icon (planner spec, 2026-11-25; after W1)** — PRD 2b.3.
+- `cut apply` result gains `warnings: [{panel (scene/panel index), moment_id, type, message, alternatives?: [moment ids]}]`
+  per [D-7]; pure `draftWarnings(draft, moments, brief)` with tests (calmer alternative in dup group, ★ / must-have kept,
+  too long, speech / action exemption up to 20 s, no warnings for user-placed panels in replace mode).
+- `cut_out: [from, to]` on a draft panel and CLI `moment cut-out <id> <from> <to> [--ai]` [D-8]: validated (inside the
+  moment, both parts ≥ 1 s); trims the moment, creates the sibling moment (migration: `highlights.split_of`), inserts the
+  following panel(s); one undo step; undo restores both. Tests incl. undo.
+- `--ai` on `moment trim | speed | cut-out` [D-9]: edit without confirming; tests that the moment stays unprotected.
+- Tile icon [D-6] in `MomentTile` (pure helper `shakeHint(moment)` tested); drawer lists jitter + shakes (from W1).
+- SKILL.md drafting rules: read `jitter` + `shakes`; avoid `shaky`; for a shake inside a good moment decide keep vs
+  `cut_out`; B-roll cover only as a suggestion in chat; name `shaky_kept` warnings in the draft summary; action moments up
+  to ~20 s, static/silent ≤ 8 s.
+
+**C1 — critic plumbing + cut critic context (planner spec, 2026-11-25; parallel to W1)** — PRD 2b.4/2b.6 code part.
+- Findings schema (Zod, `src/core/critic/findings.ts`) per [D-12]; `clippilot critic save --file f.json [--json]` validates
+  (ids must exist in the cut; protected flag recomputed from the DB, never trusted from the file) and stores it;
+  `critic list [--cut] --json`, `critic show <file|latest> --json`, `critic resolve <file> <finding id>
+  applied|skipped|protected [--note]`, `critic summary [--cut] --json` (per round: counts by severity and resolution, plus
+  the applied changes as one line each).
+- `clippilot critic context [--cut id] --out <dir> --json`: brief + per panel (scene name / event, position, intent, state,
+  moment: range, speed, played duration, tier / shot / role, description, speech + speech_cut, jitter, shakes (when W1 is
+  in; tolerate absence), motion camera / change, audio_keep, protected + why, dup-group alternatives + candidate ids, prev /
+  next panel ids) and one still strip PNG per panel: frames every 0.5 s of the played range + the exact last frame, from
+  the proxy, labelled with the time, composited with `sharp` (max 12 frames per strip; longer panels sample evenly + last).
+  Tests: context JSON from a fixture DB, strip timestamps (pure), protected reasons, strip rendering on a tiny generated clip.
+- Story preview (for C2): `src/core/critic/preview.ts` builds an ffmpeg filter graph from the cut (trim, speed via setpts /
+  atempo, keep-audio full volume, others −18 dB, burned label "S<scene>·P<panel>") → 480p H.264/AAC; pure graph builder
+  tested, one integration test on generated media.
+- `clippilot critic story [--cut id] [--yes] [--json]` [D-11]: renders the preview, estimates cost (pure, tested); without
+  `--yes` prints `{estimate_usd, duration_sec, preview}` and exits 2; with `--yes` uploads (Files API, as analyze does for
+  big proxies) to `story_critic_model` (default `gemini-2.5-pro`) with a prompt (brief, panel table with labels/ids/intents,
+  rules: what to look for — pacing, order, scene membership, repetition, ending, too-long holds, cut-off speech — and the
+  findings JSON format), validates with the same schema (retry malformed JSON up to 3×, like analyze), saves it as critic
+  `story`. Gemini client injectable; tests with a fake client.
+
+**C2 — critic agents + review loop skill (planner, 2026-11-25; after C1 + D1)** — written by the planner (prompts/skills,
+no production code): `.claude/agents/cut-critic.md` [D-10], `.claude/skills/cut-critic/SKILL.md` (rules: static ≈ 2–3 s,
+speech / clear action longer; cut-off sentences; shakes / shaky moments with calmer alternatives; last panel of a scene
+holding a static image; clip belonging to the neighbouring scene's event; repetition of near-identical shots; every
+proposal concrete: new in/out, replacement moment id, target scene), and a "Review loop" section in the clippilot skill
+[D-13]: steps, cost OK, `--ai` edits, `critic resolve`, change list format.
+
+**A1 — acceptance prep (planner, after C2)** [D-14].
+
 - Also open (no decision needed): the "locked" band is misleading until light-jitter calibration — treat Arrifana as all
   handheld (resolve-prep marks every non-shaky clip orange anyway in practice: 5 locked panels are really handheld);
   `clippilot` skill changes (transcribe/speech) not installed globally (`npm run skill:install` = the user's call);
