@@ -1545,6 +1545,13 @@ document every assumption. Each item below is marked [D-n] and referenced from t
 - [D-13] Loop: max 3 rounds; apply must + should that are not protected; nits are listed, not applied; protected items are
   listed for the user; stops early when a round has no must/should. Story critic runs in round 1 and in the last round
   only (cost), cut critic every round.
+- [D-15] Moments are shared between cuts ("the moment is the edit"): AI trims the loop makes on the "Acceptance" cut also
+  change those moments in "Main" (only unprotected ones). Backup before seeding: `clippilot.pre-acceptance.db`.
+- [D-16] The planner spent ≈ $0.60 of Gemini credits on test runs of the story critic (one failed on the retired model).
+- [D-17] (W1) The boundary nudge uses high-confidence shakes only.
+- [D-18] The review loop is its own skill (`review-loop`) next to the `cut-critic` skill + agent, not a section of the
+  clippilot skill; `npm run skill:install` now installs all three skills and the agent.
+- [D-19] (D1) see "D1 result": draft speed records `ai_speed`; "★" = effective hero; action = role OR change OR camera.
 - [D-14] Acceptance prep: the planner copies the Arrifana cut "Main" into a cut "Acceptance" and seeds ~10 faults
   (key in `~/Video/ClipPilot Arrifana/.clippilot/reviews/acceptance-key.md`, not in the repo, so the user can stay blind).
   The user's two real cases (chapter-2 clip belonging to chapter 1; last clip of chapter 1 holds a static image too long)
@@ -1674,7 +1681,23 @@ holding a static image; clip belonging to the neighbouring scene's event; repeti
 proposal concrete: new in/out, replacement moment id, target scene), and a "Review loop" section in the clippilot skill
 [D-13]: steps, cost OK, `--ai` edits, `critic resolve`, change list format.
 
-**A1 — acceptance prep (planner, after C2)** [D-14].
+**C2 result (2026-11-25):** ✅ `.claude/agents/cut-critic.md` (sonnet), `.claude/skills/cut-critic/SKILL.md`,
+`.claude/skills/review-loop/SKILL.md`; cut-critic skill revised after the trial run.
+
+**A1 — acceptance prep ✅ (2026-11-25)** [D-14]: cut **"Acceptance" (id 2)** in `~/Video/ClipPilot Arrifana` = "Main" + 9 seeded
+faults + the user's 2 real cases (42 panels, 235.7 s vs target 165 s). Key (don't read before the test):
+`~/Video/ClipPilot Arrifana/.clippilot/reviews/acceptance-key.md`.
+
+**How to run the acceptance test (user)**
+1. Review the decisions [D-1]…[D-19] above (and the implementer decisions in the W1 / C1 / C1b / D1 results).
+2. `cd ~/dev/clippilot && npm run skill:install` (installs the clippilot, cut-critic, review-loop skills and the cut-critic
+   agent globally — needed when the session runs outside this repo).
+3. In a Claude Code session in `~/Video/ClipPilot Arrifana`: "Run the review loop on the cut Acceptance". Claude shows the
+   story-critic cost (≈ $0.15 per run, 2 runs) and waits for your OK; then up to 3 rounds; change list in chat.
+4. Look at the board (cut "Acceptance"; every change is one undo step) and score against the key: ≥ 8 of 11 found, few
+   false alarms (PRD 2b.7).
+5. To reset: copy `.clippilot/clippilot.pre-acceptance.db` over `.clippilot/clippilot.db` (board closed). Note that the
+   backup predates migrations 024 (runs again automatically) — nothing else is lost.
 
 - Also open (no decision needed): the "locked" band is misleading until light-jitter calibration — treat Arrifana as all
   handheld (resolve-prep marks every non-shaky clip orange anyway in practice: 5 locked panels are really handheld);
