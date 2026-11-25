@@ -1695,6 +1695,43 @@ pass the cut id; `panel move` is 0-based vs 1-based findings → `critic show` a
 after moves → labels stored at save time, merged findings shown once (`distinct_changes`); must-haves → `brief_check`
 in `critic context`; rules for conflicting findings across critics written into the review-loop skill. C1d ✅ (1238 tests).
 
+**F1 — shake fit: trim/split around shakes, AI check, mark (user decision 2026-11-25, planner spec)** — replaces the W1
+boundary nudge. Why (user, after the dry run): the kiss (moment 241, 7.0–10.0 s) still contains a shake at 8.02–8.14 s;
+whether a shake gets fixed must not depend on an LLM critic noticing it. Decisions (user): **all shakes** (high and low
+confidence) count; **Gemini Flash** verifies; applies to **every unprotected AI moment**, also ones placed in a cut.
+Steps per moment (after `motion` has detected the clip's shakes):
+1. **Plan (pure, deterministic)** `planShakeFix(range, shakes, sentences)`: clean parts = range minus every overlapping
+   shake (shake bounds ± 1 frame); parts < 1.0 s are dropped. No overlap → `clean`. One part ≥ 2 s → `trim` to it.
+   Several parts ≥ 1.0 s with total ≥ 2 s → `split` (first part stays the moment, the others become sibling AI moments
+   with `split_of`, as D1 `cut-out`). Nothing usable (total < 2 s) → `kept` ("no clean range"). A plan that would newly
+   cut a sentence → `kept` ("speech").
+2. **Verify (Gemini Flash, `gemini_model`)** only for `trim` / `split` plans: inline proxy segment of the original range
+   (± 0.5 s), the moment's description, the shake times and the proposed part(s); Zod answer `{keeps_content: boolean,
+   reason: string}` (retry malformed 3×). The question: does the edited version still contain the moment's key action
+   complete — or does the key action happen during a removed shake (e.g. the kiss at the shake)?
+3. **Apply or mark:** yes → apply (trim via `snapUnprotected`, split via the D1 cut-out path with `ai`: panels using the
+   moment get the sibling panel(s) right behind) → `shake_status = 'fixed'`; no → range unchanged, `shake_status =
+   'kept'`, `shake_note` = Gemini's reason. Protected moments: never changed; marked `kept` ("protected") when they contain
+   a shake. Moments without shakes: `clean`.
+- Storage: migration 025 `highlights.shake_status TEXT` (null = not checked | clean | fixed | kept), `shake_note TEXT`,
+  `shake_checked_start/_end REAL` (range that was checked; a changed range → checked again next run, no repeat Gemini call
+  for an unchanged range).
+- Where it runs: `clippilot shakes fix [--project] [--cut <id>] [--dry-run] [--json]` (dry run = plans only, no Gemini
+  call, no writes; JSON: per moment status, plan, verdict, reason; totals + Gemini calls); `motion` (and so `analyze`)
+  runs it after detection instead of the old nudge (remove `nudgeClip`/`nudgeRange`). The review-loop and drafting
+  skills run `shakes fix` after `cut apply` and after each loop round (AI range edits can create new overlaps).
+- Undo: one history step "Shake fix (n moments)" per cut that uses a changed moment (snapshot covers those moments,
+  siblings and panels), so the board can undo it.
+- Output: `shake_status` + `shake_note` on `moments list` / `cut show` moments and `critic context`; drawer line
+  "Shake kept — <note>" / "Shake trimmed out"; tile "≈" stays for `kept` and for shaky jitter.
+- Tests first: planner (no shake, shake at start → trim, at end → trim, middle → split, two shakes → 3 parts / drop tiny
+  parts, total < 2 s → kept, new speech cut → kept, low + high both count), verifier with a fake client (yes → applied,
+  no → kept with note, malformed → retry), split creates sibling moments + panels in every cut using the moment,
+  protected untouched but marked, idempotent re-run (no second Gemini call), changed range re-checked, undo restores
+  moments + panels, dry run writes nothing.
+- Done when: typecheck + test:all green; planner runs `shakes fix --dry-run` then the real run on Arrifana (backup first;
+  42 of 167 moments contain shakes; ≈ $0.02) and checks the kiss (241) plus 5 fixed and 5 kept moments on the stills.
+
 **How to run the acceptance test (user)**
 1. Review the decisions [D-1]…[D-19] above (and the implementer decisions in the W1 / C1 / C1b / D1 results).
 2. `cd ~/dev/clippilot && npm run skill:install` (installs the clippilot, cut-critic, review-loop skills and the cut-critic
