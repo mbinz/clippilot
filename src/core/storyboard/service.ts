@@ -12,6 +12,9 @@ import { isTier, tierRankSql, type Tier } from '../tiers.js';
 import { speechForRange, type SpeechCut } from '../transcribe/speech.js';
 import { jitterBand, type JitterBand, type JitterBandConfig } from '../motion/motion.js';
 import { isMeasured } from '../motion/index.js';
+import { momentMotion, shakesForMoment, type ShakeView } from '../motion/curve.js';
+import { MotionRepository, type StoredCurve } from '../../db/repositories/motion.repository.js';
+import type { Shake } from '../motion/curve.js';
 import { DEFAULT_CONFIG } from '../config/defaults.js';
 import type { TranscriptSegment, TranscriptWord } from '../transcribe/whisper.js';
 
@@ -27,11 +30,20 @@ export interface MomentSpeech {
   speech_cut: SpeechCut;
 }
 
-/** Measured jitter and stillness of a moment's current range; both null when not measured or stale (trimmed since). */
+/**
+ * Measured jitter and stillness of a moment's current range, derived from the clip's motion curve (W1; the stored
+ * columns when there is no curve and they are not stale); null when not measured. `shakes` = the single jolts inside
+ * the range, null when the clip has no curve.
+ */
 export interface MomentMotion {
   jitter: { score: number; band: JitterBand } | null;
   motion: { camera: number; change: number } | null;
+  shakes: ShakeView[] | null;
 }
+
+/** One clip's stored motion data, loaded once per read. */
+type ClipMotion = { curve: StoredCurve; shakes: Shake[] } | null;
+type MotionCache = Map<number, ClipMotion>;
 
 export type MomentWithSpeech = HighlightRecord & MomentSpeech & MomentMotion;
 
@@ -101,6 +113,7 @@ export interface MomentRow {
   speech_cut: SpeechCut;
   jitter: MomentMotion['jitter'];
   motion: MomentMotion['motion'];
+  shakes: MomentMotion['shakes'];
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -112,11 +125,26 @@ export class StoryboardService {
     private jitterCfg: JitterBandConfig = DEFAULT_CONFIG,
   ) {}
 
-  private motionOf(m: HighlightRecord): MomentMotion {
-    if (!isMeasured(m)) return { jitter: null, motion: null };
+  private motionOf(m: HighlightRecord, cache: MotionCache): MomentMotion {
+    if (!cache.has(m.clip_id)) {
+      const repo = new MotionRepository(this.db);
+      const curve = repo.getCurve(m.clip_id);
+      cache.set(m.clip_id, curve ? { curve, shakes: repo.getShakes(m.clip_id) } : null);
+    }
+    const cm = cache.get(m.clip_id)!;
+    if (cm) {
+      const v = momentMotion(cm.curve, m.start_sec, m.end_sec);
+      return {
+        jitter: { score: v.jitter.score, band: jitterBand(v.jitter.score, this.jitterCfg) },
+        motion: { camera: v.camera, change: v.change },
+        shakes: shakesForMoment(cm.shakes, cm.curve.medianResidual, m.start_sec, m.end_sec, m.speed ?? 1),
+      };
+    }
+    if (!isMeasured(m)) return { jitter: null, motion: null, shakes: null };
     return {
       jitter: { score: m.jitter_score!, band: jitterBand(m.jitter_score!, this.jitterCfg) },
       motion: { camera: m.camera_motion ?? 0, change: m.frame_change ?? 0 },
+      shakes: null,
     };
   }
 
@@ -328,10 +356,11 @@ export class StoryboardService {
     };
     const momentStmt = this.db.prepare('SELECT * FROM highlights WHERE id = ?');
     const transcripts = new Map<number, { segments: TranscriptSegment[]; words: TranscriptWord[] } | null>();
+    const motions: MotionCache = new Map();
     const momentOf = (mid: number | null): MomentWithSpeech | null => {
       if (mid === null) return null;
       const m = momentStmt.get(mid) as HighlightRecord | undefined;
-      return m ? { ...m, ...this.speechOf(m, transcripts), ...this.motionOf(m) } : null;
+      return m ? { ...m, ...this.speechOf(m, transcripts), ...this.motionOf(m, motions) } : null;
     };
 
     const totals = { panels: 0, filled: 0, candidates: 0, gaps: 0, duration_sec: 0 };
@@ -574,9 +603,10 @@ export class StoryboardService {
       WHERE ${where.join(' AND ')} ORDER BY h.clip_id, h.start_sec, h.id
     `).all(...params) as (HighlightRecord & { event_id: number | null })[];
     const transcripts = new Map<number, { segments: TranscriptSegment[]; words: TranscriptWord[] } | null>();
+    const motions: MotionCache = new Map();
     return rows.map((h) => ({
       ...this.speechOf(h, transcripts),
-      ...this.motionOf(h),
+      ...this.motionOf(h, motions),
       id: h.id, clip_id: h.clip_id, event_id: h.event_id, start_sec: h.start_sec, end_sec: h.end_sec,
       speed: h.speed, ai_start_sec: h.ai_start_sec, ai_end_sec: h.ai_end_sec,
       tier: h.user_tier ?? h.tier, ai_tier: h.tier, user_tier: h.user_tier, seen: h.seen_at !== null, shot: h.shot, role: h.role, issues: JSON.parse(h.issues || '[]') as string[],

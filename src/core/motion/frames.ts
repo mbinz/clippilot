@@ -32,7 +32,7 @@ export const decodeClipFrames: ClipFrameSource = async (req) => {
     p.stderr.on('data', (c: Buffer) => { err += c; });
     const exited = new Promise<number | null>((resolve, reject) => { p.on('error', reject); p.on('close', resolve); });
     exited.catch(() => {});
-    let pending = Buffer.alloc(0);
+    let pending: Buffer = Buffer.alloc(0);
     let count = 0;
     try {
       for await (const chunk of p.stdout as AsyncIterable<Buffer>) {
