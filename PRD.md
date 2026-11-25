@@ -1,5 +1,8 @@
 # ClipPilot — PRD
 
+> 2026-11-25: **learning from human choices** planned (roadmap 2c) after three grilling rounds: all agent instructions
+> move to `instructions/`, the user's final cut vs the AI's cut drives approved instruction changes and project proposals.
+>
 > 2026-11-23: v0.2 accepted (Arrifana rough cut preferred over an empty timeline, export clean). v0.3 planned after a
 > grilling round + three mockup rounds (`mockups/scene-board-v3.html`): **the moment is the edit**, two drawers
 > (panel = choose, moment = review), similar moments + alternatives, "seen". Prioritized roadmap below.
@@ -37,6 +40,10 @@ finishing.
 - **AI proposes, human confirms — and confirmation is optional.** Everything the AI proposes is usable as-is; human choices are marked as such. As AI gets better, approval can drop away without a redesign.
 - **Human changes are protected.** No tool (draft, critics, normalisers, resolve-prep) changes what the user touched: moments trimmed / sped / confirmed / ★'d / rejected, panels the user placed, scenes the user made or changed. Tools may *point at* them; the user decides. (2026-11-24)
 - **Reviewers don't edit.** Critics and resolve-prep only report or mark; only Claude (the drafter) changes the cut, and only what isn't protected. (2026-11-24)
+- **The system learns from the user, through approved instruction changes.** After a project the user can start a
+  learning step: Claude compares the AI's cut with the final cut and proposes changes to agent instructions (any step:
+  analyze, brief, draft, critics, review loop) and to the project (missing tools, step order, coded rules). The user
+  approves each one; nothing learns on its own. (2026-11-25)
 - **Categorical tags over absolute scores.** The model is asked for checkable categories (tier, shot, role, issues), not 1–5 numbers. What can be measured (shake, frame rate, duration) is computed in code, not asked of the model.
 - **One path into the timeline.** Everything on a timeline — own clips, generated cards, stock, AI video — is a real file that goes through normal ingest.
 - **v1: Claude drafts in chat, the UI shows and steers.** Long-term the UI becomes the main workspace and starts AI actions itself (roadmap, below).
@@ -174,6 +181,17 @@ finishing tool; fine cut, timing, mix and grade taste stay manual. Full workflow
       max 3 rounds; result on the board (undoable history) + short change list in chat.
    7. **Acceptance** — ~10 seeded faults in a copy of the Arrifana cut + the user's 2 real cases (+ notes later); ≥ 8/10
       found, few false alarms.
+2c. **Learning from human choices (decided 2026-11-25, grilling rounds 1–3):** after 2b, before full Portugal's learning
+   run (recording must exist before Portugal). Critics are the definition of quality; Claude improves the cut with the
+   editing tools; the user's final cut is the answer key.
+   1. **L0 Instructions in one place** — every prompt/skill in `instructions/`, `.claude` points there; Claude's skill
+      split by role (clippilot, brief, draft, **edit** = the catalogue of editing tools that exist today, cut-critic,
+      review-loop); "Pipeline: who does what" in ARCHITECTURE.md.
+   2. **L1 Who made each edit** — edit history records `ai | user` per step.
+   3. **L2 Human interventions, static** — `clippilot learn context`: the AI's last version vs the final cut (panels,
+      scenes, moments, rejects, hidden clips) + every critic finding and what happened to it + the brief.
+   4. **L3 Learning skill** — started by the user; patterns → which step owns each → (A) instruction diffs, (B) project
+      proposals into STATUS.md; short interview, one question per pattern; the user accepts / edits / rejects each.
 3. **Mac app + ingest/analyze from the UI** — Electron shell around the server + web UI, project picker, CLI keeps
    working on the same DB; no terminal for a new trip. CI comes with packaging.
 4. **Assistant in the app** — chat panel in the board (Claude via the Agent SDK with the user's login, acting through
@@ -193,7 +211,7 @@ finishing tool; fine cut, timing, mix and grade taste stay manual. Full workflow
 - Effects, transitions, audio mixing
 - Touching originals (delete / move / rename)
 - Bins / keywords / selects export
-- Learned taste profiles
+- Automatically learned taste profiles (learning only through user-approved instruction changes, roadmap 2c)
 - AI model provider abstraction; packaging, CI, MCP surface; Resolve scripting
 
 ## Future / wishlist
