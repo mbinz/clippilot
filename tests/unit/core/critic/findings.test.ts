@@ -156,7 +156,7 @@ describe('ReviewStore', () => {
   it('summarises per round: severities, resolutions and the applied changes', () => {
     const store = new ReviewStore(dir);
     const r1 = store.save(parsed({ round: 1 }, [
-      finding({ id: 'a', severity: 'must', kind: 'trim', panel_id: 5, proposal: 'out at 3.0' }),
+      finding({ id: 'a', severity: 'must', kind: 'trim', panel_id: 5, proposal: { start_sec: 12, end_sec: 15.5 } }),
       finding({ id: 'b', severity: 'should', kind: 'remove', panel_id: 6, message: 'dup' }),
       finding({ id: 'c', severity: 'nit', kind: 'other' }),
       finding({ id: 'd', severity: 'must', kind: 'replace', protected: true }),
@@ -172,6 +172,67 @@ describe('ReviewStore', () => {
       by_severity: { must: 2, should: 2, nit: 1 },
       by_resolution: { applied: 1, skipped: 1, protected: 1, open: 2 },
     });
-    expect(s[0]!.applied).toEqual(['S1·P2 trim: out at 3.0']);
+    expect(s[0]!.applied).toEqual(['S1·P2 trim: 12.0–15.5 s']);
+  });
+});
+
+describe('structured proposals', () => {
+  const check = (f: ReturnType<typeof fixture>, over: Record<string, unknown>) => {
+    const parsed = FindingsFileSchema.safeParse(file([finding({ id: 'P', panel_id: f.p1.id, ...over })], { cut_id: f.cut.id }));
+    if (!parsed.success) return parsed.error.issues.map((i) => i.message);
+    return validateAgainstCut(parsed.data, f.svc.getCut(f.cut.id)!, new HighlightRepository(f.db)).errors;
+  };
+
+  it('accepts valid proposals of every kind', () => {
+    const f = fixture();
+    // m1 = 1-5 s in a 30 s clip; p1 is the only panel in sc1; sc2 holds p2
+    expect(check(f, { kind: 'trim', proposal: { start_sec: 1.5, end_sec: 4, note: 'tighter' } })).toEqual([]);
+    expect(check(f, { kind: 'replace', proposal: { moment_id: f.m3 } })).toEqual([]);
+    expect(check(f, { kind: 'remove', proposal: {} })).toEqual([]);
+    expect(check(f, { kind: 'reorder', proposal: { position: 1 } })).toEqual([]);
+    expect(check(f, { kind: 'move_scene', proposal: { to_scene_id: f.sc2.id, position: 1 } })).toEqual([]);
+    expect(check(f, { kind: 'speed', proposal: { speed: 0.5 } })).toEqual([]);
+    expect(check(f, { kind: 'cut_out', proposal: { from: 2, to: 3 } })).toEqual([]);
+    expect(check(f, { kind: 'other' })).toEqual([]);
+    expect(check(f, { kind: 'trim' })).toEqual([]);
+  });
+
+  it.each([
+    ['trim outside the clip', { kind: 'trim', proposal: { start_sec: 1, end_sec: 31 } }, /clip/],
+    ['trim negative start', { kind: 'trim', proposal: { start_sec: -1, end_sec: 3 } }, /clip/],
+    ['trim shorter than 0.5 s', { kind: 'trim', proposal: { start_sec: 2, end_sec: 2.5 } }, /0\.5/],
+    ['replace with unknown moment', { kind: 'replace', proposal: { moment_id: 99999 } }, /moment 99999/],
+    ['reorder to position 0', { kind: 'reorder', proposal: { position: 0 } }, /position/],
+    ['reorder beyond the scene', { kind: 'reorder', proposal: { position: 5 } }, /position/],
+    ['move to a scene outside the cut', { kind: 'move_scene', proposal: { to_scene_id: 99999 } }, /scene 99999/],
+    ['speed 2', { kind: 'speed', proposal: { speed: 2 } }, /./],
+    ['cut_out outside the moment', { kind: 'cut_out', proposal: { from: 0, to: 3 } }, /moment/],
+    ['cut_out reversed', { kind: 'cut_out', proposal: { from: 4, to: 3 } }, /moment|from/],
+    ['a field of another kind', { kind: 'remove', proposal: { start_sec: 1 } }, /remove/],
+    ['a proposal on other', { kind: 'other', proposal: { note: 'x' } }, /other/],
+    ['a string proposal', { kind: 'trim', proposal: 'out at 3' }, /./],
+  ])('rejects %s', (_n, over, re) => {
+    const f = fixture();
+    expect(check(f, over as Record<string, unknown>).join('\n')).toMatch(re);
+  });
+
+  it('rejects replacing with a rejected moment', () => {
+    const f = fixture();
+    f.db.prepare("UPDATE highlights SET status = 'rejected' WHERE id = ?").run(f.m3);
+    expect(check(f, { kind: 'replace', proposal: { moment_id: f.m3 } }).join('\n')).toMatch(/rejected/);
+  });
+
+  it('reads stored files with a string proposal as {note}, and summarises other shapes', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'clippilot-reviews-'));
+    const store = new ReviewStore(dir);
+    const saved = store.save(FindingsFileSchema.parse(file([finding()])));
+    const p = path.join(dir, saved.file);
+    const raw = JSON.parse(fs.readFileSync(p, 'utf-8'));
+    raw.findings[0].proposal = 'out at 3.0';
+    fs.writeFileSync(p, JSON.stringify(raw));
+    expect(store.load(saved.file).findings[0]!.proposal).toEqual({ note: 'out at 3.0' });
+    store.resolve(saved.file, 'F1', 'applied');
+    expect(store.summary(1)[0]!.applied).toEqual(['cut trim: out at 3.0']);
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 });

@@ -11,6 +11,26 @@ export const KINDS = ['trim', 'replace', 'remove', 'reorder', 'move_scene', 'spe
 export const RESOLUTIONS = ['applied', 'skipped', 'protected'] as const;
 export type Resolution = (typeof RESOLUTIONS)[number];
 
+/**
+ * What a finding proposes, machine-applicable. All fields optional; which ones are allowed and valid depends on the finding's
+ * `kind` (checked in `validateAgainstCut`). Times are clip seconds. `note` is free text allowed on any proposal.
+ */
+export const ProposalSchema = z.object({
+  start_sec: z.number().optional(), end_sec: z.number().optional(),                       // trim
+  moment_id: z.number().int().optional(),                                                  // replace
+  position: z.number().int().optional(),                                                   // reorder, move_scene
+  to_scene_id: z.number().int().optional(),                                                // move_scene
+  speed: z.union([z.literal(1), z.literal(0.5), z.literal(0.25)]).optional(),              // speed
+  from: z.number().optional(), to: z.number().optional(),                                  // cut_out
+  note: z.string().optional(),
+}).strict();
+export type Proposal = z.infer<typeof ProposalSchema>;
+
+const PROPOSAL_FIELDS: Record<(typeof KINDS)[number], readonly string[]> = {
+  trim: ['start_sec', 'end_sec'], replace: ['moment_id'], remove: [], reorder: ['position'],
+  move_scene: ['to_scene_id', 'position'], speed: ['speed'], cut_out: ['from', 'to'], other: [],
+};
+
 export const FindingSchema = z.object({
   id: z.string().min(1),
   severity: z.enum(SEVERITIES),
@@ -19,7 +39,7 @@ export const FindingSchema = z.object({
   moment_id: z.number().int().optional(),
   scene_id: z.number().int().optional(),
   message: z.string().min(1),
-  proposal: z.string().optional(),
+  proposal: ProposalSchema.optional(),
   /** Always recomputed from the database on save; whatever a critic writes here is ignored. */
   protected: z.boolean().default(false),
 });
@@ -55,6 +75,60 @@ function isProtected(f: Finding, panels: Map<number, PanelNode>, hl: HighlightRe
   return momentProtected(f.moment_id) || momentProtected(panel?.moment_id) || panel?.source === 'user';
 }
 
+function proposalErrors(
+  f: Finding,
+  ctx: { moment: { start: number; end: number; clipDuration: number | null } | undefined; panelsInScene: number | undefined; scenes: Set<number>; hl: HighlightRepository },
+): string[] {
+  const pr = f.proposal!;
+  const e: string[] = [];
+  const bad = (msg: string) => e.push(`finding ${f.id}: ${msg}`);
+  if (f.kind === 'other') { bad('a finding of kind other has no proposal'); return e; }
+  const allowed = PROPOSAL_FIELDS[f.kind];
+  for (const k of Object.keys(pr)) {
+    if (k !== 'note' && !allowed.includes(k)) bad(`proposal field "${k}" does not belong to kind ${f.kind}${allowed.length ? ` (allowed: ${allowed.join(', ')})` : ''}`);
+  }
+  switch (f.kind) {
+    case 'trim': {
+      const { start_sec: a, end_sec: b } = pr;
+      if ((a === undefined) !== (b === undefined)) bad('trim needs both start_sec and end_sec');
+      else if (a !== undefined && b !== undefined) {
+        if (a < 0 || (ctx.moment?.clipDuration != null && b > ctx.moment.clipDuration)) bad(`trim ${a}-${b} s lies outside the clip${ctx.moment?.clipDuration != null ? ` (0-${ctx.moment.clipDuration} s)` : ''}`);
+        if (!(b > a + 0.5)) bad(`trim end_sec must be more than 0.5 s after start_sec (got ${a}-${b})`);
+      }
+      break;
+    }
+    case 'replace': {
+      const id = pr.moment_id;
+      if (id !== undefined) {
+        const m = ctx.hl.findById(id);
+        if (!m) bad(`replace: moment ${id} does not exist`);
+        else if (m.status === 'rejected') bad(`replace: moment ${id} is rejected`);
+      }
+      break;
+    }
+    case 'reorder':
+      if (pr.position !== undefined && (pr.position < 1 || (ctx.panelsInScene !== undefined && pr.position > ctx.panelsInScene))) {
+        bad(`reorder position ${pr.position} is outside the scene (1-${ctx.panelsInScene ?? '?'})`);
+      }
+      break;
+    case 'move_scene':
+      if (pr.to_scene_id !== undefined && !ctx.scenes.has(pr.to_scene_id)) bad(`move_scene: scene ${pr.to_scene_id} is not in the cut`);
+      if (pr.position !== undefined && pr.position < 1) bad(`move_scene position ${pr.position} must be 1 or more`);
+      break;
+    case 'cut_out': {
+      const { from, to } = pr;
+      if ((from === undefined) !== (to === undefined)) bad('cut_out needs both from and to');
+      else if (from !== undefined && to !== undefined) {
+        if (!(to > from)) bad(`cut_out to (${to}) must be after from (${from})`);
+        if (ctx.moment && (from < ctx.moment.start || to > ctx.moment.end)) bad(`cut_out ${from}-${to} s lies outside the moment (${ctx.moment.start}-${ctx.moment.end} s)`);
+      }
+      break;
+    }
+    default:
+  }
+  return e;
+}
+
 /** Check ids against the cut (everything must exist in it) and recompute `protected` from the database. */
 export function validateAgainstCut(
   file: FindingsFile, tree: CutTree, hl: HighlightRepository,
@@ -68,6 +142,14 @@ export function validateAgainstCut(
     if (p.moment_id !== null) moments.add(p.moment_id);
     for (const c of p.candidates) moments.add(c.id);
   }
+  const momentInfo = new Map<number, { start: number; end: number; clipDuration: number | null }>();
+  for (const p of panels.values()) {
+    for (const m of [p.moment, ...p.candidates]) {
+      if (m) momentInfo.set(m.id, { start: m.start_sec, end: m.end_sec, clipDuration: m.clip_id === p.clip?.id ? p.clip.duration_sec : null });
+    }
+  }
+  const sceneOfPanel = new Map<number, (typeof tree.scenes)[number]>();
+  for (const sc of tree.scenes) for (const p of sc.panels) sceneOfPanel.set(p.id, sc);
   const seen = new Set<string>();
   for (const f of file.findings) {
     if (seen.has(f.id)) errors.push(`duplicate finding id "${f.id}"`);
@@ -75,6 +157,15 @@ export function validateAgainstCut(
     if (f.panel_id !== undefined && !panels.has(f.panel_id)) errors.push(`finding ${f.id}: panel ${f.panel_id} is not in cut ${tree.cut.id}`);
     if (f.moment_id !== undefined && !moments.has(f.moment_id)) errors.push(`finding ${f.id}: moment ${f.moment_id} is not in cut ${tree.cut.id}`);
     if (f.scene_id !== undefined && !scenes.has(f.scene_id)) errors.push(`finding ${f.id}: scene ${f.scene_id} is not in cut ${tree.cut.id}`);
+    if (f.proposal) {
+      const pf = f.panel_id === undefined ? undefined : panels.get(f.panel_id);
+      const mid = f.moment_id ?? pf?.moment?.id ?? pf?.moment_id ?? undefined;
+      errors.push(...proposalErrors(f, {
+        moment: mid === undefined ? undefined : momentInfo.get(mid),
+        panelsInScene: f.panel_id === undefined ? undefined : sceneOfPanel.get(f.panel_id)?.panels.length,
+        scenes, hl,
+      }));
+    }
   }
   return {
     errors,
@@ -98,8 +189,24 @@ export interface RoundSummary {
   findings: number;
   by_severity: Record<(typeof SEVERITIES)[number], number>;
   by_resolution: Record<Resolution | 'open', number>;
-  /** One line per applied finding: "<panel label> <kind>: <proposal or message>". */
+  /** One line per applied finding: "<panel label> <kind>: <readable proposal or message>". */
   applied: string[];
+}
+
+const t1 = (n: number) => n.toFixed(1);
+
+/** Readable one-liner of a proposal ("12.0–15.5 s", "speed x0.5", ...); null when it says nothing. */
+export function describeProposal(p: Proposal | undefined): string | null {
+  if (!p) return null;
+  const parts: string[] = [];
+  if (p.start_sec !== undefined && p.end_sec !== undefined) parts.push(`${t1(p.start_sec)}–${t1(p.end_sec)} s`);
+  if (p.from !== undefined && p.to !== undefined) parts.push(`cut ${t1(p.from)}–${t1(p.to)} s`);
+  if (p.moment_id !== undefined) parts.push(`moment ${p.moment_id}`);
+  if (p.to_scene_id !== undefined) parts.push(`to scene ${p.to_scene_id}${p.position !== undefined ? ` at position ${p.position}` : ''}`);
+  else if (p.position !== undefined) parts.push(`to position ${p.position}`);
+  if (p.speed !== undefined) parts.push(`speed x${p.speed}`);
+  if (p.note) parts.push(parts.length ? `(${p.note})` : p.note);
+  return parts.length ? parts.join(' ') : null;
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -128,7 +235,12 @@ export class ReviewStore {
   }
 
   private read(p: string): StoredReview {
-    return JSON.parse(fs.readFileSync(p, 'utf-8')) as StoredReview;
+    const review = JSON.parse(fs.readFileSync(p, 'utf-8')) as StoredReview;
+    // Files written before proposals were structured hold a free string.
+    for (const f of review.findings) {
+      if (typeof (f as { proposal?: unknown }).proposal === 'string') f.proposal = { note: (f as unknown as { proposal: string }).proposal };
+    }
+    return review;
   }
 
   private resolvePath(ref: string): string {
@@ -175,7 +287,7 @@ export class ReviewStore {
         if (res?.status === 'applied') {
           const where = f.panel_id !== undefined ? (labels.get(f.panel_id) ?? `panel ${f.panel_id}`)
             : f.moment_id !== undefined ? `moment ${f.moment_id}` : f.scene_id !== undefined ? `scene ${f.scene_id}` : 'cut';
-          r.applied.push(`${where} ${f.kind}: ${f.proposal ?? f.message}`);
+          r.applied.push(`${where} ${f.kind}: ${describeProposal(f.proposal) ?? f.message}`);
         }
       }
     }

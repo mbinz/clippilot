@@ -19,7 +19,7 @@ function fixture() {
 }
 
 const good = (f: ReturnType<typeof fixture>) => JSON.stringify({
-  findings: [{ id: 'F1', severity: 'should', kind: 'trim', panel_id: f.p2.id, message: 'holds too long', proposal: 'out at 9.0' }],
+  findings: [{ id: 'F1', severity: 'should', kind: 'trim', panel_id: f.p2.id, message: 'holds too long', proposal: { start_sec: 8, end_sec: 9 } }],
 });
 
 function fake(responses: (string | Error)[]): StoryCriticClient & { calls: number } {
@@ -48,6 +48,28 @@ describe('buildStoryPrompt [D-11]', () => {
   });
 });
 
+describe('buildStoryPrompt proposals and panel timing', () => {
+  it('describes the proposal format and gives clip in/out, speed and preview start per panel, plus speech', () => {
+    const f = fixture();
+    f.db.prepare('UPDATE highlights SET speed = 0.5 WHERE id = ?').run(f.m1);
+    const text = (({ system, user }) => system + '\n' + user)(buildStoryPrompt(f.svc.getCut(f.cut.id)!));
+    for (const k of ['start_sec', 'end_sec', 'moment_id', 'position', 'to_scene_id', 'speed', 'from', 'note', 'clip time']) expect(text).toContain(k);
+    expect(text).toMatch(/S1·P1.*in 1 .*out 4.*speed 0\.5.*preview 0\.0 s/);
+    // m1 plays (4-1)/0.5 = 6 s, so panel 2 starts at 6.0 s in the preview
+    expect(text).toMatch(/S1·P2.*in 8.*out 10.*preview 6\.0 s/);
+    expect(text.toLowerCase()).toContain('speech');
+  });
+
+  it('includes the moment speech truncated to ~200 chars', () => {
+    const f = fixture();
+    const tree = f.svc.getCut(f.cut.id)!;
+    tree.scenes[0]!.panels[0]!.moment!.speech = 'x'.repeat(500);
+    const u = buildStoryPrompt(tree).user;
+    expect(u).toMatch(/speech: "x{200}…"/);
+    expect(u).not.toMatch(/x{201}/);
+  });
+});
+
 describe('runStoryCritic', () => {
   it('returns validated findings tagged as the story critic, with protected recomputed from the DB', async () => {
     const f = fixture();
@@ -71,6 +93,15 @@ describe('runStoryCritic', () => {
     const client = fake(['not json', badIds, good(f)]);
     const r = await runStoryCritic({ client, model: 'm', preview: '/p.mp4', tree: f.svc.getCut(f.cut.id)!, hl: new HighlightRepository(f.db), round: 1 });
     expect(client.calls).toBe(3);
+    expect(r.findings).toHaveLength(1);
+  });
+
+  it('treats an invalid proposal as malformed and retries', async () => {
+    const f = fixture();
+    const badProposal = JSON.stringify({ findings: [{ id: 'X', severity: 'must', kind: 'trim', panel_id: f.p2.id, message: 'm', proposal: { start_sec: 8, end_sec: 99 } }] });
+    const client = fake([badProposal, good(f)]);
+    const r = await runStoryCritic({ client, model: 'm', preview: '/p.mp4', tree: f.svc.getCut(f.cut.id)!, hl: new HighlightRepository(f.db), round: 1 });
+    expect(client.calls).toBe(2);
     expect(r.findings).toHaveLength(1);
   });
 

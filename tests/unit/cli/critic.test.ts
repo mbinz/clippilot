@@ -59,7 +59,7 @@ const findingsFile = (o: Record<string, unknown> = {}, findings?: unknown[]) => 
   fs.writeFileSync(p, JSON.stringify({
     critic: 'cut', cut_id: ids.cut, round: 1,
     findings: findings ?? [
-      { id: 'F1', severity: 'must', kind: 'trim', panel_id: ids.p1, message: 'long', proposal: 'out at 3', protected: false },
+      { id: 'F1', severity: 'must', kind: 'trim', panel_id: ids.p1, message: 'long', proposal: { start_sec: 1, end_sec: 3 }, protected: false },
       { id: 'F2', severity: 'should', kind: 'remove', panel_id: ids.p2, message: 'dup' },
     ],
     ...o,
@@ -125,7 +125,7 @@ describe('critic save / list / show / resolve / summary', () => {
     expect(list).toEqual([expect.objectContaining({ file: saved.file, critic: 'cut', round: 1, findings: 2, open: 1 })]);
     const sum = await run({}, 'summary', '--json');
     expect(sum.cut_id).toBe(ids.cut);
-    expect(sum.rounds[0]).toMatchObject({ round: 1, by_resolution: { applied: 1, open: 1 }, applied: ['S1·P1 trim: out at 3'] });
+    expect(sum.rounds[0]).toMatchObject({ round: 1, by_resolution: { applied: 1, open: 1 }, applied: ['S1·P1 trim: 1.0–3.0 s'] });
   });
 
   it('rejects an unknown finding or resolution', async () => {

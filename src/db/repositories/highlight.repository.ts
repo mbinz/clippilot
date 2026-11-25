@@ -183,6 +183,10 @@ export class HighlightRepository {
     })();
   }
 
+  findById(id: number): HighlightRecord | undefined {
+    return this.db.prepare('SELECT * FROM highlights WHERE id = ?').get(id) as HighlightRecord | undefined;
+  }
+
   findByClip(clipId: number): HighlightRecord[] {
     return this.stmtFindByClip.all(clipId) as HighlightRecord[];
   }

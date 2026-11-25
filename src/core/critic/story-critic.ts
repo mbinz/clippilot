@@ -27,18 +27,39 @@ Judge the film as a viewer would. Look for:
 Only report real problems; prefer few, concrete findings over many vague ones. Every proposal must be concrete \
 (new in/out time, a target scene, a panel to drop). Never invent ids: use only the ids in the panel table.`;
 
-/** Brief + panel table (label, ids, scene, range, intent) + the output format; the video is attached separately. */
+const SPEECH_MAX = 200;
+const r1 = (n: number) => Math.round(n * 10) / 10;
+
+const PROPOSAL_FORMAT = `"proposal" is an optional object, fixed per kind (all times are CLIP seconds, i.e. the "in"/"out" numbers of the panel table, not preview time); any proposal may also carry "note": "free text":
+- trim: {"start_sec": <new in>, "end_sec": <new out>} (inside the clip, end more than 0.5 s after start)
+- replace: {"moment_id": <another moment of the project>}
+- remove: {}
+- reorder: {"position": <1-based position within the panel's scene>}
+- move_scene: {"to_scene_id": <scene id>, "position": <1-based, optional>}
+- speed: {"speed": 1 | 0.5 | 0.25}
+- cut_out: {"from": <clip s>, "to": <clip s>} (remove the middle part; both inside the panel's in/out)
+- other: no proposal`;
+
+/** Brief + panel table (label, ids, scene, clip in/out, speed, preview start, speech, intent) + the output format; the video is attached separately. */
 export function buildStoryPrompt(tree: CutTree): StoryPrompt {
   const labels = panelLabels(tree);
+  let t = 0;
   const rows = tree.scenes.flatMap((s) => s.panels.map((p) => {
     const m = p.state === 'filled' ? p.moment : p.candidates[0] ?? null;
-    const what = m ? `moment ${m.id} | clip ${m.clip_id} ${m.start_sec}-${m.end_sec} s x${m.speed} | ${m.description}` : 'gap (not in the video)';
+    let what = 'gap (not in the video)';
+    if (m) {
+      const speech = m.speech ? ` | speech: "${m.speech.length > SPEECH_MAX ? m.speech.slice(0, SPEECH_MAX) + '…' : m.speech}"` : '';
+      what = `moment ${m.id} | clip ${m.clip_id} in ${m.start_sec} out ${m.end_sec} s (clip time) speed ${m.speed} | preview ${r1(t).toFixed(1)} s | ${m.description}${speech}`;
+      t += (m.end_sec - m.start_sec) / m.speed;
+    }
     return `${labels.get(p.id)} | panel ${p.id} | scene ${s.id} "${s.name}" | ${what} | intent: ${p.intent}`;
   }));
-  const user = `Brief:\n${JSON.stringify(tree.brief ?? {}, null, 2)}\n\nPanels in order (label | ids | content | intent):\n${rows.join('\n')}\n\n` +
+  const user = `Brief:\n${JSON.stringify(tree.brief ?? {}, null, 2)}\n\n` +
+    `Panels in order (label | ids | clip in/out in clip seconds, speed, start time in the preview | description | speech said in it, when there is a transcript | intent). ` +
+    `Use the speech to place trims on sentence boundaries:\n${rows.join('\n')}\n\n` +
     `Answer with JSON only: {"findings": [{"id": "F1", "severity": "${SEVERITIES.join('|')}", "kind": "${KINDS.join('|')}", ` +
     `"panel_id": <number, optional>, "moment_id": <number, optional>, "scene_id": <number, optional>, "message": "what is wrong", ` +
-    `"proposal": "concrete fix, optional"}]}.\n` +
+    `"proposal": {...optional}}]}.\n${PROPOSAL_FORMAT}\n` +
     'severity: must = clearly breaks the film, should = worth fixing, nit = minor taste. Ids F1, F2, ... must be unique. ' +
     'Refer to panels by panel_id (and moment_id when it is about the clip), to scenes by scene_id. An empty list is a valid answer.';
   return { system: SYSTEM, user };
