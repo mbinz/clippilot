@@ -31,6 +31,10 @@ export interface HighlightRecord {
   ai_end_sec: number;
   /** The user's override of `tier` (the ★), or null. */
   user_tier: Tier | null;
+  /** A speed the AI set itself (draft / `--ai` edits): not the user's speed edit. Null = the default speed counts. */
+  ai_speed: number | null;
+  /** The moment this one was cut out of (a shake cut out of a good moment leaves this sibling after it). */
+  split_of: number | null;
   seen_at: string | null;
   /** Motion measurement (null = never measured); valid only while the range equals `motion_start_sec`..`motion_end_sec`. */
   jitter_score: number | null;
@@ -61,7 +65,7 @@ export interface InsertHighlight {
 function editReasons(r: HighlightRecord, fps: number | null | undefined): string[] {
   const reasons: string[] = [];
   if (r.start_sec !== (r.ai_start_sec ?? r.start_sec) || r.end_sec !== (r.ai_end_sec ?? r.end_sec)) reasons.push('trimmed');
-  if (r.speed !== defaultSpeed(r.suggested_speed, fps)) reasons.push('speed');
+  if (r.speed !== (r.ai_speed ?? defaultSpeed(r.suggested_speed, fps))) reasons.push('speed');
   if (r.user_tier !== null) reasons.push('starred');
   return reasons;
 }

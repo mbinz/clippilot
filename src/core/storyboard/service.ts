@@ -4,6 +4,7 @@ import type { Clip } from '../../types/clip.js';
 import type { HighlightRecord } from '../../db/repositories/highlight.repository.js';
 import type { EventRecord } from '../../db/repositories/event.repository.js';
 import { speedAllowed } from '../analyze/highlights.js';
+import { HighlightRepository } from '../../db/repositories/highlight.repository.js';
 import { BriefSchema, BriefStateSchema, formatIssues, type Draft } from './schema.js';
 import { applyDraft as applyDraftImpl } from './draft.js';
 import * as ops from './history.js';
@@ -20,6 +21,8 @@ import type { TranscriptSegment, TranscriptWord } from '../transcribe/whisper.js
 
 export const MAIN_CUT_NAME = 'Main';
 export const MIN_PANEL_SEC = 0.5;
+/** Both parts left by a cut-out must be at least this long. */
+export const MIN_CUT_PART_SEC = 1;
 const SPEEDS = [1, 0.5, 0.25];
 
 export type PanelClip = Pick<Clip, 'id' | 'file_path' | 'proxy_path' | 'duration_sec' | 'fps' | 'resolution' | 'hidden'>;
@@ -477,7 +480,11 @@ export class StoryboardService {
               this.db.prepare('UPDATE highlights SET ai_start_sec = start_sec, ai_end_sec = end_sec WHERE id = ?').run(m.id);
             }
           }
-          if (input.speed !== undefined) this.writeMomentSpeed(m, input.speed);
+          if (input.speed !== undefined) {
+            this.writeMomentSpeed(m, input.speed);
+            // Same for the speed: a draft's speed is the AI's choice, not a speed edit by the user.
+            if (input.source !== 'user') this.recordAiSpeed(m.id);
+          }
         }
         if (input.source === 'user') this.confirmMoment(m.id);
       } else if (input.candidates?.length) {
@@ -550,19 +557,85 @@ export class StoryboardService {
     this.db.prepare("UPDATE story_segments SET source = 'user' WHERE moment_id = ?").run(m.id);
   }
 
-  trimMoment(id: number, startSec: number, endSec: number): void {
+  /** The moment must be an untouched AI proposal before a tool (`--ai`) may change it. */
+  private assertUnprotected(m: HighlightRecord): void {
+    const reasons = new HighlightRepository(this.db).protectionReasons(m.id);
+    if (reasons.length) throw new Error(`Moment ${m.id} is protected (${reasons.join(', ')}); only you can change it`);
+  }
+
+  /** The moment's current range becomes its AI range (an AI edit is not "trimmed" by the user). */
+  private adoptRangeAsAi(id: number): void {
+    this.db.prepare('UPDATE highlights SET ai_start_sec = start_sec, ai_end_sec = end_sec WHERE id = ?').run(id);
+  }
+
+  /** The moment's current speed is the AI's own choice (null when it equals the default speed). */
+  private recordAiSpeed(id: number): void {
+    const m = this.moment(id);
+    const aiSpeed = m.speed === defaultSpeed(m.suggested_speed, this.clip(m.clip_id).fps) ? null : m.speed;
+    this.db.prepare('UPDATE highlights SET ai_speed = ? WHERE id = ?').run(aiSpeed, id);
+  }
+
+  /** `ai`: an edit by Claude in the review loop; the moment stays unconfirmed and unprotected (refused when it is protected). */
+  trimMoment(id: number, startSec: number, endSec: number, opts: { ai?: boolean } = {}): void {
     const m = this.moment(id);
     this.tx(() => {
+      if (opts.ai) this.assertUnprotected(m);
       this.writeMomentRange(m, startSec, endSec);
-      this.touchMoment(m);
+      if (opts.ai) this.adoptRangeAsAi(id);
+      else this.touchMoment(m);
     });
   }
 
-  setMomentSpeed(id: number, speed: number): void {
+  setMomentSpeed(id: number, speed: number, opts: { ai?: boolean } = {}): void {
     const m = this.moment(id);
     this.tx(() => {
+      if (opts.ai) this.assertUnprotected(m);
       this.writeMomentSpeed(m, speed);
-      this.touchMoment(m);
+      if (opts.ai) this.recordAiSpeed(id);
+      else this.touchMoment(m);
+    });
+  }
+
+  /**
+   * Cut `[fromSec, toSec]` out of a moment (a shake): the moment keeps the part before, a new sibling moment (same
+   * clip and tags, `split_of`) gets the part after and a panel of its own right behind every panel of `cutId` that
+   * uses the moment (only `panelId` when given). The sibling is always an unprotected AI moment; the trimmed moment
+   * is the user's decision unless `ai`.
+   */
+  cutOutMoment(id: number, fromSec: number, toSec: number, opts: { ai?: boolean; cutId: number; panelId?: number }): { sibling_id: number; panels: number[] } {
+    const m = this.moment(id);
+    return this.tx(() => {
+      this.assertUsable(m);
+      if (fromSec < m.start_sec || toSec > m.end_sec) throw new Error(`Cut out ${fromSec}-${toSec} must be inside the moment (${m.start_sec}-${m.end_sec})`);
+      if (toSec <= fromSec) throw new Error('Cut out must start before it ends');
+      if (fromSec - m.start_sec < MIN_CUT_PART_SEC - 1e-9) throw new Error(`Cut out must leave at least ${MIN_CUT_PART_SEC} s before the cut`);
+      if (m.end_sec - toSec < MIN_CUT_PART_SEC - 1e-9) throw new Error(`Cut out must leave at least ${MIN_CUT_PART_SEC} s after the cut`);
+      if (opts.ai) this.assertUnprotected(m);
+
+      this.writeMomentRange(m, m.start_sec, fromSec);
+      if (opts.ai) this.adoptRangeAsAi(id);
+      else this.touchMoment(m);
+
+      const fps = this.clip(m.clip_id).fps;
+      const r = this.db.prepare(`INSERT INTO highlights (clip_id, start_sec, end_sec, ai_start_sec, ai_end_sec, description, tier, shot, role,
+          issues, slowmo, slowmo_reason, suggested_speed, audio_keep, audio_type, speed, ai_speed, split_of)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(m.clip_id, toSec, m.end_sec, toSec, m.end_sec, m.description, m.tier, m.shot, m.role, m.issues, m.slowmo,
+          m.slowmo_reason, m.suggested_speed, m.audio_keep, m.audio_type, m.speed,
+          m.speed === defaultSpeed(m.suggested_speed, fps) ? null : m.speed, id);
+      const siblingId = Number(r.lastInsertRowid);
+
+      const using = this.db.prepare('SELECT id FROM story_segments WHERE story_id = ? AND moment_id = ? ORDER BY scene_id, position')
+        .all(opts.cutId, id) as { id: number }[];
+      const panels: number[] = [];
+      for (const { id: panelId } of using) {
+        if (opts.panelId !== undefined && panelId !== opts.panelId) continue;
+        const p = this.panel(panelId);
+        const added = this.addPanel(p.scene_id, { intent: p.intent, momentId: siblingId, source: 'ai' }, p.position + 1);
+        if (p.source === 'user') this.db.prepare("UPDATE story_segments SET source = 'user' WHERE id = ?").run(added.id);
+        panels.push(added.id);
+      }
+      return { sibling_id: siblingId, panels };
     });
   }
 
@@ -583,7 +656,7 @@ export class StoryboardService {
   resetMoment(id: number): void {
     const m = this.moment(id);
     const speed = defaultSpeed(m.suggested_speed, this.clip(m.clip_id).fps);
-    this.db.prepare('UPDATE highlights SET start_sec = ?, end_sec = ?, speed = ? WHERE id = ?')
+    this.db.prepare('UPDATE highlights SET start_sec = ?, end_sec = ?, speed = ?, ai_speed = NULL WHERE id = ?')
       .run(m.ai_start_sec ?? m.start_sec, m.ai_end_sec ?? m.end_sec, speed, id);
   }
 
@@ -621,15 +694,17 @@ export class StoryboardService {
     this.db.prepare('UPDATE highlights SET seen_at = ? WHERE id = ?').run(seen ? new Date().toISOString() : null, momentId);
   }
 
-  placeMoment(panelId: number, momentId: number): void {
-    this.panel(panelId);
+  /** `ai`: Claude's pick (review loop): the panel stays an AI panel and the moment is not confirmed. */
+  placeMoment(panelId: number, momentId: number, opts: { ai?: boolean } = {}): void {
+    const panel = this.panel(panelId);
     const m = this.moment(momentId);
     this.assertUsable(m);
+    if (opts.ai && panel.source === 'user') throw new Error(`Panel ${panelId} was placed by the user; only you can change it`);
     this.tx(() => {
-      this.db.prepare("UPDATE story_segments SET state = 'filled', source = 'user', clip_id = ?, moment_id = ? WHERE id = ?")
-        .run(m.clip_id, m.id, panelId);
+      this.db.prepare("UPDATE story_segments SET state = 'filled', source = ?, clip_id = ?, moment_id = ? WHERE id = ?")
+        .run(opts.ai ? 'ai' : 'user', m.clip_id, m.id, panelId);
       this.db.prepare('DELETE FROM panel_candidates WHERE panel_id = ?').run(panelId);
-      this.db.prepare("UPDATE highlights SET status = 'confirmed', reject_reason = NULL WHERE id = ?").run(momentId);
+      if (!opts.ai) this.db.prepare("UPDATE highlights SET status = 'confirmed', reject_reason = NULL WHERE id = ?").run(momentId);
     });
   }
 

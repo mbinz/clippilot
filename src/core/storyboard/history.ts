@@ -12,6 +12,8 @@ export interface Snapshot {
   /** Moments of the cut's project that differ from their default (status, range, speed or ★). */
   moments: MomentState[];
   hidden_clips: number[];
+  /** Moments cut out of another one (`split_of`), full rows; absent in snapshots written before D1. */
+  splits?: Row[];
 }
 
 export interface MomentState {
@@ -22,6 +24,10 @@ export interface MomentState {
   end_sec: number;
   speed: number;
   user_tier: string | null;
+  /** AI range / AI speed (absent in snapshots written before D1; then left as they are). */
+  ai_start_sec?: number;
+  ai_end_sec?: number;
+  ai_speed?: number | null;
 }
 
 export interface OperationInfo {
@@ -40,18 +46,27 @@ export interface HistoryState {
 
 type MomentDefaults = MomentState & { default_start: number; default_end: number; default_speed: number };
 
-/** Every moment of the project that differs from its default: status, range (vs the ai range), speed or user tier. */
-function editedMoments(db: Database.Database, projectId: number): MomentDefaults[] {
+/** Every moment of the project with its state and the defaults it is compared against (analysis range, default speed). */
+function momentRows(db: Database.Database, projectId: number): MomentDefaults[] {
   const rows = db.prepare(`SELECT h.id, h.status, h.reject_reason, h.start_sec, h.end_sec, h.speed, h.user_tier,
+      h.ai_start_sec, h.ai_end_sec, h.ai_speed,
       COALESCE(h.ai_start_sec, h.start_sec) AS default_start, COALESCE(h.ai_end_sec, h.end_sec) AS default_end,
       h.suggested_speed, c.fps
     FROM highlights h JOIN clips c ON c.id = h.clip_id WHERE c.project_id = ? ORDER BY h.id`).all(projectId) as
     (Omit<MomentDefaults, 'default_speed'> & { suggested_speed: number; fps: number | null })[];
-  return rows
-    .map((r) => ({ ...r, default_speed: defaultSpeed(r.suggested_speed, r.fps) }))
-    .filter((r) => r.status !== 'proposed' || r.start_sec !== r.default_start || r.end_sec !== r.default_end
-      || r.speed !== r.default_speed || r.user_tier !== null);
+  return rows.map((r) => ({ ...r, default_speed: defaultSpeed(r.suggested_speed, r.fps) }));
 }
+
+const isEdited = (r: MomentDefaults): boolean => r.status !== 'proposed' || r.start_sec !== r.default_start
+  || r.end_sec !== r.default_end || r.speed !== r.default_speed || r.user_tier !== null || r.ai_speed !== null;
+
+/** Every moment of the project that differs from its default: status, range (vs the ai range), speed, AI speed or user tier. */
+function editedMoments(db: Database.Database, projectId: number): MomentDefaults[] {
+  return momentRows(db, projectId).filter(isEdited);
+}
+
+const stateOf = ({ id, status, reject_reason, start_sec, end_sec, speed, user_tier, ai_start_sec, ai_end_sec, ai_speed }: MomentDefaults): MomentState =>
+  ({ id, status, reject_reason, start_sec, end_sec, speed, user_tier, ai_start_sec, ai_end_sec, ai_speed });
 
 export function snapshot(db: Database.Database, cutId: number): Snapshot {
   const cut = db.prepare('SELECT name, brief, brief_state, project_id FROM stories WHERE id = ?').get(cutId) as
@@ -64,11 +79,16 @@ export function snapshot(db: Database.Database, cutId: number): Snapshot {
     panels: all('SELECT * FROM story_segments WHERE story_id = ? ORDER BY scene_id, position', cutId),
     candidates: all(`SELECT pc.* FROM panel_candidates pc JOIN story_segments p ON p.id = pc.panel_id
       WHERE p.story_id = ? ORDER BY pc.panel_id, pc.position`, cutId),
-    moments: editedMoments(db, cut.project_id).map(({ id, status, reject_reason, start_sec, end_sec, speed, user_tier }) =>
-      ({ id, status, reject_reason, start_sec, end_sec, speed, user_tier })),
+    moments: editedMoments(db, cut.project_id).map(stateOf),
     hidden_clips: (all('SELECT id FROM clips WHERE project_id = ? AND hidden = 1 ORDER BY id', cut.project_id) as { id: number }[])
       .map((r) => r.id),
+    splits: splitRows(db, cut.project_id),
   };
+}
+
+function splitRows(db: Database.Database, projectId: number): Row[] {
+  return db.prepare(`SELECT h.* FROM highlights h JOIN clips c ON c.id = h.clip_id
+    WHERE c.project_id = ? AND h.split_of IS NOT NULL ORDER BY h.id`).all(projectId) as Row[];
 }
 
 function insertRows(db: Database.Database, table: string, rows: Row[]): void {
@@ -77,6 +97,14 @@ function insertRows(db: Database.Database, table: string, rows: Row[]): void {
     db.prepare(`INSERT INTO ${table} (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`)
       .run(...cols.map((c) => row[c]));
   }
+}
+
+/** Moments cut out of another one: those that did not exist at the snapshot are deleted, missing ones are re-created. */
+function restoreSplits(db: Database.Database, projectId: number, splits: Row[]): void {
+  const want = new Set(splits.map((r) => r.id as number));
+  const have = new Set(splitRows(db, projectId).map((r) => r.id as number));
+  for (const id of have) if (!want.has(id)) db.prepare('DELETE FROM highlights WHERE id = ?').run(id);
+  insertRows(db, 'highlights', splits.filter((r) => !have.has(r.id as number)));
 }
 
 /** Rewrite the cut (and the project's moment statuses / hidden clips) to exactly the snapshot, in one transaction. */
@@ -88,17 +116,22 @@ export function restore(db: Database.Database, cutId: number, snap: Snapshot): v
       .run(snap.cut.name, snap.cut.brief, snap.cut.brief_state, cutId);
 
     db.prepare('DELETE FROM scenes WHERE story_id = ?').run(cutId); // cascades panels and candidates
+    if (snap.splits) restoreSplits(db, cut.project_id, snap.splits);
     insertRows(db, 'scenes', snap.scenes);
     insertRows(db, 'story_segments', snap.panels);
     insertRows(db, 'panel_candidates', snap.candidates);
 
     // Every moment that is edited now goes back to its default; then the snapshot's edits are applied.
     const reset = db.prepare(`UPDATE highlights SET status = 'proposed', reject_reason = NULL, start_sec = ?, end_sec = ?,
-      speed = ?, user_tier = NULL WHERE id = ?`);
+      speed = ?, user_tier = NULL, ai_speed = NULL WHERE id = ?`);
     for (const m of editedMoments(db, cut.project_id)) reset.run(m.default_start, m.default_end, m.default_speed, m.id);
     const setMoment = db.prepare(`UPDATE highlights SET status = ?, reject_reason = ?, start_sec = ?, end_sec = ?,
-      speed = ?, user_tier = ? WHERE id = ?`);
-    for (const m of snap.moments) setMoment.run(m.status, m.reject_reason, m.start_sec, m.end_sec, m.speed, m.user_tier, m.id);
+      speed = ?, user_tier = ?, ai_start_sec = COALESCE(?, ai_start_sec), ai_end_sec = COALESCE(?, ai_end_sec), ai_speed = ?
+      WHERE id = ?`);
+    for (const m of snap.moments) {
+      setMoment.run(m.status, m.reject_reason, m.start_sec, m.end_sec, m.speed, m.user_tier,
+        m.ai_start_sec ?? null, m.ai_end_sec ?? null, m.ai_speed ?? null, m.id);
+    }
 
     db.prepare('UPDATE clips SET hidden = 0 WHERE project_id = ? AND hidden = 1').run(cut.project_id);
     const hide = db.prepare('UPDATE clips SET hidden = 1 WHERE id = ?');
@@ -114,12 +147,26 @@ export function historyState(db: Database.Database, cutId: number): HistoryState
   return { can_undo: !!undo, can_redo: !!redo, undo_label: undo?.label ?? null, redo_label: redo?.label ?? null };
 }
 
-/** Run `fn` and log it as one operation (before/after snapshot); a new operation clears the redo stack. */
+/**
+ * Run `fn` and log it as one operation (before/after snapshot); a new operation clears the redo stack.
+ * Moments the operation changed are part of both snapshots even when they look unedited afterwards (an AI edit moves
+ * the AI range along), so undo restores them exactly.
+ */
 export function command<T>(db: Database.Database, cutId: number, label: string, fn: () => T): T {
   return db.transaction(() => {
+    const projectId = (db.prepare('SELECT project_id FROM stories WHERE id = ?').get(cutId) as { project_id: number } | undefined)?.project_id;
     const before = snapshot(db, cutId);
+    const beforeAll = new Map(momentRows(db, projectId!).map((r) => [r.id, stateOf(r)]));
     const result = fn();
     const after = snapshot(db, cutId);
+    const afterAll = new Map(momentRows(db, projectId!).map((r) => [r.id, stateOf(r)]));
+    for (const id of new Set([...beforeAll.keys(), ...afterAll.keys()])) {
+      const b = beforeAll.get(id);
+      const a = afterAll.get(id);
+      if (JSON.stringify(b) === JSON.stringify(a)) continue;
+      if (b && !before.moments.some((m) => m.id === id)) before.moments.push(b);
+      if (a && !after.moments.some((m) => m.id === id)) after.moments.push(a);
+    }
     db.prepare('DELETE FROM operations WHERE story_id = ? AND undone = 1').run(cutId);
     db.prepare('INSERT INTO operations (story_id, label, "before", "after") VALUES (?, ?, ?, ?)')
       .run(cutId, label, JSON.stringify(before), JSON.stringify(after));
