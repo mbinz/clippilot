@@ -143,7 +143,7 @@ export function PanelDrawer(p: Props) {
       <div className="mt-4 border-t border-bd-line pt-3">
         <div className="mb-2 flex items-center gap-2">
           <b className="text-[11px] font-semibold uppercase tracking-[.07em] text-bd-muted">Options</b>
-          <span className={kbd}>{base ? `${kindLabel(base)} · ` : ''}{options.length}{current ? ' · first = in the story now' : ''}</span>
+          <span className={kbd}>{options.length} similar{current ? ' · first = in the story now' : ''}</span>
         </div>
         <div className={`${GRID} !grid-cols-[repeat(auto-fill,minmax(118px,1fr))]`}>
           {options.map((x) => (

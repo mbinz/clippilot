@@ -18,7 +18,9 @@ Projects: `~/Video/ClipPilot Arrifana` (main test cut), `~/Video/ClipPilot Odece
 Order agreed 2026-11-25. Each line: theme — what — spec.
 
 ### Now
-- [ ] **Similar moments** — SM1 look fingerprints in `analyze` → SM2 drawer ranking → SM3 groups everywhere —
+- [x] **Similar moments** SM1 look fingerprints in `analyze` (SigLIP, 0.24 s/moment) + SM2 drawer ranking — done
+  2026-11-25; Arrifana (180) + Odeceixe (19) fingerprinted
+- [ ] **Similar moments** — SM3 groups everywhere, **after** the tuning round below —
   [spec](docs/specs/similar-moments.md)
 
 ### Next
@@ -34,6 +36,8 @@ Order agreed 2026-11-25. Each line: theme — what — spec.
   [spec](docs/specs/analysis-polish.md) (Q4)
 
 ### Needs you
+- [ ] Tune similar moments by eye (SM-9): open panel/moment drawers on Arrifana + Odeceixe, note "X should / shouldn't
+  be with Y". One knob: `LOOK_THRESHOLD` = 0.80 in `src/core/look/similar.ts` (2 of 19 Odeceixe moments have none)
 - [ ] Score the acceptance run against `acceptance-key.md` (≥ 8 of 11 found, few false alarms) —
   [how](docs/specs/draft-quality.md) ("How to run the acceptance test")
 - [ ] Decide: drop the general 2 s / 8 s moment-length rules?
@@ -64,6 +68,8 @@ shakes, draft rules, critics, review loop, acceptance loop run) — details in [
 [docs/specs/](docs/specs/).
 
 ## Deferred / future
+- Look fingerprints aren't redone when `look_model` changes (stale rule is range only)
+- objc warning: duplicate libvips (sharp + transformers.js) — harmless so far, watch for crashes
 - Music-aware cutting (track per cut, length fitting, beat sync)
 - Speed ramps within a segment
 - VO script drafted from the storyboard
