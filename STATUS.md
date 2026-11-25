@@ -1592,7 +1592,10 @@ document every assumption. Each item below is marked [D-n] and referenced from t
 - `cut_out: [from, to]` on a draft panel and CLI `moment cut-out <id> <from> <to> [--ai]` [D-8]: validated (inside the
   moment, both parts ≥ 1 s); trims the moment, creates the sibling moment (migration: `highlights.split_of`), inserts the
   following panel(s); one undo step; undo restores both. Tests incl. undo.
-- `--ai` on `moment trim | speed | cut-out` [D-9]: edit without confirming; tests that the moment stays unprotected.
+- `--ai` on `moment trim | speed | cut-out` [D-9]: edit without confirming; the moment must stay unprotected under **both**
+  `HighlightRepository.findUnprotected` and `protectionReasons` (C1): an `--ai` trim moves the ai range along (as
+  `snapUnprotected` does); an `--ai` speed change must not count as "speed changed" (e.g. record the AI speed next to the
+  moment) — a later user edit (no `--ai`) protects it as today. Tests for all three verbs, incl. undo.
 - Tile icon [D-6] in `MomentTile` (pure helper `shakeHint(moment)` tested); drawer lists jitter + shakes (from W1).
 - SKILL.md drafting rules: read `jitter` + `shakes`; avoid `shaky`; for a shake inside a good moment decide keep vs
   `cut_out`; B-roll cover only as a suggestion in chat; name `shaky_kept` warnings in the draft summary; action moments up
