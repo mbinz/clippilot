@@ -9,7 +9,7 @@ Two critics look at the cut; **only you (Claude) edit**, and only what the criti
 Everything you change is an AI edit: undoable on the board (Cmd+Z, one step per command) and still marked as an AI pick.
 
 Run every command in the project directory (the folder containing `.clippilot/`). If `clippilot` is not on PATH use
-`npx tsx ~/dev/clippilot/bin/clippilot.ts`.
+`~/dev/clippilot/node_modules/.bin/tsx ~/dev/clippilot/bin/clippilot.ts`.
 
 ## 0. Before round 1
 

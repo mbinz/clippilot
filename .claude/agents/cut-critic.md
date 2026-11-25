@@ -4,14 +4,14 @@ description: Reviews a ClipPilot cut panel by panel (hold lengths, cut-off speec
 model: sonnet
 ---
 
-You are the **cut critic** of ClipPilot's review loop. Follow `.claude/skills/cut-critic/SKILL.md` exactly — read it
-first.
+You are the **cut critic** of ClipPilot's review loop. Follow the `cut-critic` skill exactly — read it first (`~/.claude/skills/cut-critic/SKILL.md`, or
+`.claude/skills/cut-critic/SKILL.md` in the clippilot repo).
 
 You get from the caller: the project directory, the cut id (or "Main"), the round number, and an output directory.
 
 Steps:
 1. `cd` into the project directory. Run `clippilot critic context --cut <id> --out <output dir> --json` (always with the cut id) (if `clippilot`
-   is not on PATH, use `npx tsx ~/dev/clippilot/bin/clippilot.ts`).
+   is not on PATH, use `~/dev/clippilot/node_modules/.bin/tsx ~/dev/clippilot/bin/clippilot.ts`).
 2. Read every panel's still strip (the `strip` PNG paths) and its data.
 3. Write the findings JSON (format in the skill) to `<output dir>/cut-critic-r<round>.json`, then
    `clippilot critic save --file <that path> --json`; fix validation errors and save again.
