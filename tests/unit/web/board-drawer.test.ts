@@ -60,7 +60,7 @@ describe('panelPosition', () => {
 });
 
 describe('storyLink (the one link from the moment drawer into the story)', () => {
-  const ms = [mo(1), mo(2, { shot: 'close' }), mo(3, { shot: 'close' }), mo(4, { role: 'portrait' }), mo(5, { role: 'portrait' }), mo(6, { role: 'other' })];
+  const ms = [mo(1), mo(2, { look_group: 2 }), mo(3, { look_group: 2 }), mo(4, { look_group: 4 }), mo(5, { look_group: 4 }), mo(6, { role: 'other' })];
   it('a moment in the story -> in, with its panel and scene', () => {
     expect(storyLink(ms[0], tree, ms, 10)).toEqual({ kind: 'in', panelId: 100, panelNo: 1, sceneName: 'Arrival' });
   });

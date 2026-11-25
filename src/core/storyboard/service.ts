@@ -1,4 +1,4 @@
-import { similarTo, type LookMoment } from '../look/similar.js';
+import { similarTo, lookGroups, type LookMoment } from '../look/similar.js';
 import { lookState } from '../look/stale.js';
 import type Database from 'better-sqlite3';
 import type { BriefState, Cut, Panel, PanelSource, Scene } from '../../types/story.js';
@@ -116,6 +116,8 @@ export interface MomentRow {
   audio_keep: boolean;
   audio_type: string;
   dup_group: number | null;
+  /** Look group (SM-7): id of the moment's average-linkage group in its event; null = alone / no fresh fingerprint. */
+  look_group: number | null;
   status: string;
   description: string;
   /** Spoken words inside the range (null = clip not transcribed) and which boundary cuts a sentence. */
@@ -292,7 +294,8 @@ export class StoryboardService {
   /** Per moment of the project: ids of its similar moments (same event, by look), nearest first (SM2). */
   similarIds(projectId: number): Map<number, number[]> {
     const ms = this.lookMoments(projectId);
-    return new Map(ms.map((m) => [m.id, similarTo(m, ms).similar]));
+    const groups = lookGroups(ms);
+    return new Map(ms.map((m) => [m.id, similarTo(m, ms, groups).similar]));
   }
 
   /** Similar moments of one moment (see `similarIds`); a moment without a fresh fingerprint has none. */
@@ -302,7 +305,7 @@ export class StoryboardService {
     if (!row) return [];
     const ms = this.lookMoments(row.project_id);
     const subject = ms.find((m) => m.id === momentId);
-    return subject ? similarTo(subject, ms).similar : [];
+    return subject ? similarTo(subject, ms, lookGroups(ms)).similar : [];
   }
 
   // ---------- lookups for logging (which cut an edit belongs to, human names for labels) ----------
@@ -743,6 +746,7 @@ export class StoryboardService {
     `).all(...params) as (HighlightRecord & { event_id: number | null })[];
     const transcripts = new Map<number, { segments: TranscriptSegment[]; words: TranscriptWord[] } | null>();
     const motions: MotionCache = new Map();
+    const groups = lookGroups(this.lookMoments(projectId));
     return rows.map((h) => ({
       ...this.speechOf(h, transcripts),
       ...this.motionOf(h, motions),
@@ -750,7 +754,7 @@ export class StoryboardService {
       speed: h.speed, ai_start_sec: h.ai_start_sec, ai_end_sec: h.ai_end_sec,
       tier: h.user_tier ?? h.tier, ai_tier: h.tier, user_tier: h.user_tier, seen: h.seen_at !== null, shot: h.shot, role: h.role, issues: JSON.parse(h.issues || '[]') as string[],
       slowmo: h.slowmo, suggested_speed: h.suggested_speed, audio_keep: Boolean(h.audio_keep),
-      audio_type: h.audio_type, dup_group: h.dup_group, status: h.status, description: h.description,
+      audio_type: h.audio_type, dup_group: h.dup_group, look_group: groups.get(h.id) ?? null, status: h.status, description: h.description,
     }));
   }
 

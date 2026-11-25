@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  effectiveTier, isHero, similarKey, recTime, poolOrder, alternatives, otherInEvent, slotFor, usage, fades, loopStep, seekState, loopSeekTarget,
+  effectiveTier, isHero, recTime, poolOrder, alternatives, otherInEvent, slotFor, usage, fades, loopStep, seekState, loopSeekTarget,
   type PoolMoment, type PoolTree,
 } from '../../../web/src/board/pool.js';
 
@@ -25,10 +25,6 @@ describe('tier / key / time', () => {
     expect(effectiveTier(m)).toBe(eff);
     expect(isHero(m)).toBe(hero);
   });
-  it('similarKey = event + role + shot', () => {
-    expect(similarKey(mo(1, { ev: 3, role: 'establishing', shot: 'wide' }))).toBe('3|establishing|wide');
-    expect(similarKey(mo(1, { shot: null }))).toBe('1|action|null');
-  });
   it('recTime = recorded_at epoch s + start_sec; unparsable -> 0 + start', () => {
     expect(recTime(mo(1, { rec: 0, start_sec: 5 }))).toBe(T0 + 5);
     const bad = mo(1, { start_sec: 2 }); bad.clip.recorded_at = null;
@@ -36,36 +32,48 @@ describe('tier / key / time', () => {
   });
 });
 
-describe('poolOrder', () => {
-  it('groups by similarKey ordered by earliest time; stars and rest separate; out bucket', () => {
+describe('poolOrder (look groups, SM-8)', () => {
+  it('groups by look_group ordered by earliest time; a group with any star sits in the star section; out bucket', () => {
     const ms = [
-      mo(1, { rec: 10, role: 'action' }),
-      mo(2, { rec: 20, role: 'portrait' }),
-      mo(3, { rec: 30, role: 'action' }),
-      mo(4, { rec: 5, role: 'action', user_tier: 'hero' }),
-      mo(5, { rec: 6, tier: 'hero', user_tier: 'filler' }),
-      mo(6, { rec: 1, role: 'portrait', status: 'rejected' }),
+      mo(1, { rec: 10, look_group: 1 }),
+      mo(2, { rec: 20 }),
+      mo(3, { rec: 30, look_group: 1 }),
+      mo(4, { rec: 5, look_group: 9, user_tier: 'hero' }),
+      mo(5, { rec: 6, look_group: 1, tier: 'hero', user_tier: 'filler' }),
+      mo(6, { rec: 1, look_group: 1, status: 'rejected' }),
       mo(7, { rec: 2, hidden: true }),
-      mo(8, { rec: 40, role: 'portrait', tier: 'hero' }),
+      mo(8, { rec: 40, look_group: 9 }),
+      mo(10, { rec: 1, user_tier: 'hero' }),
     ];
     const r = poolOrder(ms);
-    expect(ids(r.heroes)).toEqual([[4], [8]]);
+    // 8 is not starred but belongs to the starred group 9: it sits behind the star, not in the rest section
+    expect(ids(r.heroes)).toEqual([[10], [4, 8]]);
     expect(ids(r.rest)).toEqual([[5, 1, 3], [2]]);
     expect(r.out.map((m) => m.id).sort()).toEqual([6, 7]);
   });
-  it('group order uses earliest time over ALL visible moments, not just the section', () => {
+  it('starred takes first inside a group, then recording time; group order uses the earliest visible member', () => {
     const ms = [
-      mo(1, { rec: 50, role: 'a' }), mo(2, { rec: 60, role: 'b' }),
-      mo(3, { rec: 1, role: 'b', user_tier: 'hero' }),
-      mo(4, { rec: 2, role: 'a', user_tier: 'hero' }),
+      mo(1, { rec: 50, look_group: 1 }), mo(2, { rec: 60, look_group: 1, user_tier: 'hero' }), mo(3, { rec: 10, look_group: 1 }),
+      mo(4, { rec: 20, look_group: 4, user_tier: 'hero' }), mo(5, { rec: 5, look_group: 4 }),
     ];
-    const r = poolOrder(ms);
-    expect(ids(r.heroes)).toEqual([[3], [4]]);
-    expect(ids(r.rest)).toEqual([[2], [1]]);
+    // group 4 starts at 5, group 1 at 10
+    expect(ids(poolOrder(ms).heroes)).toEqual([[4, 5], [2, 3, 1]]);
+    expect(poolOrder(ms).rest).toEqual([]);
   });
-  it('separate events are separate groups', () => {
-    const r = poolOrder([mo(1, { rec: 1, ev: 1 }), mo(2, { rec: 2, ev: 2 }), mo(3, { rec: 3, ev: 1 })]);
-    expect(ids(r.rest)).toEqual([[1, 3], [2]]);
+  it('moments with no look_group (or null) stand alone, never grouped by role/shot', () => {
+    const r = poolOrder([mo(1, { rec: 1 }), mo(2, { rec: 2, look_group: null }), mo(3, { rec: 3, look_group: undefined })]);
+    expect(ids(r.rest)).toEqual([[1], [2], [3]]);
+  });
+  it('is deterministic: input order does not matter, equal times fall back to id', () => {
+    const ms = [
+      mo(1, { rec: 10, look_group: 1 }), mo(2, { rec: 10, look_group: 1 }), mo(3, { rec: 10 }), mo(4, { rec: 10 }),
+      mo(5, { rec: 3, look_group: 1, user_tier: 'hero' }),
+    ];
+    const a = poolOrder(ms), b = poolOrder([...ms].reverse());
+    expect(ids(a.heroes)).toEqual(ids(b.heroes));
+    expect(ids(a.rest)).toEqual(ids(b.rest));
+    expect(ids(a.heroes)).toEqual([[5, 1, 2]]);
+    expect(ids(a.rest)).toEqual([[3], [4]]);
   });
   it('empty', () => expect(poolOrder([])).toEqual({ heroes: [], rest: [], out: [] }));
 });
@@ -96,7 +104,8 @@ describe('otherInEvent', () => {
 });
 
 describe('slotFor / usage', () => {
-  const ms = [mo(1), mo(2), mo(3, { role: 'x' }), mo(4), mo(5, { role: 'x' })];
+  // 2,4 share look group 7 with 1; 3 and 5 share group 8 (moment 3 sits in a candidates panel); 9 is alone
+  const ms = [mo(1, { look_group: 7 }), mo(2, { look_group: 7 }), mo(3, { look_group: 8 }), mo(4, { look_group: 7 }), mo(5, { look_group: 8 }), mo(6)];
   const tree: PoolTree = {
     scenes: [
       { id: 10, panels: [
@@ -111,7 +120,7 @@ describe('slotFor / usage', () => {
     ],
   };
   it('own filled panel wins', () => expect(slotFor(ms[1], tree, ms, 10)).toBe(111));
-  it('similar moment: prefers current scene, else first anywhere', () => {
+  it('same look group: prefers current scene, else first anywhere', () => {
     expect(slotFor(ms[3], tree, ms, 11)).toBe(111);
     expect(slotFor(ms[3], tree, ms, 10)).toBe(100);
     expect(slotFor(ms[3], tree, ms)).toBe(100);
@@ -119,7 +128,12 @@ describe('slotFor / usage', () => {
   it('candidates panel counts via its first candidate', () => {
     expect(slotFor(ms[4], tree, ms, 10)).toBe(110);
   });
-  it('null when nothing similar', () => expect(slotFor(mo(9, { role: 'zzz' }), tree, ms)).toBeNull());
+  it('null when nothing in its group is in the cut; without a look group only its own panel counts', () => {
+    expect(slotFor(mo(9, { look_group: 99 }), tree, ms)).toBeNull();
+    // same role/shot/event as everything, but no group: never matches by label
+    expect(slotFor(ms[5]!, tree, ms)).toBeNull();
+    expect(slotFor(mo(1), tree, ms)).toBe(100);
+  });
   it('usage: first occurrence only, 1-based panelNo, scene index', () => {
     expect(usage(tree)).toEqual({
       1: { panelId: 100, sceneIndex: 0, panelNo: 1, source: 'ai' },

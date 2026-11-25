@@ -102,6 +102,19 @@ describe('board selection file + context', () => {
       setLook(t.db, [h, e]);
       expect(t.svc.alternatives(ms[0])).toEqual([ms[2]]);
     });
+    it('look groups (SM-7): listMoments carries look_group; a moment\'s list contains its group members even below the line', () => {
+      // 0 / 0.4 / 0.8 rad: A~B and B~C above the line, A~C (0.75) below; average linkage still groups all three
+      setLook(t.db, ms, (id) => (id === ms[0] ? 0 : id === ms[1] ? 0.4 : 0.8));
+      const rows = t.svc.listMoments(t.projectId);
+      expect(rows.map((r) => r.look_group)).toEqual([ms[0], ms[0], ms[0]]);
+      expect(t.svc.alternatives(ms[0])).toEqual([ms[1], ms[2]]);
+      expect(t.svc.similarIds(t.projectId).get(ms[2])).toEqual([ms[1], ms[0]]);
+    });
+    it('look_group is null without a fresh fingerprint or when alone', () => {
+      expect(t.svc.listMoments(t.projectId).map((r) => r.look_group)).toEqual([null, null, null]);
+      setLook(t.db, ms, (id) => (id === ms[2] ? 1.5 : 0));
+      expect(t.svc.listMoments(t.projectId).map((r) => r.look_group)).toEqual([ms[0], ms[0], null]);
+    });
     it('no fingerprint -> nothing similar; unknown moment -> []; similarIds covers every moment of the project', () => {
       expect(t.svc.alternatives(ms[0])).toEqual([]);
       expect(t.svc.alternatives(99999)).toEqual([]);

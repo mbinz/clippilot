@@ -16,6 +16,8 @@ export interface PoolMoment {
   seen?: boolean;
   /** Ids of similar moments by look (server-computed, nearest first); missing/empty = none (no fingerprint). */
   similar_ids?: number[];
+  /** Look group id (server-computed, SM-7); missing/null = alone or no fingerprint. */
+  look_group?: number | null;
   clip: { event_id: number | null; recorded_at: string | null; hidden: boolean | number };
 }
 
@@ -31,7 +33,8 @@ export interface PoolTree { scenes: { id: number; panels: PoolPanel[] }[] }
 export const effectiveTier = (m: Pick<PoolMoment, 'tier' | 'user_tier'>): string => m.user_tier ?? m.tier;
 export const isHero = (m: Pick<PoolMoment, 'tier' | 'user_tier'>): boolean => effectiveTier(m) === 'hero';
 
-export const similarKey = (m: PoolMoment): string => `${m.clip.event_id}|${m.role}|${m.shot}`;
+/** Grouping key: the look group, or the moment alone. */
+const groupKey = (m: PoolMoment): string => (m.look_group == null ? `m${m.id}` : `g${m.look_group}`);
 
 /** Recording time of a moment: clip start (epoch s) + offset into the clip. */
 export const recTime = (m: PoolMoment): number =>
@@ -39,31 +42,30 @@ export const recTime = (m: PoolMoment): number =>
 
 export const isOut = (m: PoolMoment): boolean => m.status === 'rejected' || !!m.clip.hidden;
 
-const byTime = (a: PoolMoment, b: PoolMoment): number => recTime(a) - recTime(b);
+const byTime = (a: PoolMoment, b: PoolMoment): number => recTime(a) - recTime(b) || a.id - b.id;
 
 /** Stars first (effective tier), then recording time. */
 const starsThenTime = (a: PoolMoment, b: PoolMoment): number =>
   Number(isHero(b)) - Number(isHero(a)) || byTime(a, b);
 
+/**
+ * Pool sections (SM-8): moments grouped by look group. A group with any ★ sits in the ★ section (starred takes first,
+ * then recording time), all others in the rest; groups ordered by the earliest recording time of their visible members.
+ */
 export function poolOrder(moments: PoolMoment[]): { heroes: PoolMoment[][]; rest: PoolMoment[][]; out: PoolMoment[] } {
   const vis = moments.filter((m) => !isOut(m));
   const out = moments.filter(isOut);
-  const start = new Map<string, number>();
+  const byGroup = new Map<string, PoolMoment[]>();
   for (const m of vis) {
-    const k = similarKey(m);
-    start.set(k, Math.min(start.get(k) ?? Infinity, recTime(m)));
+    const k = groupKey(m);
+    const g = byGroup.get(k);
+    if (g) g.push(m); else byGroup.set(k, [m]);
   }
-  const groups = (ms: PoolMoment[]): PoolMoment[][] => {
-    const sorted = [...ms].sort((a, b) =>
-      (start.get(similarKey(a))! - start.get(similarKey(b))!) || byTime(a, b));
-    const g: PoolMoment[][] = [];
-    for (const m of sorted) {
-      const last = g[g.length - 1];
-      if (last && similarKey(last[0]) === similarKey(m)) last.push(m); else g.push([m]);
-    }
-    return g;
-  };
-  return { heroes: groups(vis.filter(isHero)), rest: groups(vis.filter((m) => !isHero(m))), out };
+  const groups = [...byGroup.values()].map((g) => g.sort(starsThenTime));
+  const start = (g: PoolMoment[]): number => Math.min(...g.map(recTime));
+  const firstId = (g: PoolMoment[]): number => Math.min(...g.map((m) => m.id));
+  groups.sort((a, b) => start(a) - start(b) || firstId(a) - firstId(b));
+  return { heroes: groups.filter((g) => g.some(isHero)), rest: groups.filter((g) => !g.some(isHero)), out };
 }
 
 /** Similar moments (by look, nearest first) as the server ranked them; out moments and unknown ids are dropped. */
@@ -90,19 +92,19 @@ function panelMomentId(p: PoolPanel): number | null {
 }
 
 /**
- * The panel a moment would compete for: the filled panel using it; else a panel whose moment is similar
+ * The panel a moment would compete for: the filled panel using it; else a panel whose moment is in the same look group
  * (preferring `currentSceneId`); else null.
  */
 export function slotFor(m: PoolMoment, tree: PoolTree, moments: PoolMoment[], currentSceneId?: number): number | null {
   for (const s of tree.scenes) for (const p of s.panels) if (p.state === 'filled' && p.moment_id === m.id) return p.id;
   const byId = new Map(moments.map((x) => [x.id, x]));
-  const k = similarKey(m);
+  if (m.look_group == null) return null;
   const sib: { sceneId: number; panelId: number }[] = [];
   for (const s of tree.scenes) {
     for (const p of s.panels) {
       const id = panelMomentId(p);
       const pm = id == null ? undefined : byId.get(id);
-      if (pm && similarKey(pm) === k) sib.push({ sceneId: s.id, panelId: p.id });
+      if (pm && pm.look_group === m.look_group) sib.push({ sceneId: s.id, panelId: p.id });
     }
   }
   return (sib.find((x) => x.sceneId === currentSceneId) ?? sib[0])?.panelId ?? null;

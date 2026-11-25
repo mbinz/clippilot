@@ -4,7 +4,8 @@ import type { Brief, Draft } from './schema.js';
 export interface RuleMoment {
   id: number;
   status: string;
-  dup_group: number | null;
+  /** Look group (SM-7); null = alone or no fingerprint. */
+  look_group: number | null;
   tier: string;
   user_tier: string | null;
   role: string | null;
@@ -25,7 +26,7 @@ export interface DraftWarning {
   moment_id: number;
   type: DraftWarningType;
   message: string;
-  /** Calmer moments of the same duplicate group (`shaky_alternative`). */
+  /** Calmer moments of the same look group (`shaky_alternative`). */
   alternatives?: number[];
 }
 
@@ -43,7 +44,7 @@ const isAction = (m: RuleMoment): boolean => m.role === 'action'
   || (m.motion?.change ?? 0) >= ACTION_CHANGE || (m.motion?.camera ?? 0) >= ACTION_CAMERA;
 
 /**
- * Draft rules [D-7] as warnings (never errors): a shaky moment used although a calmer one of its duplicate group
+ * Draft rules [D-7] as warnings (never errors): a shaky moment used although a calmer one of its look group
  * exists, a shaky moment kept because it is a ★ or a brief must-have, a moment playing too long. `moments` must be the
  * moments as applied (ranges, speed), so the lengths are the played ones. Only panels of the draft are judged.
  */
@@ -59,11 +60,11 @@ export function draftWarnings(draft: Draft, moments: RuleMoment[], brief: Brief 
       warnings.push({ panel: at, moment_id: m.id, type, message, ...(alternatives ? { alternatives } : {}) });
 
     if (isShaky(m)) {
-      const calmer = m.dup_group === null ? [] : moments
-        .filter((o) => o.id !== m.id && o.dup_group === m.dup_group && o.status !== 'rejected' && !isShaky(o) && !hasHighShake(o))
+      const calmer = m.look_group === null ? [] : moments
+        .filter((o) => o.id !== m.id && o.look_group === m.look_group && o.status !== 'rejected' && !isShaky(o) && !hasHighShake(o))
         .map((o) => o.id);
       if (calmer.length) {
-        add('shaky_alternative', `Moment ${m.id} is shaky; calmer moment(s) of the same shot exist: ${calmer.join(', ')}`, calmer);
+        add('shaky_alternative', `Moment ${m.id} is shaky; calmer moment(s) of the same look exist: ${calmer.join(', ')}`, calmer);
       } else if (isStar(m) || mustHave.has(m.id)) {
         add('shaky_kept', `Moment ${m.id} is shaky but kept (${isStar(m) ? '★' : 'brief must-have'}) and has no calmer alternative`);
       }

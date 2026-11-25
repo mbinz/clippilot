@@ -71,6 +71,7 @@ moments → 4 groups, largest 10) and miss retakes that got a different label; n
   `critic/context.ts` alternatives, `storyboard/selection.ts` similar ids all switch; `similarKey` removed.
 - Tests first: no chaining (A≈B, B≈C, A≉C → A and C apart); deterministic order; ★ section rule; `slotFor`;
   `shaky_alternative` with/without fingerprints.
+- **Result (2026-11-25):** done. `lookGroups` in `look/similar.ts` (group id = smallest member id); `look_group` on `listMoments`/`/moments`/`cut moments`; `similar_ids` ∪= group members; web `poolOrder`/`slotFor` by `look_group` (★ group rule), `rules.ts` `shaky_alternative` uses `look_group`, `similarKey` gone. Arrifana (180 moments): 23 groups, largest 23 of 66 (Delfine); at 0.80 groups run large, tune by eye (SM-9).
 
 **SM4 (deferred) — retire the old clip similarity** per SM-10, incl. a migration dropping `clip_similarity_*`, the
 SKILL/instructions mention of `similar` / `mark-best`, and the ARCHITECTURE "Query" line.

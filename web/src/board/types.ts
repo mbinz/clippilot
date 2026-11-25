@@ -42,6 +42,8 @@ export interface BoardMoment {
   seen: boolean;
   /** Similar moments by look, nearest first (server-computed; empty = none or no fingerprint). */
   similar_ids: number[];
+  /** Look group id (server-computed); null = alone or no fingerprint. */
+  look_group: number | null;
   shot: string | null;
   role: string | null;
   issues: string[];

@@ -5,7 +5,7 @@ import { DraftValidationError, type Draft } from '../../../../src/core/storyboar
 import { HighlightRepository } from '../../../../src/db/repositories/highlight.repository.js';
 
 const mo = (id: number, o: Partial<RuleMoment> = {}): RuleMoment => ({
-  id, status: 'proposed', dup_group: null, tier: 'solid', user_tier: null, role: 'detail', start_sec: 0, end_sec: 4, speed: 1,
+  id, status: 'proposed', look_group: null, tier: 'solid', user_tier: null, role: 'detail', start_sec: 0, end_sec: 4, speed: 1,
   speech: null, jitter: { score: 0.2, band: 'locked' }, motion: { camera: 0, change: 0 }, shakes: [], ...o,
 });
 const shaky = { score: 3, band: 'shaky' as const };
@@ -14,27 +14,32 @@ const draft = (...ids: (number | undefined)[]): Draft => ({ scenes: [{ name: 'S'
 const brief = (must: number[]) => ({ target_sec: 60, audience: 'a', mood: '', ending: '', must_have: must.map((id) => ({ moment_id: id, text: 't' })) });
 
 describe('draftWarnings - shaky moments', () => {
-  it('shaky_alternative: a shaky moment used although a calmer one exists in its dup group', () => {
-    const w = draftWarnings(draft(1), [mo(1, { dup_group: 7, jitter: shaky }), mo(2, { dup_group: 7 }), mo(3, { dup_group: 8 })], null);
+  it('shaky_alternative: a shaky moment used although a calmer one exists in its look group', () => {
+    const w = draftWarnings(draft(1), [mo(1, { look_group: 7, jitter: shaky }), mo(2, { look_group: 7 }), mo(3, { look_group: 8 })], null);
     expect(w).toEqual([expect.objectContaining({ panel: { scene: 1, panel: 1 }, moment_id: 1, type: 'shaky_alternative', alternatives: [2] })]);
     expect(w[0]!.message).toMatch(/Moment 1.*shaky.*2/);
   });
 
   it('a calmer alternative is not shaky, has no high-confidence shake and is not rejected (low-confidence shakes are fine)', () => {
     const moments = [
-      mo(1, { dup_group: 7, jitter: shaky }),
-      mo(2, { dup_group: 7, jitter: shaky }),
-      mo(3, { dup_group: 7, shakes: [shake('high')] }),
-      mo(4, { dup_group: 7, status: 'rejected' }),
-      mo(5, { dup_group: 7, shakes: [shake('low')] }),
+      mo(1, { look_group: 7, jitter: shaky }),
+      mo(2, { look_group: 7, jitter: shaky }),
+      mo(3, { look_group: 7, shakes: [shake('high')] }),
+      mo(4, { look_group: 7, status: 'rejected' }),
+      mo(5, { look_group: 7, shakes: [shake('low')] }),
     ];
     const w = draftWarnings(draft(1), moments, null);
     expect(w[0]).toMatchObject({ type: 'shaky_alternative', alternatives: [5] });
   });
 
   it('no warning for a calm moment, or for a shaky one that is neither starred nor a must-have and has no alternative', () => {
-    expect(draftWarnings(draft(1), [mo(1, { dup_group: 7 }), mo(2, { dup_group: 7 })], null)).toEqual([]);
+    expect(draftWarnings(draft(1), [mo(1, { look_group: 7 }), mo(2, { look_group: 7 })], null)).toEqual([]);
     expect(draftWarnings(draft(1), [mo(1, { jitter: shaky })], null)).toEqual([]);
+  });
+
+  it('without fingerprints (look_group null everywhere) nothing counts as an alternative, even if others are calm', () => {
+    const w = draftWarnings(draft(1), [mo(1, { jitter: shaky, user_tier: 'hero' }), mo(2), mo(3)], null);
+    expect(w).toEqual([expect.objectContaining({ type: 'shaky_kept' })]);
   });
 
   it('shaky_kept: shaky, no calmer alternative, and starred', () => {
@@ -51,7 +56,7 @@ describe('draftWarnings - shaky moments', () => {
   });
 
   it('with a calmer alternative it is shaky_alternative even when starred (never both)', () => {
-    const w = draftWarnings(draft(1), [mo(1, { dup_group: 7, jitter: shaky, user_tier: 'hero' }), mo(2, { dup_group: 7 })], brief([1]));
+    const w = draftWarnings(draft(1), [mo(1, { look_group: 7, jitter: shaky, user_tier: 'hero' }), mo(2, { look_group: 7 })], brief([1]));
     expect(w.map((x) => x.type)).toEqual(['shaky_alternative']);
   });
 

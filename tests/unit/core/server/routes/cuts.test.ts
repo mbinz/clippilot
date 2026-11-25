@@ -194,6 +194,7 @@ describe('Cut API routes', () => {
       const rows = await ok('GET', `/projects/${t.projectId}/moments`);
       expect(rows[0].similar_ids).toEqual([mb[0], ma[1]]);
       expect(rows[0]).not.toHaveProperty('look_vec');
+      expect(rows.map((r: any) => r.look_group)).toEqual([ma[0], ma[0], ma[0]]);
       t.db.prepare('UPDATE highlights SET look_vec = NULL WHERE id = ?').run(ma[1]);
       expect((await ok('GET', `/projects/${t.projectId}/moments`))[1].similar_ids).toEqual([]);
     });
