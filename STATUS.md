@@ -31,7 +31,7 @@ clip — prototype W0 judged by the user (141 verdicts, 71 % real). **Next sessi
 (section "W0 — Wackler prototype" below), then slice W1.**
 **2026-11-25:** W0 questions answered; vocabulary: **shake** = single jolt (was "Wackler"), **jitter** = continuous
 handheld micro-movement (S1's "shake" today). Gemini's `shake` issue is dropped (measured instead). **Next: slice J1
-(rename + drop), then the border-patch experiment, then W1** — all under "W0 — Wackler prototype" below.
+(rename + drop), then W1** (border-patch experiment done: P 0.83 / R 0.93) — all under "W0 — Wackler prototype" below.
 
 `v0.1.0` — ingest (resumable) / analyze with timestamped highlights / search / summary; OTIO + FCPXML export verified in free Resolve (M1). No story/storyboard workflow yet (M3).
 Solo project, MIT. Run via `tsx`, no compiled binary.
@@ -1458,11 +1458,22 @@ suggestion + resolve-prep marker only, no second track in ClipPilot yet (Q26c). 
   4. High-jitter scenes (boat, action): keep their shake candidates, mark them "in moving scene" (lower confidence).
   5. No remembered examples. Recall gets measured **after W1** instead: a Chrome review page with ~30 near misses
      (candidates just below the threshold); every "yes" there is a missed shake.
-- **User idea (2026-11-25), not yet tested:** measure camera motion on the **frame border** only (subjects are mostly
-  in the middle; the border shows best whether the frame moves). Planner's take: likely better than left/right halves,
-  but border areas can be sky/water (little texture, unreliable match) or moving water/foreground → measure several
-  border patches separately, camera motion = consensus of the textured ones, patch disagreement = subject motion. To be
-  checked against `verdicts.json` with the prototype before the W1 spec fixes the method.
+- **Border experiment (user idea, 2026-11-25):** subjects sit mostly in the middle, so the frame border shows best
+  whether the camera moves. Prototype `measure3.mts` + `evaluate.py` (same dir; `all4.json` = per-frame shifts of centre,
+  left/right halves and 8 border patches + patch texture, 51 candidate clips, 6.5 min with 8 workers): every patch gets
+  its own shake residual; camera = median of the textured patches (texture = mean gradient ≥ 4); **patch disagreement**
+  = median distance of the patch residuals from that consensus ÷ consensus, summed over the candidate. Against the
+  141 verdicts (baseline P 0.71 / R 1.00):
+  - halves ratio < 0.8 (W0 rule, reproduced): P 0.79 / R 0.87 (drops 18 no / 13 yes).
+  - border patch disagreement < 0.5: **P 0.83 / R 0.90** (drops 22 no / 10 yes); stable for texture 2…8.
+  - lost "yes" include the two strongest shakes (122 and 75 %/s): a jump beyond the ±16 px search range makes patches
+    disagree → **always keep peaks ≥ 60 %/s** (all 7 were real): **P 0.83 / R 0.93** (halves + same exception: 0.80 / 0.90).
+  - border-only detection (re-detecting on the consensus curve, drop if its peak < 0.5 × its own threshold): drops 8 no,
+    0 yes (P 0.75 / R 1.00) — safe but weak on its own; adds nothing on top of the disagreement rule.
+  - left over: birds C0561 (100 fps, birds fill the border too) 4 no, GoPro GH010376 (boat) 4 no — "in moving scene" cases.
+  - Caveat: thresholds picked on the same 141 verdicts (differences of 3–4 items); the near-miss review after W1 and new
+    footage are the real check.
+  - **Planner recommendation for W1:** border-patch disagreement < 0.5 + keep peaks ≥ 60 %/s, instead of the halves rule.
 
 **J1 — rename shake → jitter, drop Gemini's shake tag (planner spec, 2026-11-25; before W1)**
 Vocabulary decided by the user: a **shake** is a single jolt (was "Wackler"); **jitter** is the continuous handheld
@@ -1486,10 +1497,10 @@ micro-movement present in every handheld shot. Today the code calls jitter "shak
 - Done when: unit + integration green, typecheck clean, resolve-prep tests green, pilot DB migrated (backup first), the
   Arrifana `cut show --json` shows `jitter` and no `shake`, resolve-prep still marks the Arrifana cut the same way.
 
-**W1 — per-clip motion curve + shakes (outline; spec after J1 and the border experiment)**
+**W1 — per-clip motion curve + shakes (outline; spec after J1)**
 - Per-clip motion curve in ClipPilot (new table, ~10 values/s) + **shake events** with start/end/peak/**jump distance
   (px)**/confidence (lower for "in moving scene" and slowed-down border cases); every shake marked separately;
-  subject-motion rule (halves ratio < 0.8, or the border method if it wins); jitter values per moment derived from the
+  subject-motion rule (border-patch disagreement < 0.5, peaks ≥ 60 %/s always kept — see border experiment); jitter values per moment derived from the
   curve (no re-decode after trims); `moments list`/`cut show` carry `shakes` inside the moment; AI-moment boundary nudge
   out of a shake; drawer marks on the clip timeline; `motion` measures whole clips; `verdicts.json` becomes a regression
   fixture (precision/recall on Arrifana). Then the near-miss recall review, then roadmap 2b.3 (draft rules + board icon).
