@@ -38,7 +38,7 @@ Order agreed 2026-11-25. Each line: theme — what — spec.
 
 ### Needs you
 - [ ] Tune similar moments by eye (SM-9): drawers + pool groups on Arrifana, note "X should / shouldn't be with Y",
-  groups too big? One knob: `LOOK_THRESHOLD` = 0.80 in `src/core/look/similar.ts`. Since SM3 a drawer list also holds
+  groups too big? Round 1 done (★ = stars only, threshold 0.80 → 0.85). One knob: `LOOK_THRESHOLD` = 0.85 in `src/core/look/similar.ts`. Since SM3 a drawer list also holds
   the whole group (median 14 per moment); a ★ anywhere pulls the group into the ★ section (★ 9 → 43 on Arrifana)
 - [ ] Score the acceptance run against `acceptance-key.md` (≥ 8 of 11 found, few false alarms) —
   [how](docs/specs/draft-quality.md) ("How to run the acceptance test")

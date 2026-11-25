@@ -3,12 +3,12 @@
  *
  * Constants (start values, to be tuned by eye on the board, SM-9). Chosen from the Odeceixe spread (19 moments, one
  * event, 171 pairs): cosine p10 0.58 / median 0.70 / p75 0.82 / p90 0.93 / max 0.99; pairs recorded < 5 min apart
- * average 0.82. A threshold of 0.80 keeps the upper quarter (~5 similar moments per moment, 48 of 171 pairs), clear
+ * average 0.82. A threshold of 0.80 kept the upper quarter (~5 similar moments per moment, 48 of 171 pairs), clear
  * of the median where unrelated shots of the same place sit. The time boost is small (0.05 at zero distance, linear
  * to 0 at 5 min): enough to put a take recorded right after the subject ahead of an equally alike one hours later,
  * too small to pull a different shot over the line on its own.
  */
-export const LOOK_THRESHOLD = 0.80;
+export const LOOK_THRESHOLD = 0.85; // raised from 0.80 after the first board round (groups too large)
 export const TIME_BOOST = 0.05;
 export const TIME_BOOST_WINDOW_SEC = 300;
 

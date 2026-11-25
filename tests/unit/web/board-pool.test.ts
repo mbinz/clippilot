@@ -32,8 +32,8 @@ describe('tier / key / time', () => {
   });
 });
 
-describe('poolOrder (look groups, SM-8)', () => {
-  it('groups by look_group ordered by earliest time; a group with any star sits in the star section; out bucket', () => {
+describe('poolOrder (look groups, SM-8 revised: star section = stars only)', () => {
+  it('groups by look_group ordered by earliest time; only starred moments sit in the star section; out bucket', () => {
     const ms = [
       mo(1, { rec: 10, look_group: 1 }),
       mo(2, { rec: 20 }),
@@ -46,19 +46,20 @@ describe('poolOrder (look groups, SM-8)', () => {
       mo(10, { rec: 1, user_tier: 'hero' }),
     ];
     const r = poolOrder(ms);
-    // 8 is not starred but belongs to the starred group 9: it sits behind the star, not in the rest section
-    expect(ids(r.heroes)).toEqual([[10], [4, 8]]);
-    expect(ids(r.rest)).toEqual([[5, 1, 3], [2]]);
+    // 8 is not starred: it goes down to the rest section even though its group has a star
+    expect(ids(r.heroes)).toEqual([[10], [4]]);
+    expect(ids(r.rest)).toEqual([[5, 1, 3], [2], [8]]);
     expect(r.out.map((m) => m.id).sort()).toEqual([6, 7]);
   });
-  it('starred takes first inside a group, then recording time; group order uses the earliest visible member', () => {
+  it('stars group by look among themselves; unstarred members group below; order by earliest member', () => {
     const ms = [
       mo(1, { rec: 50, look_group: 1 }), mo(2, { rec: 60, look_group: 1, user_tier: 'hero' }), mo(3, { rec: 10, look_group: 1 }),
       mo(4, { rec: 20, look_group: 4, user_tier: 'hero' }), mo(5, { rec: 5, look_group: 4 }),
     ];
-    // group 4 starts at 5, group 1 at 10
-    expect(ids(poolOrder(ms).heroes)).toEqual([[4, 5], [2, 3, 1]]);
-    expect(poolOrder(ms).rest).toEqual([]);
+    const r = poolOrder([...ms, mo(6, { rec: 70, look_group: 1, user_tier: 'hero' })]);
+    // stars: group 4 = [4] (rec 20), group 1 = [2, 6] (rec 60); rest: group 4 = [5] (rec 5), group 1 = [3, 1] (rec 10)
+    expect(ids(r.heroes)).toEqual([[4], [2, 6]]);
+    expect(ids(r.rest)).toEqual([[5], [3, 1]]);
   });
   it('moments with no look_group (or null) stand alone, never grouped by role/shot', () => {
     const r = poolOrder([mo(1, { rec: 1 }), mo(2, { rec: 2, look_group: null }), mo(3, { rec: 3, look_group: undefined })]);
@@ -72,8 +73,8 @@ describe('poolOrder (look groups, SM-8)', () => {
     const a = poolOrder(ms), b = poolOrder([...ms].reverse());
     expect(ids(a.heroes)).toEqual(ids(b.heroes));
     expect(ids(a.rest)).toEqual(ids(b.rest));
-    expect(ids(a.heroes)).toEqual([[5, 1, 2]]);
-    expect(ids(a.rest)).toEqual([[3], [4]]);
+    expect(ids(a.heroes)).toEqual([[5]]);
+    expect(ids(a.rest)).toEqual([[1, 2], [3], [4]]);
   });
   it('empty', () => expect(poolOrder([])).toEqual({ heroes: [], rest: [], out: [] }));
 });

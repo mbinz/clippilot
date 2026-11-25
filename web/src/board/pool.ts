@@ -55,17 +55,20 @@ const starsThenTime = (a: PoolMoment, b: PoolMoment): number =>
 export function poolOrder(moments: PoolMoment[]): { heroes: PoolMoment[][]; rest: PoolMoment[][]; out: PoolMoment[] } {
   const vis = moments.filter((m) => !isOut(m));
   const out = moments.filter(isOut);
-  const byGroup = new Map<string, PoolMoment[]>();
-  for (const m of vis) {
-    const k = groupKey(m);
-    const g = byGroup.get(k);
-    if (g) g.push(m); else byGroup.set(k, [m]);
-  }
-  const groups = [...byGroup.values()].map((g) => g.sort(starsThenTime));
-  const start = (g: PoolMoment[]): number => Math.min(...g.map(recTime));
-  const firstId = (g: PoolMoment[]): number => Math.min(...g.map((m) => m.id));
-  groups.sort((a, b) => start(a) - start(b) || firstId(a) - firstId(b));
-  return { heroes: groups.filter((g) => g.some(isHero)), rest: groups.filter((g) => !g.some(isHero)), out };
+  // Star section holds only starred moments (user, 2026-11-25); unstarred group members go down to the rest.
+  const group = (ms: PoolMoment[]): PoolMoment[][] => {
+    const byGroup = new Map<string, PoolMoment[]>();
+    for (const m of ms) {
+      const k = groupKey(m);
+      const g = byGroup.get(k);
+      if (g) g.push(m); else byGroup.set(k, [m]);
+    }
+    const groups = [...byGroup.values()].map((g) => g.sort(starsThenTime));
+    const start = (g: PoolMoment[]): number => Math.min(...g.map(recTime));
+    const firstId = (g: PoolMoment[]): number => Math.min(...g.map((m) => m.id));
+    return groups.sort((a, b) => start(a) - start(b) || firstId(a) - firstId(b));
+  };
+  return { heroes: group(vis.filter(isHero)), rest: group(vis.filter((m) => !isHero(m))), out };
 }
 
 /** Similar moments (by look, nearest first) as the server ranked them; out moments and unknown ids are dropped. */

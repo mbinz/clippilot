@@ -31,7 +31,8 @@ moments → 4 groups, largest 10) and miss retakes that got a different label; n
   **Groups:** average-linkage clustering per event with the same threshold (no union-find chaining: A≈B and B≈C must not
   pull A and C together). A moment's drawer list always contains its group members (plus anything else above the line),
   so pool groups and drawer lists never disagree.
-- [SM-8] **Pool:** a group with any ★ sits in the ★ section, starred takes first, then recording time; groups ordered
+- [SM-8] **(revised 2026-11-25, user: "only show actual stars")** The ★ section holds starred moments only (grouped by
+  look among themselves); unstarred members of a starred group go down to the rest. Old rule, kept for history: **Pool:** a group with any ★ sits in the ★ section, starred takes first, then recording time; groups ordered
   by earliest recording time as today.
 - [SM-9] **Tuning by eye:** tests use synthetic vectors only (no golden fixture). Threshold + time boost are constants in
   one file; the user checks Odeceixe on the board and says "X should / shouldn't be with Y", the planner adjusts. No
@@ -75,3 +76,5 @@ moments → 4 groups, largest 10) and miss retakes that got a different label; n
 
 **SM4 (deferred) — retire the old clip similarity** per SM-10, incl. a migration dropping `clip_similarity_*`, the
 SKILL/instructions mention of `similar` / `mark-best`, and the ARCHITECTURE "Query" line.
+
+**Tuning round 1 (2026-11-25):** ★ section = stars only (SM-8 revised); `LOOK_THRESHOLD` 0.80 → 0.85.
