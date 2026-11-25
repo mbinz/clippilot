@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  measurePair, downsample2, checkFrameCount, shakeResidual, detectShakes, momentMotion, shakesForMoment, PATCH_COUNT,
+  measurePair, downsample2, checkFrameCount, shakeResidual, detectShakes, momentMotion, shakesForMoment, PATCH_COUNT, PATCH_CENTRES,
   type RawCurve,
 } from '../../../../src/core/motion/curve.js';
 import { jitterScore, cameraMotion, type Shift } from '../../../../src/core/motion/motion.js';
@@ -171,7 +171,58 @@ describe('detectShakes', () => {
       expect(k[0].peak).toBeGreaterThanOrEqual(60);
       expect(k[0].confidence).toBe('high');
     });
-    it('low-texture patches are ignored (at least 3 textured, else all patches count)', () => {
+    describe('similarity camera model (shift + zoom + rotation)', () => {
+      // patch velocity of the camera model at patch j: shift + zoom s * (x, y) + rotation r * (-y, x); y scaled by the aspect
+      const model = (s: Shift, zoom: number, rot: number) => (j: number): [number, number] => {
+        const [cx, cy] = PATCH_CENTRES[j], x = cx - 0.5, y = (cy - 0.5) * 0.5625;
+        return [Math.round(s.dx + zoom * x * 320 - rot * y * 320), Math.round(s.dy + zoom * y * 320 + rot * x * 320)];
+      };
+      const withModel = (zoom: number, rot: number) => {
+        const s = zeros(200); jolt(s, 100, 6);
+        const z = (i: number) => (i >= 100 && i < 103 ? 1 : i >= 103 && i < 106 ? -1 : 0);
+        return raw(s, { patch: (j, i) => model(s[i], zoom * z(i), rot * z(i))(j) });
+      };
+      it('uniform shift: ~ 0', () => {
+        expect(detectShakes(withModel(0, 0)).shakes[0].disagreement).toBeLessThan(0.1);
+      });
+      it('pure zoom (radial pattern beyond the shift): kept, disagreement small', () => {
+        const k = detectShakes(withModel(0.06, 0)).shakes;
+        expect(k).toHaveLength(1);
+        expect(k[0].disagreement).toBeLessThan(0.25);
+      });
+      it('rotation: kept', () => {
+        const k = detectShakes(withModel(0, 0.1)).shakes;
+        expect(k).toHaveLength(1);
+        expect(k[0].disagreement).toBeLessThan(0.25);
+      });
+      it('zoom + rotation + shift together: kept', () => {
+        const k = detectShakes(withModel(0.05, 0.08)).shakes;
+        expect(k).toHaveLength(1);
+        expect(k[0].disagreement).toBeLessThan(0.25);
+      });
+      it('a subject moving most of the border patches (not a camera model): dropped', () => {
+        const s = zeros(200); jolt(s, 100, 6);
+        const subj = (j: number, i: number): [number, number] => {
+          if (i < 95 || i > 115) return [0, 0];
+          return j % 2 ? [s[i].dx, s[i].dy] : [((j * 7 + i) % 11) - 5, ((j * 3 + i) % 9) - 4];
+        };
+        expect(detectShakes(raw(s, { patch: subj })).shakes).toHaveLength(0);
+      });
+      it('fewer than 4 textured patches: all 8 are fitted', () => {
+        const c = withModel(0.06, 0);
+        for (let i = 0; i < c.dx.length; i++) for (let j = 3; j < PATCH_COUNT; j++) c.texture[i * PATCH_COUNT + j] = 1;
+        expect(detectShakes(c).shakes[0].disagreement).toBeLessThan(0.25);
+      });
+      it('flat patches carrying garbage are ignored once >= 4 textured remain', () => {
+        const c = withModel(0.06, 0);
+        for (let i = 0; i < c.dx.length; i++) for (let j = 4; j < PATCH_COUNT; j++) {
+          c.texture[i * PATCH_COUNT + j] = 1;
+          if (i >= 95 && i <= 115) { c.patchDx[i * PATCH_COUNT + j] = 12; c.patchDy[i * PATCH_COUNT + j] = -9; }
+        }
+        expect(detectShakes(c).shakes[0].disagreement).toBeLessThan(0.25);
+      });
+    });
+    it('low-texture patches are ignored (at least 4 textured, else all patches count)', () => {
       // 5 textured patches agree, 3 flat ones are garbage -> still kept
       const garbage = (j: number, i: number): [number, number] => (j >= 5 && i >= 95 && i <= 115 ? [7, -6] : [0, 0]);
       const s = joltClip();
@@ -214,13 +265,13 @@ describe('detectShakes', () => {
       expect(strong.peak).toBeGreaterThanOrEqual(60);
       expect(strong.confidence).toBe('high');
     });
-    it('disagreement 0.3 - 0.5: low', () => {
+    it('disagreement 0.3 - 0.4: low', () => {
       const s = jc(6);
-      // half of the patches only follow half of the movement -> disagreement ~ 1/3
-      const d = detectShakes(raw(s, { patch: (j, i) => (j >= 4 ? [s[i].dx / 2, s[i].dy] as [number, number] : [s[i].dx, s[i].dy]) }));
+      // 5 of 8 patches only follow half of the movement (no camera model fits that) -> disagreement ~ 0.32
+      const d = detectShakes(raw(s, { patch: (j, i) => (j < 5 ? [s[i].dx / 2, s[i].dy] as [number, number] : [s[i].dx, s[i].dy]) }));
       expect(d.shakes).toHaveLength(1);
       expect(d.shakes[0].disagreement).toBeGreaterThanOrEqual(0.3);
-      expect(d.shakes[0].disagreement).toBeLessThan(0.5);
+      expect(d.shakes[0].disagreement).toBeLessThan(0.4);
       expect(d.shakes[0].confidence).toBe('low');
     });
   });

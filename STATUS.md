@@ -1814,6 +1814,11 @@ R 0.93 — same as the W1 rule — and 93@7.06 goes from 0.88 (dropped) to 0.24 
 - Done when green; planner re-measures Arrifana (`motion --force`, backup), runs the shake fit, `eval:shakes` ≥ 0.80 / 0.88,
   and checks panel 1 of scene 5.
 
+**W2 result (2026-11-25):** ✅ (1307 tests). Similarity fit in `curve.ts` (`fitSimilarity`, threshold 0.4, ≥ 4 textured
+patches). Arrifana re-measured (backup `clippilot.pre-w2.db`, 100 clips, 11.5 min): 114 shakes (was 113; the new one is
+C0611 7.06–8.26 s, high, disagreement 0.24); eval P 0.83 / R 0.92 (unchanged); shake fit re-run: 179 checked, 4 fixed,
+14 kept, 7 Gemini calls — scene 5 panel 1 (moment 325) now ends at 7.02 s, before the jolt.
+
 **How to run the acceptance test (user)**
 1. Review the decisions [D-1]…[D-19] above (and the implementer decisions in the W1 / C1 / C1b / D1 results).
 2. `cd ~/dev/clippilot && npm run skill:install` (installs the clippilot, cut-critic, review-loop skills and the cut-critic

@@ -20,6 +20,12 @@ const PATCHES: Rect[] = [
   [0.06, 0.26, 0.385, 0.615], [0.74, 0.94, 0.385, 0.615],
 ];
 
+/** Patch centres (fraction of the frame), same order as PATCHES; the camera-model fit uses them. */
+export const PATCH_CENTRES: [number, number][] = [
+  [0.16, 0.215], [0.5, 0.215], [0.84, 0.215], [0.16, 0.785], [0.5, 0.785], [0.84, 0.785], [0.16, 0.5], [0.84, 0.5],
+];
+export const DEFAULT_ASPECT = 9 / 16;
+
 // ---------- measuring one frame pair ----------
 
 function sad(p: Uint8Array, c: Uint8Array, w: number, h: number, dx: number, dy: number, step: number, r: Rect, limit: number): number {
@@ -114,6 +120,8 @@ export interface RawCurve {
   /** Width of the decoded frames (px) and of the source video (px). */
   width: number;
   srcWidth: number;
+  /** Frame height / width (default 9/16); scales y in the camera-model fit. */
+  aspect?: number;
   dx: Int8Array;
   dy: Int8Array;
   change: Float32Array;
@@ -143,7 +151,7 @@ export async function measureCurve(
     prev = f; prevS = fS;
   }
   return {
-    fps: dims.fps, width: w, srcWidth: dims.srcWidth,
+    fps: dims.fps, width: w, srcWidth: dims.srcWidth, aspect: h / w,
     dx: Int8Array.from(dx), dy: Int8Array.from(dy), change: Float32Array.from(change),
     patchDx: Int8Array.from(pdx), patchDy: Int8Array.from(pdy), texture: Float32Array.from(tex),
   };
@@ -209,7 +217,7 @@ export interface Shake {
   /** [D-1] largest distance of the camera path from its 0.5 s moving average inside the shake. */
   jump_pct: number;
   jump_px: number;
-  /** Patch disagreement (median distance of the patch residuals from the consensus / consensus). */
+  /** Patch disagreement: median distance of the patch residuals from the fitted camera model (shift + zoom + rotation) / model magnitude. */
   disagreement: number;
   moving_scene: boolean;
   confidence: Confidence;
@@ -222,7 +230,7 @@ export const MERGE_GAP_SEC = 0.25;
 export const CONTINUOUS_RESIDUAL = 8;
 export const MOVING_SCENE_RESIDUAL = 4;
 export const STRONG_PEAK = 60;
-export const MAX_DISAGREEMENT = 0.5;
+export const MAX_DISAGREEMENT = 0.4;
 export const LOW_DISAGREEMENT = 0.3;
 
 export const shakeThreshold = (medianResidual: number): number => Math.max(SHAKE_K * medianResidual, SHAKE_FLOOR);
@@ -258,7 +266,7 @@ export function detectShakes(c: RawCurve): Detection {
   }
   if (merged.length === 0) return { medianResidual: base, continuous: false, shakes: [] };
 
-  const patch = patchDisagreement(c, r);
+  const patch = patchDisagreement(c);
   const path = smoothedPath(shifts, fps);
   const movingScene = base >= MOVING_SCENE_RESIDUAL;
   const shakes: Shake[] = [];
@@ -284,34 +292,57 @@ export function detectShakes(c: RawCurve): Detection {
 }
 
 /**
- * Patch disagreement over frames s..e: per frame the textured patches (>= 4, at least 3 else all) are compared with
- * their consensus (median velocity); result = sum of the median distances of the patch residuals from the consensus
- * residual / sum of the consensus residual.
+ * Fit v = (tx - r*y + s*x, ty + r*x + s*y) (shift, zoom, rotation; x, y centred, y scaled by the aspect) to the
+ * given patches by least squares (4x4 normal equations, Gaussian elimination). Returns the parameters, or null when
+ * the system is singular.
  */
-function patchDisagreement(c: RawCurve, _centre: number[]): (s: number, e: number) => number {
-  const n = c.dx.length, { fps, width } = c;
-  const idxAt = (i: number): number[] => {
-    const all = Array.from({ length: PATCH_COUNT }, (_, j) => j);
-    const textured = all.filter((j) => c.texture[i * PATCH_COUNT + j] >= TEXTURE_MIN);
-    return textured.length >= 3 ? textured : all;
+export function fitSimilarity(pts: { x: number; y: number; vx: number; vy: number }[]): [number, number, number, number] | null {
+  const M = [0, 0, 0, 0].map(() => [0, 0, 0, 0, 0]); // augmented normal matrix
+  const add = (row: number[], b: number): void => {
+    for (let a = 0; a < 4; a++) { for (let c = 0; c < 4; c++) M[a][c] += row[a] * row[c]; M[a][4] += row[a] * b; }
   };
-  const vx = Array.from({ length: PATCH_COUNT }, (_, j) => velocity(c.patchDx, fps, width, PATCH_COUNT, j));
-  const vy = Array.from({ length: PATCH_COUNT }, (_, j) => velocity(c.patchDy, fps, width, PATCH_COUNT, j));
-  const used: number[][] = [];
-  const bx = new Array<number>(n), by = new Array<number>(n);
-  for (let i = 0; i < n; i++) {
-    const idx = idxAt(i);
-    used.push(idx);
-    bx[i] = median(idx.map((j) => vx[j][i]));
-    by[i] = median(idx.map((j) => vy[j][i]));
+  for (const p of pts) {
+    add([1, 0, p.x, -p.y], p.vx);
+    add([0, 1, p.y, p.x], p.vy);
   }
-  const [bRx, bRy] = residualXY(bx, by, fps);
-  const pr = vx.map((_, j) => residualXY(vx[j], vy[j], fps));
+  for (let col = 0; col < 4; col++) {
+    let piv = col;
+    for (let r = col + 1; r < 4; r++) if (Math.abs(M[r][col]) > Math.abs(M[piv][col])) piv = r;
+    if (Math.abs(M[piv][col]) < 1e-12) return null;
+    [M[col], M[piv]] = [M[piv], M[col]];
+    for (let r = 0; r < 4; r++) {
+      if (r === col) continue;
+      const f = M[r][col] / M[col][col];
+      for (let c = col; c < 5; c++) M[r][c] -= f * M[col][c];
+    }
+  }
+  return [M[0][4] / M[0][0], M[1][4] / M[1][1], M[2][4] / M[2][2], M[3][4] / M[3][3]];
+}
+
+/**
+ * Patch disagreement over frames s..e [W2]: per frame a similarity camera model (shift + zoom + rotation) is fitted
+ * to the shake residual vectors of the textured patches (>= 4, else all 8); result = sum of the median distances of
+ * the patch residuals from the model / sum of the mean model magnitude over the patches. A zoom or rotation moves the
+ * patches apart but is still the camera; a subject moving only some of them is not.
+ */
+function patchDisagreement(c: RawCurve): (s: number, e: number) => number {
+  const n = c.dx.length, { fps, width } = c;
+  const aspect = c.aspect ?? DEFAULT_ASPECT;
+  const pos = PATCH_CENTRES.map(([fx, fy]) => ({ x: fx - 0.5, y: (fy - 0.5) * aspect }));
+  const pr = Array.from({ length: PATCH_COUNT }, (_, j) =>
+    residualXY(velocity(c.patchDx, fps, width, PATCH_COUNT, j), velocity(c.patchDy, fps, width, PATCH_COUNT, j), fps));
   return (s, e) => {
     let num = 0, den = 0;
     for (let i = s; i <= e; i++) {
-      num += median(used[i].map((j) => Math.hypot(pr[j][0][i] - bRx[i], pr[j][1][i] - bRy[i])));
-      den += Math.hypot(bRx[i], bRy[i]);
+      const all = Array.from({ length: PATCH_COUNT }, (_, j) => j);
+      let idx = all.filter((j) => c.texture[i * PATCH_COUNT + j] >= TEXTURE_MIN);
+      if (idx.length < 4) idx = all;
+      const pts = idx.map((j) => ({ ...pos[j], vx: pr[j][0][i], vy: pr[j][1][i] }));
+      const p = fitSimilarity(pts);
+      if (!p) { num += median(pts.map((q) => Math.hypot(q.vx, q.vy))); den += 1e-9; continue; }
+      const pred = pts.map((q) => [p[0] + p[2] * q.x - p[3] * q.y, p[1] + p[2] * q.y + p[3] * q.x]);
+      num += median(pts.map((q, k) => Math.hypot(q.vx - pred[k][0], q.vy - pred[k][1])));
+      den += pred.reduce((a, v) => a + Math.hypot(v[0], v[1]), 0) / pred.length;
     }
     return num / Math.max(1e-9, den);
   };
