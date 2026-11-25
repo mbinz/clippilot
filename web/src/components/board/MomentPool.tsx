@@ -55,7 +55,7 @@ export function MomentPool({ moments, eventId, usage, currentSceneIndex, selecte
         <div className="flex-1" />
         <div className="flex flex-wrap gap-3.5 text-[11px] text-bd-dim">
           <span>unused only {'·'} {view.inStory} in the story</span>
-          <span><i className="mr-[5px] inline-block h-[11px] w-[18px] rounded-[3px] bg-[#555] align-[-1px]" />seen</span>
+          <span><i className="mr-[5px] inline-block h-[11px] w-[18px] rounded-[3px] bg-[#555] align-[-1px]" />not seen yet</span>
         </div>
       </div>
 

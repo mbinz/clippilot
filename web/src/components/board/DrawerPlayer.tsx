@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type MutableRefObject, type RefObject } from 'react';
-import { loopSeekTarget, seekState } from '../../board/pool';
+import { seekState } from '../../board/pool';
+import { frameLoopTarget, frameSec, useFrameWatch } from '../../board/frameWatch';
 import { playLabel } from '../../board/drawer';
 import { btnIcon, kbd } from './ui';
 
@@ -11,6 +12,8 @@ interface Props {
   /** Playback speed inside the range (outside it the clip plays at 1x). */
   rate: number;
   duration: number;
+  /** Clip fps (frame duration for the exact loop end); default 25. */
+  fps?: number | null;
   hint: string;
   videoRef: RefObject<HTMLVideoElement | null>;
   /** Filled by the player: seek to a clip time (outside the range = play on, inside = loop again). */
@@ -20,12 +23,18 @@ interface Props {
 }
 
 /** Drawer player: the range loops; a seek outside it plays the clip on until the next seek back inside. */
-export function DrawerPlayer({ src, a, b, rate, duration, hint, videoRef, seekRef, onTime }: Props) {
+export function DrawerPlayer({ src, a, b, rate, duration, fps, hint, videoRef, seekRef, onTime }: Props) {
   const cur = useRef({ a, b, rate });
   cur.current = { a, b, rate };
   const free = useRef(false);
   const [label, setLabel] = useState({ t: 0, free: false });
   const [paused, setPaused] = useState(false);
+
+  // Loop on the last frame before b; mediaTime is read once per frame (Safari).
+  useFrameWatch(videoRef, (t, v) => {
+    const jump = frameLoopTarget(t, cur.current.a, cur.current.b, free.current, frameSec(fps));
+    if (jump !== null) v.currentTime = jump;
+  }, [src, fps]);
 
   // Speed only applies inside the range.
   useEffect(() => {
@@ -58,11 +67,8 @@ export function DrawerPlayer({ src, a, b, rate, duration, hint, videoRef, seekRe
             v.play().catch(() => {});
           }}
           onTimeUpdate={(e) => {
-            const v = e.currentTarget;
-            const t = v.currentTime; // read once (Safari advances it between reads)
-            const jump = loopSeekTarget(t, cur.current.a, cur.current.b, free.current);
-            if (jump !== null) v.currentTime = jump;
-            const now = jump ?? t;
+            const t = e.currentTarget.currentTime; // read once (Safari advances it between reads)
+            const now = t;
             if (duration) onTime(now / duration);
             setLabel({ t: now, free: free.current });
           }}

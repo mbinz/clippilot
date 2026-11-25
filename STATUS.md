@@ -1840,6 +1840,11 @@ the jolt that the shake fit trimmed away. Export (Resolve) is frame-exact; only 
 - Tests first for the pure parts; component wiring checked by the planner in the browser (sample `currentTime` at each
   loop: max overshoot past the end ≤ 1 frame).
 
+**P2 + P3 result (2026-11-25):** ✅ (1314 tests). P2: `web/src/board/frameWatch.ts` (`requestVideoFrameCallback`, rAF
+fallback; loop / advance at the last frame before the end) used by `VideoThumb`, `DrawerPlayer`, `PreviewModal`; checked by
+the user in Safari (scene 5 panel 1 no longer shows the jolt). P3 (user decision): **unseen** moments are greyed out, seen
+ones in colour (`fades()` in `pool.ts`); legend "not seen yet".
+
 **How to run the acceptance test (user)**
 1. Review the decisions [D-1]…[D-19] above (and the implementer decisions in the W1 / C1 / C1b / D1 results).
 2. `cd ~/dev/clippilot && npm run skill:install` (installs the clippilot, cut-critic, review-loop skills and the cut-critic

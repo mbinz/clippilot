@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { frameEndReached, frameSec, useFrameWatch } from '../../board/frameWatch';
 
 // One live preview video at a time: starting a hover stops the previous one.
 let stopCurrent: (() => void) | null = null;
@@ -15,12 +16,14 @@ interface VideoThumbProps {
   b: number;
   /** Hover playback rate (muted). */
   rate?: number;
+  /** Clip fps (frame duration for the exact loop end); default 25. */
+  fps?: number | null;
   className?: string;
   children?: ReactNode;
 }
 
 /** Poster image that plays its range muted and looping from the proxy while hovered. */
-export function VideoThumb({ poster, src, a, b, rate = 2, className = '', children }: VideoThumbProps) {
+export function VideoThumb({ poster, src, a, b, rate = 2, fps, className = '', children }: VideoThumbProps) {
   const [live, setLive] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
@@ -32,6 +35,11 @@ export function VideoThumb({ poster, src, a, b, rate = 2, className = '', childr
   useEffect(() => () => {
     if (stopCurrent === mine.current) stopCurrent = null;
   }, []);
+
+  // Loop on the last frame before b (timeupdate is ~0.25 s too coarse).
+  useFrameWatch(videoRef, (t, v) => {
+    if (frameEndReached(t, b, frameSec(fps))) v.currentTime = a;
+  }, [live, src, a, b, fps]);
 
   const start = () => {
     if (!src) return;
@@ -68,7 +76,6 @@ export function VideoThumb({ poster, src, a, b, rate = 2, className = '', childr
             }}
             onTimeUpdate={(e) => {
               const v = e.currentTarget;
-              if (v.currentTime >= b) v.currentTime = a;
               if (barRef.current) barRef.current.style.width = `${Math.max(0, ((v.currentTime - a) / (b - a)) * 100)}%`;
             }}
           />

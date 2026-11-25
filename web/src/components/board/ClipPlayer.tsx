@@ -30,7 +30,7 @@ export function ClipPlayer({ moment: m, clipMoments, usage, editable, tone, hint
   return (
     <>
       <DrawerPlayer
-        src={m.clip.proxy_url} a={trim.range.a} b={trim.range.b} rate={m.speed} duration={m.clip.duration_sec}
+        src={m.clip.proxy_url} a={trim.range.a} b={trim.range.b} rate={m.speed} duration={m.clip.duration_sec} fps={m.clip.fps}
         hint={hint} videoRef={videoRef} seekRef={seekRef} onTime={setPlayhead}
       />
       <ClipTimeline
