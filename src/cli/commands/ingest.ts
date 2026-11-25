@@ -11,6 +11,8 @@ import { resolveDbPath } from '../../utils/fs.js';
 import { ingestDirectory } from '../../core/ingest/index.js';
 import { assignEvents } from '../../core/events/index.js';
 import { loadConfig } from '../../core/config/manager.js';
+import { runAnalyze } from './analyze.js';
+import { analyzeAfterIngest } from './ingest-analysis.js';
 import { createProgressBar } from '../formatters/progress.js';
 import { logger } from '../../utils/logger.js';
 
@@ -44,6 +46,10 @@ export function registerIngestCommand(parent: Command): void {
       const projectName = options.project ?? path.basename(absPath);
       const project = projectRepo.findOrCreate(projectName);
 
+      const knownBefore = new Set(clipRepo.listByProject(project.id).map((c) => c.id));
+      let newClipIds: number[] = [];
+      const config = await loadConfig(basePath);
+
       const bar = createProgressBar('Ingest');
       let barStarted = false;
 
@@ -70,7 +76,7 @@ export function registerIngestCommand(parent: Command): void {
 
         if (barStarted) bar.stop();
 
-        assignEvents(db, project.id, { timeZone: (await loadConfig(basePath)).timezone });
+        assignEvents(db, project.id, { timeZone: config.timezone });
 
         console.log('');
         console.log(chalk.green(`Ingest complete for project "${projectName}"`));
@@ -78,11 +84,21 @@ export function registerIngestCommand(parent: Command): void {
         console.log(`  New clips imported: ${result.imported}`);
         console.log(`  Skipped (already known): ${result.skipped}`);
         console.log(`  Errors: ${result.errors}`);
+        newClipIds = clipRepo.listByProject(project.id).map((c) => c.id).filter((id) => !knownBefore.has(id));
       } catch (err) {
         if (barStarted) bar.stop();
         throw err;
       } finally {
         db.close();
       }
+
+      // Same analysis as `clippilot analyze`, on the clips just imported.
+      await analyzeAfterIngest({
+        newClipIds,
+        skipAnalysis: !!options.skipAnalysis,
+        hasKey: !!config.gemini_api_key,
+        run: (clipIds) => runAnalyze(basePath, { clipIds }),
+        log: (line) => console.log(chalk.yellow(line)),
+      });
     });
 }
