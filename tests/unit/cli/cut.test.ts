@@ -289,6 +289,80 @@ describe('clippilot cut undo / redo / history', () => {
   });
 });
 
+describe('clippilot --ai edits and cut-out', () => {
+  const dbRow = (sql: string, ...p: unknown[]) => {
+    const db = createDb(path.join(dir, '.clippilot', 'clippilot.db'));
+    try { return db.prepare(sql).get(...p) as any; } finally { db.close(); }
+  };
+  const reasons = (id: number): string[] => {
+    const db = createDb(path.join(dir, '.clippilot', 'clippilot.db'));
+    try { return new HighlightRepository(db).protectionReasons(id); } finally { db.close(); }
+  };
+
+  /** An AI draft: panel 1 on `moment`, source ai, moments unconfirmed. */
+  async function aiPanel(moment: number): Promise<{ id: number }> {
+    const f = path.join(dir, 'ai.json');
+    fs.writeFileSync(f, JSON.stringify({ scenes: [{ name: 'A', panels: [{ intent: 'x', moment_id: moment }] }] }));
+    await run('cut', 'apply', '--file', f);
+    return { id: (await run('cut', 'show', '--json')).scenes[0].panels[0].id };
+  }
+
+  it('moment trim --ai / speed --ai keep the moment unprotected and are one undo step each', async () => {
+    const p = await aiPanel(3);
+    await run('moment', 'trim', '3', '2.5', '5', '--ai');
+    await run('moment', 'speed', '3', '0.5', '--ai');
+    expect(dbRow('SELECT status, start_sec, end_sec, ai_start_sec, speed, ai_speed FROM highlights WHERE id = 3'))
+      .toEqual({ status: 'proposed', start_sec: 2.5, end_sec: 5, ai_start_sec: 2.5, speed: 0.5, ai_speed: 0.5 });
+    expect(reasons(3)).toEqual([]);
+    expect(dbRow('SELECT source FROM story_segments WHERE id = ?', p.id).source).toBe('ai');
+    await run('cut', 'undo', '--json');
+    await run('cut', 'undo', '--json');
+    expect(dbRow('SELECT start_sec, ai_start_sec, speed, ai_speed FROM highlights WHERE id = 3')).toEqual({ start_sec: 2, ai_start_sec: 2, speed: 1, ai_speed: null });
+    // without --ai it is the user's decision
+    await run('moment', 'trim', '3', '2.5', '5');
+    expect(reasons(3)).toEqual(['confirmed', 'trimmed']);
+  });
+
+  it('moment cut-out trims, creates the sibling and a panel behind; --ai keeps the parent unprotected; undo is one step', async () => {
+    await aiPanel(3);
+    const res = await run('moment', 'cut-out', '3', '3.5', '4.5', '--ai');
+    expect(res).toMatchObject({ ok: true, id: 3 });
+    expect(dbRow('SELECT start_sec, end_sec FROM highlights WHERE id = 3')).toEqual({ start_sec: 2, end_sec: 3.5 });
+    expect(dbRow('SELECT start_sec, end_sec, split_of FROM highlights WHERE id = ?', res.sibling_id)).toEqual({ start_sec: 4.5, end_sec: 6, split_of: 3 });
+    expect(reasons(3)).toEqual([]);
+    expect(reasons(res.sibling_id)).toEqual([]);
+    expect((await run('cut', 'show', '--json')).scenes[0].panels.map((x: any) => x.moment_id)).toEqual([3, res.sibling_id]);
+    await run('cut', 'undo', '--json');
+    expect((await run('cut', 'show', '--json')).scenes[0].panels.map((x: any) => x.moment_id)).toEqual([3]);
+    expect(dbRow('SELECT COUNT(*) AS n FROM highlights').n).toBe(3);
+    expect(dbRow('SELECT end_sec FROM highlights WHERE id = 3').end_sec).toBe(6);
+  });
+
+  it('moment cut-out with a bad range exits 1 and changes nothing', async () => {
+    await run('moment', 'cut-out', '3', '2.2', '4');
+    expect(process.exitCode).toBe(1);
+    expect(errs.join(' ')).toMatch(/at least 1/);
+    expect(dbRow('SELECT COUNT(*) AS n FROM highlights').n).toBe(3);
+  });
+
+  it('panel place --ai puts the moment on the panel as an AI panel without confirming it; undo restores the panel', async () => {
+    const p = await aiPanel(1);
+    await run('panel', 'place', String(p.id), '3', '--ai');
+    expect(dbRow('SELECT source, moment_id FROM story_segments WHERE id = ?', p.id)).toEqual({ source: 'ai', moment_id: 3 });
+    expect(dbRow('SELECT status FROM highlights WHERE id = 3').status).toBe('proposed');
+    expect(reasons(3)).toEqual([]);
+    await run('cut', 'undo', '--json');
+    expect(dbRow('SELECT moment_id FROM story_segments WHERE id = ?', p.id).moment_id).toBe(1);
+  });
+
+  it('cut apply prints the draft warnings', async () => {
+    const f = path.join(dir, 'w.json');
+    fs.writeFileSync(f, JSON.stringify({ scenes: [{ name: 'A', panels: [{ intent: 'long', moment_id: 1, start_sec: 1, end_sec: 12, speed: 1 }] }] }));
+    const res = await run('cut', 'apply', '--file', f);
+    expect(res.warnings).toEqual([expect.objectContaining({ type: 'too_long', moment_id: 1, panel: { scene: 1, panel: 1 } })]);
+  });
+});
+
 describe('clippilot export --cut', () => {
   async function build(): Promise<number> {
     const f = path.join(dir, 'draft.json');

@@ -280,9 +280,10 @@ export function registerCutCommands(parent: Command): void {
     }));
 
   panel.command('place <panelId> <momentId>')
-    .description('Put a moment on a panel (confirms the moment)')
-    .action((panelId: string, momentId: string) => withSvc(({ svc }) => {
-      svc.command(svc.cutIdOfPanel(toId(panelId)), labels.place(svc, toId(panelId)), () => svc.placeMoment(toId(panelId), toId(momentId)));
+    .description('Put a moment on a panel (confirms the moment; --ai: an AI pick, nothing is confirmed)')
+    .option('--ai', 'Edit by Claude: the panel stays an AI panel and the moment is not confirmed', false)
+    .action((panelId: string, momentId: string, o) => withSvc(({ svc }) => {
+      svc.command(svc.cutIdOfPanel(toId(panelId)), labels.place(svc, toId(panelId)), () => svc.placeMoment(toId(panelId), toId(momentId), { ai: o.ai }));
       print({ ok: true, panel_id: toId(panelId), moment_id: toId(momentId) });
     }));
 
@@ -317,20 +318,34 @@ export function registerCutCommands(parent: Command): void {
   const momentLog = (svc: StoryboardService, id: string, cut: string | undefined) => logCutOf(svc, cut, svc.projectIdOfMoment(toId(id)));
   const cutOpt = ['--cut <id>', 'Cut to log the undo step on (default: Main)'] as const;
 
+  const aiOpt = ['--ai', 'Edit by Claude (review loop): the moment stays unconfirmed and unprotected; refused on protected moments', false] as const;
+
   momentCmd.command('trim <id> <start> <end>')
     .description('Set in/out seconds of a moment (clamped to the clip). Every panel using it plays the new range')
     .option(...cutOpt)
+    .option(...aiOpt)
     .action((id: string, start: string, end: string, o) => withSvc(({ svc }) => {
-      svc.command(momentLog(svc, id, o.cut), labels.trimMoment(), () => svc.trimMoment(toId(id), toNum(start, 'start'), toNum(end, 'end')));
+      svc.command(momentLog(svc, id, o.cut), labels.trimMoment(), () => svc.trimMoment(toId(id), toNum(start, 'start'), toNum(end, 'end'), { ai: o.ai }));
       print({ ok: true, id: toId(id) });
     }));
 
   momentCmd.command('speed <id> <speed>')
     .description('Set playback speed of a moment: 1, 0.5 or 0.25 (needs enough source fps)')
     .option(...cutOpt)
+    .option(...aiOpt)
     .action((id: string, speed: string, o) => withSvc(({ svc }) => {
-      svc.command(momentLog(svc, id, o.cut), labels.momentSpeed(toNum(speed, 'speed')), () => svc.setMomentSpeed(toId(id), toNum(speed, 'speed')));
+      svc.command(momentLog(svc, id, o.cut), labels.momentSpeed(toNum(speed, 'speed')), () => svc.setMomentSpeed(toId(id), toNum(speed, 'speed'), { ai: o.ai }));
       print({ ok: true, id: toId(id), speed: toNum(speed) });
+    }));
+
+  momentCmd.command('cut-out <id> <from> <to>')
+    .description('Cut a stretch (clip seconds, e.g. a shake) out of a moment: it keeps the part before, a new moment gets the part after, with a panel behind each panel using it. Both parts must be at least 1 s')
+    .option(...cutOpt)
+    .option(...aiOpt)
+    .action((id: string, from: string, to: string, o) => withSvc(({ svc }) => {
+      const cutId = momentLog(svc, id, o.cut);
+      const res = svc.command(cutId, labels.cutOut(), () => svc.cutOutMoment(toId(id), toNum(from, 'from'), toNum(to, 'to'), { ai: o.ai, cutId }));
+      print({ ok: true, id: toId(id), ...res });
     }));
 
   momentCmd.command('star <id>')
