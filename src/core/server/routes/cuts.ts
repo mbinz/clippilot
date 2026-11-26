@@ -13,6 +13,10 @@ import { parseSelection, checkSelection, writeBoardSelection, SelectionError } f
 import { cutToSegments } from '../../storyboard/export.js';
 import { exportSegments } from '../../export/index.js';
 import type { Tier } from '../../tiers.js';
+import { fillLookFingerprints, type LookDeps } from '../../look/index.js';
+import { createSiglipEmbedder } from '../../look/siglip.js';
+import { ClipRepository } from '../../../db/repositories/clip.repository.js';
+import { HighlightRepository } from '../../../db/repositories/highlight.repository.js';
 
 type Body = Record<string, unknown>;
 
@@ -21,6 +25,8 @@ export interface CutRoutesOptions {
   basePath?: string;
   /** Runs macOS `open` with these args (injectable for tests). Default: spawn `open` without a shell. */
   opener?: (args: string[]) => void | Promise<void>;
+  /** Look fingerprint deps for moments made on the board (tests inject a fake). Default: the SigLIP model, loaded on first use. */
+  look?: LookDeps | (() => Promise<LookDeps>);
 }
 
 const defaultOpener = (args: string[]): Promise<void> => new Promise((resolve, reject) => {
@@ -37,6 +43,23 @@ export function createCutRoutes(db: Database.Database, options: CutRoutesOptions
   const thumbs = new ThumbnailRepository(db);
   const transcripts = new TranscriptRepository(db);
   const opener = options.opener ?? defaultOpener;
+
+  let lookDeps: Promise<LookDeps> | undefined;
+  const getLookDeps = (): Promise<LookDeps> => {
+    const o = options.look;
+    if (o && typeof o !== 'function') return Promise.resolve(o);
+    lookDeps ??= (o ?? (async () => ({ embedder: await createSiglipEmbedder() })))().catch((err) => { lookDeps = undefined; throw err; });
+    return lookDeps;
+  };
+  /** One fingerprint job at a time, never blocking a response; failures leave the moment without a fingerprint ("new"). */
+  let lookQueue: Promise<unknown> = Promise.resolve();
+  const fingerprintInBackground = (clipId: number): void => {
+    lookQueue = lookQueue.then(async () => {
+      const clip = new ClipRepository(db).findById(clipId);
+      if (!clip) return;
+      await fillLookFingerprints([clip], { highlights: new HighlightRepository(db) }, await getLookDeps());
+    }).catch((err) => { console.error(`look fingerprint for clip ${clipId} failed: ${(err as Error).message}`); });
+  };
 
   const media = (clipId: number, proxyPath: string | null) => {
     const [first] = thumbs.findByClip(clipId);
@@ -344,6 +367,22 @@ export function createCutRoutes(db: Database.Database, options: CutRoutesOptions
         if (tier !== undefined) svc.setMomentTier(momentId, tier as Tier | null);
         return momentRow(momentId);
       });
+    })(c);
+  });
+
+  /** BE4: a new moment from a selection on a clip's timeline; its look fingerprint follows in the background. */
+  app.post('/clips/:id/moments', async (c) => {
+    const body = await bodyOf(c);
+    return guard(() => {
+      const clipId = id(c);
+      const cutId = cutOf(body, svc.projectIdOfClip(clipId));
+      const start = num(body.start_sec, 'start_sec');
+      const end = num(body.end_sec, 'end_sec');
+      if (body.description !== undefined && typeof body.description !== 'string') throw new Error('description must be a string');
+      const created = logged(cutId, labels.newMoment(), () =>
+        momentRow(svc.createMoment(clipId, start, end, { description: body.description as string | undefined })));
+      fingerprintInBackground(clipId);
+      return created;
     })(c);
   });
 
