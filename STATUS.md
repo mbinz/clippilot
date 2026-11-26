@@ -26,7 +26,7 @@ Order agreed 2026-11-25. Each line: theme — what — spec.
   [spec](docs/specs/board-fixes.md)
 
 ### Next
-- [ ] **Board editing** — grilled 2026-11-26, build before Odeceixe: BE1 panel grid + drag/insert → BE2 panel view
+- [ ] **Board editing** — grilled 2026-11-26, build before Odeceixe: BE1 panel grid + drag/insert (done 2026-11-26) → BE2 panel view
   (two-up) → BE3 pool "find what's missing" (≈ marks, ghost placement; no side drawer) → BE4 create a moment → BE5
   full-screen compare — [spec](docs/specs/board-editing.md)
 - [ ] **Board fixes, part 3** — critic findings on the board (apply / dismiss), inside the BE2 panel view — grill
