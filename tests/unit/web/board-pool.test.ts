@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   effectiveTier, isHero, recTime, poolOrder, alternatives, otherInEvent, slotFor, usage, fades, loopStep, seekState, loopSeekTarget,
+  poolMark, poolSort, onlyNew, ghostSlot, placementScene, type PoolMark, type PoolPanel,
   type PoolMoment, type PoolTree,
 } from '../../../web/src/board/pool.js';
 
@@ -176,4 +177,106 @@ describe('loop / play-on', () => {
     [2, false, null], [4.99, false, null], [5, false, 1], [6, false, 1], [0.6, false, 1], [0.8, false, null],
     [7, true, null], [0, true, null],
   ])('loopSeekTarget t=%s free=%s -> %s', (t, free, want) => expect(loopSeekTarget(t, 1, 5, free)).toBe(want));
+});
+
+describe('BE3: poolMark / poolSort / onlyNew', () => {
+  const filledP = (id: number, moment_id: number): PoolPanel => ({ id, state: 'filled', source: 'user', moment_id, candidates: [] });
+  const ms = [mo(1, { look_group: 7 }), mo(2, { look_group: 7 }), mo(3), mo(4, { look_group: 8 })];
+  const tree: PoolTree = {
+    scenes: [
+      { id: 10, panels: [filledP(100, 3)] },
+      { id: 11, panels: [filledP(110, 4), filledP(111, 1)] },
+    ],
+  };
+  it('similar: a moment of its look group is already in a panel -> panel id and 1-based number in its scene', () => {
+    expect(poolMark(ms[1], tree, ms)).toEqual({ kind: 'similar', panelNo: 2, panelId: 111 });
+  });
+  it('prefers the viewed scene when several scenes hold a look sibling', () => {
+    const t: PoolTree = { scenes: [{ id: 10, panels: [filledP(100, 1)] }, { id: 11, panels: [filledP(110, 4), filledP(111, 1)] }] };
+    expect(poolMark(ms[1], t, ms, 11)).toEqual({ kind: 'similar', panelNo: 2, panelId: 111 });
+    expect(poolMark(ms[1], t, ms, 10)).toEqual({ kind: 'similar', panelNo: 1, panelId: 100 });
+  });
+  it('new: no look group, or no sibling in the cut', () => {
+    expect(poolMark(mo(9), tree, ms)).toEqual({ kind: 'new' });
+    expect(poolMark(mo(9, { look_group: 99 }), tree, ms)).toEqual({ kind: 'new' });
+  });
+
+  const marks = (m: PoolMoment): PoolMark => (m.look_group === 7 ? { kind: 'similar', panelNo: 1, panelId: 1 } : { kind: 'new' });
+  it('poolSort: ★ new, ★ similar, new, similar; each by recording time; empty sections dropped', () => {
+    const all = [
+      mo(1, { rec: 10, look_group: 7 }), mo(2, { rec: 5, look_group: 7, user_tier: 'hero' }), mo(3, { rec: 30 }),
+      mo(4, { rec: 20 }), mo(5, { rec: 40, user_tier: 'hero' }), mo(6, { rec: 1, user_tier: 'hero' }), mo(7, { rec: 2, look_group: 7 }),
+    ];
+    const r = poolSort(all, marks);
+    expect(r.map((s) => s.key)).toEqual(['star-new', 'star-similar', 'new', 'similar']);
+    expect(r.map((s) => s.moments.map((m) => m.id))).toEqual([[6, 5], [2], [4, 3], [7, 1]]);
+    expect(poolSort([mo(3), mo(4)], marks).map((s) => s.key)).toEqual(['new']);
+    expect(poolSort([], marks)).toEqual([]);
+  });
+  it('onlyNew drops similar moments', () => {
+    expect(onlyNew([mo(1, { look_group: 7 }), mo(3)], marks).map((m) => m.id)).toEqual([3]);
+  });
+});
+
+describe('BE3: ghostSlot', () => {
+  const sc = (...pm: (number | null)[]) => ({
+    panels: pm.map((id, i) => (id === null
+      ? { id: i, state: 'gap', source: 'ai', moment_id: null, candidates: [] } as PoolPanel
+      : { id: i, state: 'filled', source: 'ai', moment_id: id, candidates: [] } as PoolPanel)),
+  });
+  const ms = [mo(1, { rec: 100 }), mo(2, { rec: 200 }), mo(3, { rec: 300 })];
+  it('before the first, between, after the last', () => {
+    const s = sc(1, 2, 3);
+    expect(ghostSlot(mo(9, { rec: 50 }), s, ms)).toBe(0);
+    expect(ghostSlot(mo(9, { rec: 150 }), s, ms)).toBe(1);
+    expect(ghostSlot(mo(9, { rec: 250 }), s, ms)).toBe(2);
+    expect(ghostSlot(mo(9, { rec: 999 }), s, ms)).toBe(3);
+  });
+  it('panels without a time (gap, unknown moment) are skipped for the comparison', () => {
+    const s = sc(1, null, 2, null);
+    expect(ghostSlot(mo(9, { rec: 150 }), s, ms)).toBe(1);
+    expect(ghostSlot(mo(9, { rec: 250 }), s, ms)).toBe(3);
+    expect(ghostSlot(mo(9, { rec: 50 }), s, ms)).toBe(0);
+  });
+  it('a CHOOSE panel counts with its first candidate', () => {
+    const s = { panels: [{ id: 1, state: 'candidates', source: 'ai', moment_id: null, candidates: [{ id: 2 }] } as PoolPanel] };
+    expect(ghostSlot(mo(9, { rec: 150 }), s, ms)).toBe(0);
+    expect(ghostSlot(mo(9, { rec: 250 }), s, ms)).toBe(1);
+  });
+  it('no timed panel at all -> at the end', () => {
+    expect(ghostSlot(mo(9), sc(), ms)).toBe(0);
+    expect(ghostSlot(mo(9), sc(null, null), ms)).toBe(2);
+  });
+});
+
+describe('BE3: placementScene', () => {
+  const p = (id: number, moment_id: number): PoolPanel => ({ id, state: 'filled', source: 'ai', moment_id, candidates: [] });
+  const ms = [mo(1, { rec: 100 }), mo(2, { rec: 200 }), mo(3, { rec: 1000 }), mo(4, { rec: 1100 }), mo(5, { rec: 50, ev: 2 })];
+  const tree = {
+    scenes: [
+      { id: 10, event_id: 1, panels: [p(100, 1), p(101, 2)] },
+      { id: 11, event_id: 1, panels: [p(110, 3), p(111, 4)] },
+      { id: 12, event_id: 2, panels: [p(120, 5)] },
+      { id: 13, event_id: 3, panels: [] },
+    ],
+  };
+  it('the viewed scene when it is for the moment\'s event', () => {
+    expect(placementScene(mo(9, { rec: 1050 }), tree, ms, 10)).toBe(10);
+  });
+  it('else the scene of the event whose recording times contain / are nearest to the moment', () => {
+    expect(placementScene(mo(9, { rec: 1050 }), tree, ms, 12)).toBe(11);
+    expect(placementScene(mo(9, { rec: 150 }), tree, ms, 12)).toBe(10);
+    expect(placementScene(mo(9, { rec: 400 }), tree, ms, 12)).toBe(10); // nearer to scene 10's end (200) than 11's start (1000)
+    expect(placementScene(mo(9, { rec: 900 }), tree, ms, 12)).toBe(11);
+  });
+  it('a scene of the event without any timed panel still takes it', () => {
+    expect(placementScene(mo(9, { ev: 3 }), tree, ms, 10)).toBe(13);
+  });
+  it('null when no scene is for the moment\'s event (offer a new scene)', () => {
+    expect(placementScene(mo(9, { ev: 7 }), tree, ms, 10)).toBeNull();
+  });
+  it('a moment without an event goes to the viewed scene', () => {
+    const m = mo(9); m.clip.event_id = null;
+    expect(placementScene(m, tree, ms, 12)).toBe(12);
+  });
 });

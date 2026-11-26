@@ -28,7 +28,7 @@ export interface PoolPanel {
   moment_id: number | null;
   candidates: { id: number }[];
 }
-export interface PoolTree { scenes: { id: number; panels: PoolPanel[] }[] }
+export interface PoolTree { scenes: { id: number; event_id?: number | null; panels: PoolPanel[] }[] }
 
 export const effectiveTier = (m: Pick<PoolMoment, 'tier' | 'user_tier'>): string => m.user_tier ?? m.tier;
 export const isHero = (m: Pick<PoolMoment, 'tier' | 'user_tier'>): boolean => effectiveTier(m) === 'hero';
@@ -154,4 +154,75 @@ export function loopSeekTarget(t: number, a: number, b: number, free: boolean): 
 /** After a seek: free (play on) when outside [a-0.05, b+0.05]; inside, loop again. */
 export function seekState(t: number, a: number, b: number): boolean {
   return t < a - 0.05 || t > b + 0.05;
+}
+
+/* ---------- BE3: pool marks, sort, placement ---------- */
+
+export type PoolMark = { kind: 'similar'; panelNo: number; panelId: number } | { kind: 'new' };
+
+/** "≈ N" when a moment of the tile's look group is already in panel N of its scene (`slotFor`), else new. */
+export function poolMark(m: PoolMoment, tree: PoolTree, moments: PoolMoment[], currentSceneId?: number): PoolMark {
+  const panelId = slotFor(m, tree, moments, currentSceneId);
+  if (panelId === null) return { kind: 'new' };
+  for (const s of tree.scenes) {
+    const i = s.panels.findIndex((p) => p.id === panelId);
+    if (i >= 0) return { kind: 'similar', panelNo: i + 1, panelId };
+  }
+  return { kind: 'new' };
+}
+
+export type PoolSectionKey = 'star-new' | 'star-similar' | 'new' | 'similar';
+
+/** Pool order: ★ new, ★ ≈, new, ≈ — each in recording time. Empty sections are left out. */
+export function poolSort<T extends PoolMoment>(moments: T[], markOf: (m: T) => PoolMark): { key: PoolSectionKey; moments: T[] }[] {
+  const keyOf = (m: T): PoolSectionKey =>
+    `${isHero(m) ? 'star-' : ''}${markOf(m).kind === 'new' ? 'new' : 'similar'}` as PoolSectionKey;
+  const keys: PoolSectionKey[] = ['star-new', 'star-similar', 'new', 'similar'];
+  return keys
+    .map((key) => ({ key, moments: moments.filter((m) => keyOf(m) === key).sort(byTime) }))
+    .filter((s) => s.moments.length > 0);
+}
+
+/** The "Only new" chip: drops ≈ moments. */
+export const onlyNew = <T extends PoolMoment>(moments: T[], markOf: (m: T) => PoolMark): T[] =>
+  moments.filter((m) => markOf(m).kind === 'new');
+
+/** Insert slot (0..n) in a scene where a moment's recording time fits; panels without a time are skipped. */
+export function ghostSlot(m: PoolMoment, scene: { panels: PoolPanel[] }, moments: PoolMoment[]): number {
+  const byId = new Map(moments.map((x) => [x.id, x]));
+  const t = recTime(m);
+  let lastTimed = -1;
+  let after = -1; // last timed panel at or before t
+  scene.panels.forEach((p, i) => {
+    const id = panelMomentId(p);
+    const pm = id == null ? undefined : byId.get(id);
+    if (!pm) return;
+    lastTimed = i;
+    if (recTime(pm) <= t) after = i;
+  });
+  if (lastTimed < 0) return scene.panels.length;
+  return after + 1;
+}
+
+/**
+ * The scene a new moment is placed in: the viewed scene when it is for the moment's event (or the moment has no event),
+ * else the scene of that event whose panel times contain it / lie nearest; scenes without timed panels come last.
+ * Null = no scene for the event (offer a new one).
+ */
+export function placementScene(m: PoolMoment, tree: PoolTree, moments: PoolMoment[], viewedSceneId: number): number | null {
+  const ev = m.clip.event_id;
+  if (ev === null) return viewedSceneId;
+  const viewed = tree.scenes.find((s) => s.id === viewedSceneId);
+  if (viewed && viewed.event_id === ev) return viewed.id;
+  const byId = new Map(moments.map((x) => [x.id, x]));
+  const t = recTime(m);
+  let best: { id: number; dist: number } | null = null;
+  for (const s of tree.scenes.filter((x) => x.event_id === ev)) {
+    const times = s.panels
+      .map((p) => { const id = panelMomentId(p); const pm = id == null ? undefined : byId.get(id); return pm ? recTime(pm) : null; })
+      .filter((x): x is number => x !== null);
+    const dist = times.length === 0 ? Infinity : t < Math.min(...times) ? Math.min(...times) - t : t > Math.max(...times) ? t - Math.max(...times) : 0;
+    if (!best || dist < best.dist) best = { id: s.id, dist };
+  }
+  return best?.id ?? null;
 }
