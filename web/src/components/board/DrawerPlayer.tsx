@@ -26,6 +26,10 @@ interface Props {
   restartToken?: number;
   /** The video is ready and started playing (the other side of a two-up restarts now). */
   onStarted?: () => void;
+  /** Full screen: exact pixel size of the picture (the controls under it follow its width). Default: 16:9 across the column. */
+  box?: { w: number; h: number };
+  /** Displayed width / height of the clip, once known (portrait clips are < 1). */
+  onAspect?: (aspect: number) => void;
 }
 
 /** Drawer player: the range loops; a seek outside it plays the clip on until the next seek back inside. */
@@ -37,7 +41,7 @@ function playOn(v: HTMLVideoElement): void {
   });
 }
 
-export function DrawerPlayer({ src, a, b, rate, duration, fps, hint, videoRef, seekRef, onTime, muted = true, restartToken, onStarted }: Props) {
+export function DrawerPlayer({ src, a, b, rate, duration, fps, hint, videoRef, seekRef, onTime, muted = true, restartToken, onStarted, box, onAspect }: Props) {
   const cur = useRef({ a, b, rate });
   cur.current = { a, b, rate };
   const free = useRef(false);
@@ -83,7 +87,10 @@ export function DrawerPlayer({ src, a, b, rate, duration, fps, hint, videoRef, s
 
   return (
     <>
-      <div className="relative aspect-video overflow-hidden rounded-[10px] bg-black">
+      <div
+        className={`relative overflow-hidden rounded-[10px] bg-black ${box ? 'mx-auto' : 'aspect-video'}`}
+        style={box ? { width: box.w, height: box.h } : undefined}
+      >
         <video
           ref={videoRef}
           className="block h-full w-full cursor-pointer object-contain"
@@ -96,6 +103,7 @@ export function DrawerPlayer({ src, a, b, rate, duration, fps, hint, videoRef, s
             v.currentTime = cur.current.a;
             v.playbackRate = cur.current.rate;
             playOn(v);
+            if (v.videoWidth && v.videoHeight) onAspect?.(v.videoWidth / v.videoHeight);
             onStarted?.();
           }}
           onTimeUpdate={(e) => {
@@ -122,7 +130,7 @@ export function DrawerPlayer({ src, a, b, rate, duration, fps, hint, videoRef, s
           <span className="absolute right-2 top-2 rounded-[5px] bg-black/80 px-[7px] py-px text-[11px]">{'\u{1F422}'} {Math.round(rate * 100)} %</span>
         )}
       </div>
-      <div className="mt-2 flex items-center gap-2.5 tabular-nums">
+      <div className={`mt-2 flex items-center gap-2.5 tabular-nums ${box ? 'mx-auto' : ''}`} style={box ? { width: box.w } : undefined}>
         <button
           className={btnIcon}
           onClick={() => {

@@ -3,11 +3,14 @@ import type { BoardPanel, BoardScene, PM } from '../../board/types';
 import type { Candidate } from '../../board/panelview';
 import { dragKind } from '../../board/grid';
 import { starLabel } from '../../board/drawer';
+import { fitOne, fitTwoUp } from '../../board/fullscreen';
 import { isHero, isOut, type UsageEntry } from '../../board/pool';
 import { REASONS, btn, btnAttn, btnDanger, btnGhost, btnPrimary, kbd, tagAi, tagMine } from './ui';
 import { ClipPlayer } from './ClipPlayer';
 import { MomentTile } from './MomentTile';
 import { SpeedSegment, kindLabel } from './MomentBits';
+import { InlineText } from './InlineText';
+import { Spoken } from './Spoken';
 
 export interface PanelViewProps {
   panel: BoardPanel;
@@ -37,6 +40,8 @@ export interface PanelViewProps {
   onCreate: (clipId: number, a: number, b: number) => void;
   onSpeed: (m: PM, speed: number) => void;
   onIntent: (text: string) => void;
+  /** Inline edit of a moment's description. */
+  onDescribe: (m: PM, text: string) => void;
   onDelete: () => void;
   onStar: (m: PM) => void;
   onReject: (m: PM, reason: string) => void;
@@ -49,6 +54,27 @@ const typing = (): boolean => {
   const el = document.activeElement as HTMLElement | null;
   return !!el && (/^(INPUT|TEXTAREA)$/.test(el.tagName) || el.isContentEditable);
 };
+
+type Fs = null | 'both' | 'left' | 'right';
+
+const FS_PAD = 12;
+const FS_GAP = 16;
+/** Full-screen chrome above / under the picture: header bar, tag row, player controls, timeline + range label. */
+const FS_HEADER = 40;
+const FS_TAGS = 32;
+const FS_CONTROLS = 44;
+const FS_TIMELINE = 76;
+const FS_TRANSCRIPT = 130;
+
+function useViewport(): { w: number; h: number } {
+  const [v, setV] = useState({ w: window.innerWidth, h: window.innerHeight });
+  useEffect(() => {
+    const on = () => setV({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener('resize', on);
+    return () => window.removeEventListener('resize', on);
+  }, []);
+  return v;
+}
 
 const emptyFrame = 'flex aspect-video items-center justify-center rounded-[10px] border border-dashed border-bd-line2 bg-black text-bd-dim';
 
@@ -143,6 +169,12 @@ export function PanelView(p: PanelViewProps) {
   /** Bumped when the right player has (re)started: the left restarts with it. */
   const [restart, setRestart] = useState(0);
   const [dropOver, setDropOver] = useState(false);
+  /** Full screen (BE5): both sides, or one side alone with its long timeline and transcript. The players stay mounted. */
+  const [fs, setFs] = useState<Fs>(null);
+  /** Where Esc / ⤡ goes back to from one side alone: the two-up, or the normal view when it was entered from there. */
+  const fsBack = useRef<Fs>(null);
+  const [aspect, setAspect] = useState({ left: 16 / 9, right: 16 / 9 });
+  const view = useViewport();
   const boxRef = useRef<HTMLElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
 
@@ -182,11 +214,53 @@ export function PanelView(p: PanelViewProps) {
       } else if ((e.key === 'n' || e.key === 'N') && !e.shiftKey) {
         e.preventDefault();
         q.onNextChoose();
+      } else if ((e.key === 'f' || e.key === 'F') && !e.shiftKey) {
+        e.preventDefault();
+        setFs((cur) => (cur ? null : 'both'));
       }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, []);
+
+  // Esc leaves full screen first: caught before the board's own Esc (which closes the panel view).
+  useEffect(() => {
+    if (!fs) return;
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || typing()) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      setFs((cur) => (cur === 'left' || cur === 'right' ? fsBack.current : null));
+    };
+    document.addEventListener('keydown', onEsc, true);
+    return () => document.removeEventListener('keydown', onEsc, true);
+  }, [fs]);
+
+  // Sound follows the full-screen side; otherwise the toggle.
+  const soundSide = fs === 'left' || fs === 'right' ? fs : sound;
+
+  // Full-screen picture sizes (pure `fitTwoUp` / `fitOne`).
+  const availW = view.w - 2 * FS_PAD;
+  const availH = view.h - 2 * FS_PAD - FS_HEADER - FS_TAGS - FS_CONTROLS;
+  const rects = fs === 'both' ? fitTwoUp(availW, availH, aspect.left, aspect.right, FS_GAP) : null;
+  const one = fs === 'left' || fs === 'right'
+    ? fitOne(availW, availH - FS_TIMELINE - FS_TRANSCRIPT, aspect[fs])
+    : null;
+  const boxOf = (side: 'left' | 'right') => (rects ? { w: rects[side].w, h: rects[side].h } : one && fs === side ? { w: one.w, h: one.h } : undefined);
+  /** Two-up: a column as wide as its picture. One side alone: the whole width (long timeline), the picture centred. */
+  const colStyle = (side: 'left' | 'right') => (fs === 'both' ? { width: rects![side].w } : fs === side ? { width: availW } : undefined);
+  const fsOpen = (side: Exclude<Fs, null | 'both'>) => (
+    <button
+      className={btnGhost}
+      onClick={() => {
+        if (fs !== side) fsBack.current = fs;
+        setFs(fs === side ? fsBack.current : side);
+      }}
+      title={fs === side ? 'Back (Esc)' : 'This side full screen'}
+    >
+      {fs === side ? '⤡' : '⤢'}
+    </button>
+  );
 
   const tone = panel.state === 'gap' ? 'border-dashed border-bd-line2' : panel.source === 'user' && !undecided ? 'border-solid border-bd-mine' : 'border-dashed border-bd-ai';
   const clipMoments = (m: PM) => p.moments.filter((x) => x.clip_id === m.clip_id && !isOut(x));
@@ -195,9 +269,11 @@ export function PanelView(p: PanelViewProps) {
   return (
     <section
       ref={boxRef}
-      className="my-1 w-full rounded-xl border border-bd-line2 bg-bd-s1 p-3.5 max-[900px]:fixed max-[900px]:inset-0 max-[900px]:z-[15] max-[900px]:my-0 max-[900px]:overflow-auto max-[900px]:rounded-none"
+      className={fs
+        ? 'fixed inset-0 z-50 flex flex-col overflow-hidden bg-black p-3'
+        : 'my-1 w-full rounded-xl border border-bd-line2 bg-bd-s1 p-3.5 max-[900px]:fixed max-[900px]:inset-0 max-[900px]:z-[15] max-[900px]:my-0 max-[900px]:overflow-auto max-[900px]:rounded-none'}
     >
-      <div className="mb-2.5 flex flex-wrap items-center gap-2">
+      <div className={`flex flex-wrap items-center gap-2 ${fs ? 'h-10 flex-none' : 'mb-2.5'}`}>
         <span className="text-[10.5px] font-semibold uppercase tracking-[.08em] text-bd-muted">
           Panel {index + 1} of {scene.panels.length} {'·'} {scene.name}
         </span>
@@ -208,7 +284,7 @@ export function PanelView(p: PanelViewProps) {
             <button
               key={s}
               onClick={() => setSound(s)}
-              className={`cursor-pointer border-0 px-2.5 py-1 ${sound === s ? 'bg-bd-s2 text-bd-text' : 'bg-transparent text-bd-muted'}`}
+              className={`cursor-pointer border-0 px-2.5 py-1 ${soundSide === s ? 'bg-bd-s2 text-bd-text' : 'bg-transparent text-bd-muted'}`}
             >
               {s}
             </button>
@@ -216,10 +292,11 @@ export function PanelView(p: PanelViewProps) {
         </div>
         <button className={btnGhost} onClick={() => p.onStep(-1)} title="Previous panel (Shift+Tab)">{'‹'}</button>
         <button className={btnGhost} onClick={() => p.onStep(1)} title="Next panel (Tab)">{'›'}</button>
-        <button className={btnGhost} onClick={p.onClose} title="Close (Esc)">{'✕'}</button>
+        <button className={btnGhost} onClick={() => setFs(fs ? null : 'both')} title={fs ? 'Leave full screen (Esc)' : 'Full screen (F)'}>{fs ? '⤡' : '⤢'}</button>
+        {!fs && <button className={btnGhost} onClick={p.onClose} title="Close (Esc)">{'✕'}</button>}
       </div>
 
-      <div className="grid grid-cols-2 gap-4 max-[700px]:grid-cols-1">
+      <div className={fs ? `flex min-h-0 flex-1 justify-center gap-4 overflow-auto ${fs === 'both' ? 'items-center' : 'items-start'}` : 'grid grid-cols-2 gap-4 max-[700px]:grid-cols-1'}>
         {/* left: what is in the panel; a moment dropped here is used */}
         <div
           onDragOver={(e) => {
@@ -237,14 +314,16 @@ export function PanelView(p: PanelViewProps) {
             const mid = Number(e.dataTransfer.getData('text/plain'));
             if (mid && mid !== left?.id) p.onDropUse(mid);
           }}
-          className={`min-w-0 rounded-[10px] border-2 p-2 ${dropOver ? 'border-solid border-bd-focus' : tone}`}
+          style={colStyle('left')}
+          className={`flex min-w-0 flex-col ${fs ? `flex-none ${fs === 'right' ? 'hidden' : ''} ${fs === 'left' ? 'h-full' : ''}` : `rounded-[10px] border-2 p-2 ${dropOver ? 'border-solid border-bd-focus' : tone}`}`}
         >
-          <div className="mb-1.5 flex items-center gap-2">
+          <div className={`mb-1.5 flex items-center gap-2 ${fs ? 'h-[26px]' : ''}`}>
             {panel.state === 'filled' && (panel.source === 'user' ? <span className={tagMine}>{'✓'} YOURS</span> : <span className={tagAi}>AI</span>)}
             {undecided && <span className={tagAi}>AI default {'·'} not decided</span>}
             {panel.state === 'gap' && <span className={kbd}>empty panel</span>}
             <div className="flex-1" />
             {undecided && left && <button className={btnAttn} onClick={() => p.onUse(left)}>Use this</button>}
+            {left && fsOpen('left')}
           </div>
           {left ? (
             <>
@@ -256,39 +335,58 @@ export function PanelView(p: PanelViewProps) {
                 editable={!isOut(left)}
                 tone="amber"
                 neutralUsage
-                muted={sound !== 'left'}
+                muted={soundSide !== 'left'}
                 restartToken={restart}
                 hint="loops the moment"
                 footer={footer(left)}
                 onPick={(id) => id !== left.id && p.onSelect(id)}
                 onTrim={(a, b) => p.onTrim(left, a, b)}
                 onCreate={(a, b) => p.onCreate(left.clip_id, a, b)}
+                box={boxOf('left')}
+                bare={fs === 'both'}
+                onAspect={(a) => setAspect((cur) => ({ ...cur, left: a }))}
               />
-              <p className="mb-0 mt-2 line-clamp-2 text-[12.5px] text-[#cfd3db]">{left.description}</p>
-              <IntentInput panel={panel} onIntent={p.onIntent} />
-              {!isOut(left) && <SpeedSegment m={left} onSpeed={(v) => p.onSpeed(left, v)} />}
-              <div className="mt-2.5"><MomentTools m={left} p={p} /></div>
+              {fs === 'both' ? null : (
+                <>
+                  <p className="mb-0 mt-2 line-clamp-2 text-[12.5px] text-[#cfd3db]">
+                    <InlineText value={left.description} placeholder="Add a description" onSave={(t) => p.onDescribe(left, t)} />
+                  </p>
+                  {fs === 'left' ? <Spoken moment={left} /> : (
+                    <>
+                      <IntentInput panel={panel} onIntent={p.onIntent} />
+                      {!isOut(left) && <SpeedSegment m={left} onSpeed={(v) => p.onSpeed(left, v)} />}
+                      <div className="mt-2.5"><MomentTools m={left} p={p} /></div>
+                    </>
+                  )}
+                </>
+              )}
             </>
           ) : (
             <>
               <div className={emptyFrame}>empty {'—'} drop or pick a moment</div>
-              <IntentInput panel={panel} onIntent={p.onIntent} />
+              {!fs && <IntentInput panel={panel} onIntent={p.onIntent} />}
             </>
           )}
-          <div className="mt-2.5 flex justify-end">
-            <button className={btnDanger} onClick={p.onDelete}>Delete panel</button>
-          </div>
+          {!fs && (
+            <div className="mt-2.5 flex justify-end">
+              <button className={btnDanger} onClick={p.onDelete}>Delete panel</button>
+            </div>
+          )}
         </div>
 
         {/* right: the candidate (drag it onto the left side to use it) */}
-        <div className="min-w-0 rounded-[10px] border-2 border-solid border-bd-line p-2">
-          <div className="mb-1.5 flex items-center gap-2">
+        <div
+          style={colStyle('right')}
+          className={`flex min-w-0 flex-col ${fs ? `flex-none ${fs === 'left' ? 'hidden' : ''} ${fs === 'right' ? 'h-full' : ''}` : 'rounded-[10px] border-2 border-solid border-bd-line p-2'}`}
+        >
+          <div className={`mb-1.5 flex items-center gap-2 ${fs ? 'h-[26px]' : ''}`}>
             <span className={kbd}>
               {right ? `Candidate${rightIndex >= 0 ? ` ${rightIndex + 1} of ${p.row.length}` : ''}` : 'No candidate'}
               {right && p.usage[right.id] ? ` · in panel ${p.usage[right.id].panelNo}` : ''}
             </span>
             <div className="flex-1" />
             {right && <button className={undecided ? btnAttn : btnPrimary} onClick={() => p.onUse(right)} title="Enter">Use this</button>}
+            {right && fsOpen('right')}
           </div>
           {right ? (
             <>
@@ -307,8 +405,11 @@ export function PanelView(p: PanelViewProps) {
                   editable={!isOut(right)}
                   tone="white"
                   neutralUsage
-                  muted={sound !== 'right'}
+                  muted={soundSide !== 'right'}
                   onStarted={() => setRestart((n) => n + 1)}
+                  box={boxOf('right')}
+                  bare={fs === 'both'}
+                  onAspect={(a) => setAspect((cur) => ({ ...cur, right: a }))}
                   hint="loops the moment"
                   footer={footer(right)}
                   onPick={(id) => id !== right.id && p.onSelect(id)}
@@ -316,10 +417,15 @@ export function PanelView(p: PanelViewProps) {
                   onCreate={(a, b) => p.onCreate(right.clip_id, a, b)}
                 />
               </div>
-              <p className="mb-0 mt-2 line-clamp-2 text-[12.5px] text-[#cfd3db]">
-                {right.description} <span className={kbd}>{kindLabel(right)}</span>
-              </p>
-              <div className="mt-2.5"><MomentTools m={right} p={p} /></div>
+              {fs === 'both' ? null : (
+                <>
+                  <p className="mb-0 mt-2 line-clamp-2 text-[12.5px] text-[#cfd3db]">
+                    <InlineText value={right.description} placeholder="Add a description" onSave={(t) => p.onDescribe(right, t)} />{' '}
+                    <span className={kbd}>{kindLabel(right)}</span>
+                  </p>
+                  {fs === 'right' ? <Spoken moment={right} /> : <div className="mt-2.5"><MomentTools m={right} p={p} /></div>}
+                </>
+              )}
             </>
           ) : (
             <div className={emptyFrame}>nothing to compare {'—'} no other moments in this event</div>
@@ -327,8 +433,8 @@ export function PanelView(p: PanelViewProps) {
         </div>
       </div>
 
-      {/* candidate row */}
-      <div className="mt-3.5 border-t border-bd-line pt-3">
+      {/* candidate row (hidden in full screen) */}
+      {!fs && <div className="mt-3.5 border-t border-bd-line pt-3">
         <div className="mb-2 flex items-center gap-2">
           <b className="text-[11px] font-semibold uppercase tracking-[.07em] text-bd-muted">Candidates</b>
           <span className={kbd}>{p.row.length} {'·'} {'←'} {'→'} step, Enter use, Tab next panel</span>
@@ -348,7 +454,7 @@ export function PanelView(p: PanelViewProps) {
           ))}
           {p.row.length === 0 && <span className={kbd}>No other candidates.</span>}
         </div>
-      </div>
+      </div>}
     </section>
   );
 }

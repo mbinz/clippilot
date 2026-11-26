@@ -277,6 +277,7 @@ export function BoardView({ projectId }: Props) {
     else if (open?.kind === 'place') setOpen({ ...open, mid: r.id });
   };
   const trim = (m: PM, a: number, b: number) => void actions.patchMoment(m.id, { start_sec: a, end_sec: b }, 'Trim moment');
+  const describe = (m: PM, text: string) => void actions.patchMoment(m.id, { description: text }, 'Edit description');
   const speed = (m: PM, v: number) => void actions.patchMoment(m.id, { speed: v }, `Speed ${Math.round(v * 100)} %`);
 
   const openPreview = (list: BoardScene[]) => {
@@ -385,6 +386,7 @@ export function BoardView({ projectId }: Props) {
                   if (m) poolClick(m, poolMark(m, { scenes }, pms, scene.id));
                 }}
                 onCreate={(clipId, a, b) => void createMoment(clipId, a, b)}
+                onDescribe={describe}
               />
             ) : selPanel && selPanel.scene.id === scene.id ? (
               <PanelView
@@ -410,6 +412,7 @@ export function BoardView({ projectId }: Props) {
                 onTrim={trim}
                 onCreate={(clipId, a, b) => void createMoment(clipId, a, b)}
                 onSpeed={speed}
+                onDescribe={describe}
                 onIntent={(t) => void actions.patchPanel(selPanel.panel.id, { intent: t }, 'Edit intent')}
                 onDelete={async () => {
                   const r = await actions.deletePanel(selPanel.panel.id, panelNo(selPanel));

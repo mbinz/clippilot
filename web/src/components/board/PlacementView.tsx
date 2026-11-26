@@ -4,6 +4,7 @@ import { isOut, type UsageEntry } from '../../board/pool';
 import { btnGhost, btnPrimary, kbd } from './ui';
 import { ClipPlayer } from './ClipPlayer';
 import { kindLabel } from './MomentBits';
+import { InlineText } from './InlineText';
 
 interface Props {
   moment: PM;
@@ -20,6 +21,8 @@ interface Props {
   onPick: (momentId: number) => void;
   /** "New moment" from a selection on the clip's timeline (BE4): replaces the moment being placed. */
   onCreate: (clipId: number, a: number, b: number) => void;
+  /** Inline edit of the moment's description. */
+  onDescribe: (m: PM, text: string) => void;
 }
 
 const typing = (): boolean => {
@@ -88,7 +91,8 @@ export function PlacementView(p: Props) {
           onCreate={(a, b) => p.onCreate(m.clip_id, a, b)}
         />
         <p className="mb-0 mt-2 line-clamp-2 text-[12.5px] text-[#cfd3db]">
-          {m.description} <span className={kbd}>{kindLabel(m)}</span>
+          <InlineText value={m.description} placeholder="Add a description" onSave={(t) => p.onDescribe(m, t)} />{' '}
+          <span className={kbd}>{kindLabel(m)}</span>
         </p>
         <p className={`${kbd} mb-0 mt-1.5`}>Drag the dashed panel to any slot, or onto an empty / CHOOSE panel. ← → move it, Enter inserts, Esc cancels.</p>
       </div>

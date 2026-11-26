@@ -67,6 +67,8 @@ export interface MomentPatch {
   speed?: number;
   /** User tier: 'hero' = star; null = back to the AI tier. */
   tier?: Tier | null;
+  /** What the moment shows (trimmed server-side, at most 300 characters). */
+  description?: string;
 }
 /** The moment is the edit: in/out and speed are set on the moment (every panel using it follows). */
 export const patchMoment = (momentId: number, cutId: number, patch: MomentPatch) =>

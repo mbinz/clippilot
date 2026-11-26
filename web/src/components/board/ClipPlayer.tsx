@@ -26,10 +26,15 @@ interface Props {
   neutralUsage?: boolean;
   /** "New moment" from a selection on the timeline (BE4). */
   onCreate?: (a: number, b: number) => void;
+  /** Full screen (BE5): pixel size of the picture, and the clip's aspect once known. */
+  box?: { w: number; h: number };
+  onAspect?: (aspect: number) => void;
+  /** Full screen two-up: just the picture and its controls, no timeline / range label. */
+  bare?: boolean;
 }
 
 /** Player + timeline + range label of one moment. Mount with `key={moment.id}`. */
-export function ClipPlayer({ moment: m, clipMoments, usage, editable, tone, hint, footer, onPick, onTrim, muted, restartToken, onStarted, neutralUsage, onCreate }: Props) {
+export function ClipPlayer({ moment: m, clipMoments, usage, editable, tone, hint, footer, onPick, onTrim, muted, restartToken, onStarted, neutralUsage, onCreate, box, onAspect, bare }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const seekRef = useRef<((t: number) => void) | null>(null);
   const [playhead, setPlayhead] = useState(0);
@@ -40,15 +45,15 @@ export function ClipPlayer({ moment: m, clipMoments, usage, editable, tone, hint
       <DrawerPlayer
         src={m.clip.proxy_url} a={trim.range.a} b={trim.range.b} rate={m.speed} duration={m.clip.duration_sec} fps={m.clip.fps}
         hint={hint} videoRef={videoRef} seekRef={seekRef} onTime={setPlayhead}
-        muted={muted} restartToken={restartToken} onStarted={onStarted}
+        muted={muted} restartToken={restartToken} onStarted={onStarted} box={box} onAspect={onAspect}
       />
-      <ClipTimeline
+      {!bare && <ClipTimeline
         duration={m.clip.duration_sec} moments={clipMoments} currentId={m.id} usage={usage}
         range={trim.range} editable={editable} tone={tone} neutralUsage={neutralUsage} onRange={trim.live} onRangeCommit={trim.release}
         shakes={shakeMarks(m.shakes, trim.range, m.clip.duration_sec)}
         playhead={playhead} onPick={onPick} onSeek={(t) => seekRef.current?.(t)} onCreate={onCreate}
-      />
-      <div className="mt-1 flex justify-between gap-2 text-[11px] tabular-nums text-bd-muted">
+      />}
+      {!bare && <div className="mt-1 flex justify-between gap-2 text-[11px] tabular-nums text-bd-muted">
         <span>0:00</span>
         <span className="text-center">
           {dragging
@@ -56,7 +61,7 @@ export function ClipPlayer({ moment: m, clipMoments, usage, editable, tone, hint
             : rangeLabel(m, editable)}
         </span>
         <span className="text-right">{footer || fmtClock(m.clip.duration_sec)}</span>
-      </div>
+      </div>}
     </>
   );
 }
