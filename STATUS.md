@@ -26,9 +26,11 @@ Order agreed 2026-11-25. Each line: theme — what — spec.
   [spec](docs/specs/board-fixes.md)
 
 ### Next
-- [ ] **Board editing** — grilled 2026-11-26, build before Odeceixe: BE1 panel grid + drag/insert (done 2026-11-26) → BE2 panel view
-  (two-up, done 2026-11-26) → BE3 pool "find what's missing" (≈ marks, ghost placement; no side drawer; done 2026-11-26) → BE4 create a moment (done 2026-11-26; migration 030 `highlights.created_by`, CLI `moment add`) → BE5
-  full-screen compare — [spec](docs/specs/board-editing.md)
+- [x] **Board editing** BE1–BE5 — done 2026-11-26: panel grid + drag/insert, two-up panel view, pool ≈ marks + ghost
+  placement (no side drawer), create a moment (`moment add`), full-screen compare, moment descriptions (`moment
+  describe`); migrations 030/031 — [spec](docs/specs/board-editing.md)
+- [ ] Look at board editing in Safari (drag by hand, sound/loop sync, portrait clips, CHOOSE panel, ghost on an empty
+  panel, "New scene for <event>") — not covered in the Chrome pane checks
 - [ ] **Board fixes, part 3** — critic findings on the board (apply / dismiss), inside the BE2 panel view — grill
   first, no spec yet
 - [x] **Learning from edits** L1 who made each edit (`operations.actor`, `--ai` on scene/panel verbs) — done 2026-11-25,
@@ -59,6 +61,7 @@ Order agreed 2026-11-25. Each line: theme — what — spec.
 
 ### Cleanup (any gap)
 - [ ] Dead S1 motion code
+- [ ] clippilot skill docs: add `moment add` / `moment describe` (skills live in `~/.claude/skills/`, see L0)
 - [ ] Dead drawer helpers after BE3 (`storyLink`, `optionList`, `otherOptions`, `decisionFor`, `panelPosition` in `web/src/board/drawer.ts`, `otherInEvent` in `pool.ts`; keep `transcriptView` for BE5)
 - [ ] Pool tiles: shake hint (bare ≈, bottom right) is easy to confuse with the new "≈ N" mark — give shakes another icon
 - [ ] Retire the old clip similarity (SM4) — [spec](docs/specs/similar-moments.md)

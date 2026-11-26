@@ -1,5 +1,9 @@
 # Board editing (BE1–BE5)
 
+**Result (2026-11-26):** all five slices built and merged (1451 tests). Checked on a scratch copy of Arrifana in
+the Chrome pane; Safari pass still open (STATUS). Extras: moment description edit (`PATCH /moments/:id`, `moment
+describe`), migrations 030 `highlights.created_by` and 031 `highlights.ai_description`.
+
 From UI feedback round 1 (2026-11-25, F1–F6 below) and the grilling rounds of 2026-11-26. Order: BE1 → BE5, each slice
 merges on its own. "Board fixes, part 3" (critic findings) comes after BE5 and lands inside the panel view — own
 grilling round first.
