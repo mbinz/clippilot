@@ -92,7 +92,7 @@ export function snapshot(db: Database.Database, cutId: number): Snapshot {
 
 function splitRows(db: Database.Database, projectId: number): Row[] {
   return db.prepare(`SELECT h.* FROM highlights h JOIN clips c ON c.id = h.clip_id
-    WHERE c.project_id = ? AND h.split_of IS NOT NULL ORDER BY h.id`).all(projectId) as Row[];
+    WHERE c.project_id = ? AND (h.split_of IS NOT NULL OR h.created_by IS NOT NULL) ORDER BY h.id`).all(projectId) as Row[];
 }
 
 function insertRows(db: Database.Database, table: string, rows: Row[]): void {
@@ -103,7 +103,7 @@ function insertRows(db: Database.Database, table: string, rows: Row[]): void {
   }
 }
 
-/** Moments cut out of another one: those that did not exist at the snapshot are deleted (with panels still using them), missing ones are re-created. */
+/** Moments cut out of another one or made by hand (BE4): those that did not exist at the snapshot are deleted (with panels still using them), missing ones are re-created. */
 function restoreSplits(db: Database.Database, projectId: number, splits: Row[]): void {
   const want = new Set(splits.map((r) => r.id as number));
   const have = new Set(splitRows(db, projectId).map((r) => r.id as number));

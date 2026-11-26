@@ -36,6 +36,8 @@ export interface HighlightRecord {
   ai_speed: number | null;
   /** The moment this one was cut out of (a shake cut out of a good moment leaves this sibling after it). */
   split_of: number | null;
+  /** BE4: made by hand (`user` = the board's New moment, `ai` = `moment add --ai`); null = made by the analysis. */
+  created_by: 'user' | 'ai' | null;
   /** Shake fit (F1): null = not checked, else clean | fixed | kept; valid only while the range equals `shake_checked_*`. */
   shake_status: ShakeStatus | null;
   shake_note: string | null;

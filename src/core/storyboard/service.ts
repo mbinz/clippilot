@@ -708,6 +708,22 @@ export class StoryboardService {
     });
   }
 
+  /**
+   * BE4: a new moment on `clipId` for `startSec`..`endSec` (clamped to the clip, at least MIN_PANEL_SEC). The user's is
+   * confirmed (protected like any user edit); an `ai` one stays proposed and unprotected. Tier solid, speed 1, no analysis.
+   */
+  createMoment(clipId: number, startSec: number, endSec: number, opts: { ai?: boolean; description?: string } = {}): number {
+    const clip = this.clip(clipId);
+    if (clip.hidden) throw new Error(`Clip ${clipId} is hidden`);
+    const s = round2(Math.max(0, Math.min(startSec, clip.duration_sec)));
+    const e = round2(Math.max(0, Math.min(endSec, clip.duration_sec)));
+    if (e - s < MIN_PANEL_SEC) throw new Error(`A moment must be at least ${MIN_PANEL_SEC} s long`);
+    const r = this.db.prepare(`INSERT INTO highlights (clip_id, start_sec, end_sec, ai_start_sec, ai_end_sec, description, tier, status, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, 'solid', ?, ?)`)
+      .run(clipId, s, e, s, e, opts.description?.trim() ?? '', opts.ai ? 'proposed' : 'confirmed', opts.ai ? 'ai' : 'user');
+    return Number(r.lastInsertRowid);
+  }
+
   /** ★: the user's tier for the moment (null = back to the AI's tier). Not a confirmation. */
   setMomentTier(id: number, tier: Tier | null): void {
     this.moment(id);

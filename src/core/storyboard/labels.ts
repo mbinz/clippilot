@@ -12,6 +12,7 @@ export const labels = {
   movePanel: (svc: StoryboardService, id: number) => `Move panel ${svc.panelNo(id)}`,
   intent: (svc: StoryboardService, id: number) => `Edit intent of panel ${svc.panelNo(id)}`,
   trimMoment: () => 'Trim moment',
+  newMoment: () => 'New moment',
   cutOut: () => 'Cut out of moment',
   momentSpeed: (speed: number) => `Speed ${Math.round(speed * 100)} %`,
   /** hero = ★; null / solid = no ★; filler is spelled out. */
