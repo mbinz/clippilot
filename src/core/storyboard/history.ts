@@ -28,6 +28,9 @@ export interface MomentState {
   ai_start_sec?: number;
   ai_end_sec?: number;
   ai_speed?: number | null;
+  /** Text edits (BE5): the current description and the one before the first edit (absent in older snapshots). */
+  description?: string;
+  ai_description?: string | null;
 }
 
 export type Actor = 'ai' | 'user';
@@ -53,7 +56,7 @@ type MomentDefaults = MomentState & { default_start: number; default_end: number
 /** Every moment of the project with its state and the defaults it is compared against (analysis range, default speed). */
 function momentRows(db: Database.Database, projectId: number): MomentDefaults[] {
   const rows = db.prepare(`SELECT h.id, h.status, h.reject_reason, h.start_sec, h.end_sec, h.speed, h.user_tier,
-      h.ai_start_sec, h.ai_end_sec, h.ai_speed,
+      h.ai_start_sec, h.ai_end_sec, h.ai_speed, h.description, h.ai_description,
       COALESCE(h.ai_start_sec, h.start_sec) AS default_start, COALESCE(h.ai_end_sec, h.end_sec) AS default_end,
       h.suggested_speed, c.fps
     FROM highlights h JOIN clips c ON c.id = h.clip_id WHERE c.project_id = ? ORDER BY h.id`).all(projectId) as
@@ -62,15 +65,16 @@ function momentRows(db: Database.Database, projectId: number): MomentDefaults[] 
 }
 
 const isEdited = (r: MomentDefaults): boolean => r.status !== 'proposed' || r.start_sec !== r.default_start
-  || r.end_sec !== r.default_end || r.speed !== r.default_speed || r.user_tier !== null || r.ai_speed !== null;
+  || r.end_sec !== r.default_end || r.speed !== r.default_speed || r.user_tier !== null || r.ai_speed !== null
+  || r.ai_description !== null;
 
 /** Every moment of the project that differs from its default: status, range (vs the ai range), speed, AI speed or user tier. */
 function editedMoments(db: Database.Database, projectId: number): MomentDefaults[] {
   return momentRows(db, projectId).filter(isEdited);
 }
 
-const stateOf = ({ id, status, reject_reason, start_sec, end_sec, speed, user_tier, ai_start_sec, ai_end_sec, ai_speed }: MomentDefaults): MomentState =>
-  ({ id, status, reject_reason, start_sec, end_sec, speed, user_tier, ai_start_sec, ai_end_sec, ai_speed });
+const stateOf = ({ id, status, reject_reason, start_sec, end_sec, speed, user_tier, ai_start_sec, ai_end_sec, ai_speed, description, ai_description }: MomentDefaults): MomentState =>
+  ({ id, status, reject_reason, start_sec, end_sec, speed, user_tier, ai_start_sec, ai_end_sec, ai_speed, description, ai_description });
 
 export function snapshot(db: Database.Database, cutId: number): Snapshot {
   const cut = db.prepare('SELECT name, brief, brief_state, project_id FROM stories WHERE id = ?').get(cutId) as
@@ -132,14 +136,15 @@ export function restore(db: Database.Database, cutId: number, snap: Snapshot): v
 
     // Every moment that is edited now goes back to its default; then the snapshot's edits are applied.
     const reset = db.prepare(`UPDATE highlights SET status = 'proposed', reject_reason = NULL, start_sec = ?, end_sec = ?,
-      speed = ?, user_tier = NULL, ai_speed = NULL WHERE id = ?`);
+      speed = ?, user_tier = NULL, ai_speed = NULL, description = COALESCE(ai_description, description), ai_description = NULL WHERE id = ?`);
     for (const m of editedMoments(db, cut.project_id)) reset.run(m.default_start, m.default_end, m.default_speed, m.id);
     const setMoment = db.prepare(`UPDATE highlights SET status = ?, reject_reason = ?, start_sec = ?, end_sec = ?,
-      speed = ?, user_tier = ?, ai_start_sec = COALESCE(?, ai_start_sec), ai_end_sec = COALESCE(?, ai_end_sec), ai_speed = ?
+      speed = ?, user_tier = ?, ai_start_sec = COALESCE(?, ai_start_sec), ai_end_sec = COALESCE(?, ai_end_sec), ai_speed = ?,
+      description = COALESCE(?, description), ai_description = ?
       WHERE id = ?`);
     for (const m of snap.moments) {
       setMoment.run(m.status, m.reject_reason, m.start_sec, m.end_sec, m.speed, m.user_tier,
-        m.ai_start_sec ?? null, m.ai_end_sec ?? null, m.ai_speed ?? null, m.id);
+        m.ai_start_sec ?? null, m.ai_end_sec ?? null, m.ai_speed ?? null, m.description ?? null, m.ai_description ?? null, m.id);
     }
 
     db.prepare('UPDATE clips SET hidden = 0 WHERE project_id = ? AND hidden = 1').run(cut.project_id);

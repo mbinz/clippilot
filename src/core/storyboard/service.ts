@@ -25,6 +25,8 @@ import type { TranscriptSegment, TranscriptWord } from '../transcribe/whisper.js
 
 export const MAIN_CUT_NAME = 'Main';
 export const MIN_PANEL_SEC = 0.5;
+/** Longest moment description (inline edit). */
+export const MAX_DESCRIPTION = 300;
 /** Both parts left by a cut-out must be at least this long. */
 export const MIN_CUT_PART_SEC = 1;
 const SPEEDS = [1, 0.5, 0.25];
@@ -722,6 +724,19 @@ export class StoryboardService {
       VALUES (?, ?, ?, ?, ?, ?, 'solid', ?, ?)`)
       .run(clipId, s, e, s, e, opts.description?.trim() ?? '', opts.ai ? 'proposed' : 'confirmed', opts.ai ? 'ai' : 'user');
     return Number(r.lastInsertRowid);
+  }
+
+  /** Inline edit of what a moment shows (trimmed, at most 300 characters). Like other edits: the user's counts as confirmed, `ai` leaves it unprotected. */
+  setMomentDescription(id: number, text: string, opts: { ai?: boolean } = {}): void {
+    const m = this.moment(id);
+    if (typeof text !== 'string') throw new Error('description must be a string');
+    const d = text.trim();
+    if (d.length > MAX_DESCRIPTION) throw new Error(`description is at most ${MAX_DESCRIPTION} characters`);
+    this.tx(() => {
+      if (opts.ai) this.assertUnprotected(m);
+      this.db.prepare('UPDATE highlights SET description = ?, ai_description = COALESCE(ai_description, ?) WHERE id = ?').run(d, m.description, id);
+      if (!opts.ai) this.touchMoment(m);
+    });
   }
 
   /** ★: the user's tier for the moment (null = back to the AI's tier). Not a confirmation. */

@@ -356,6 +356,15 @@ export function registerCutCommands(parent: Command): void {
       print({ ok: true, ...row });
     }));
 
+  momentCmd.command('describe <id> <text>')
+    .description('Set what a moment shows (trimmed, at most 300 characters; empty clears it)')
+    .option(...cutOpt)
+    .option(...aiOpt)
+    .action((id: string, text: string, o) => withSvc(({ svc, db }) => {
+      svc.command(momentLog(svc, id, o.cut), labels.editDescription(), () => svc.setMomentDescription(toId(id), text, { ai: o.ai }), actorOf(o));
+      print({ ok: true, ...(db.prepare('SELECT id, description FROM highlights WHERE id = ?').get(toId(id)) as object) });
+    }));
+
   momentCmd.command('speed <id> <speed>')
     .description('Set playback speed of a moment: 1, 0.5 or 0.25 (needs enough source fps)')
     .option(...cutOpt)

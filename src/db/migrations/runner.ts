@@ -29,6 +29,7 @@ import { migration027 } from './027_jolt_at_key_action.js';
 import { migration028 } from './028_look_fingerprints.js';
 import { migration029 } from './029_operation_actor.js';
 import { migration030 } from './030_created_by.js';
+import { migration031 } from './031_ai_description.js';
 
 interface Migration {
   version: number;
@@ -67,6 +68,7 @@ const migrations: Migration[] = [
   { version: 28, name: 'look_fingerprints', up: migration028 },
   { version: 29, name: 'operation_actor', up: migration029 },
   { version: 30, name: 'created_by', up: migration030 },
+  { version: 31, name: 'ai_description', up: migration031 },
 ];
 
 export function runMigrations(db: Database.Database): void {

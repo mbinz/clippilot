@@ -172,7 +172,7 @@ describe('clippilot scene / panel / moment / clip', () => {
     expect(cmds).not.toContain('trim');
     expect(cmds).not.toContain('speed');
     const momentCmds = createProgram().commands.find((c) => c.name() === 'moment')!.commands.map((c) => c.name());
-    expect(momentCmds).toEqual(expect.arrayContaining(['trim', 'speed', 'star', 'unstar', 'reset', 'reject', 'unreject', 'add']));
+    expect(momentCmds).toEqual(expect.arrayContaining(['trim', 'speed', 'star', 'unstar', 'reset', 'reject', 'unreject', 'add', 'describe']));
   });
 
   it('moment star / unstar / reset: logged on the Main cut and undoable', async () => {
@@ -358,6 +358,21 @@ describe('clippilot --ai edits and cut-out', () => {
     await run('moment', 'add', '99', '1', '5');
     expect(process.exitCode).toBe(1);
     expect(dbRow('SELECT COUNT(*) AS n FROM highlights').n).toBe(3);
+  });
+
+  it('moment describe sets the text (user: confirmed, one undo step); --ai leaves it unprotected; too long exits 1', async () => {
+    const res = await run('moment', 'describe', '2', '  big wave  ');
+    expect(res).toMatchObject({ ok: true, id: 2, description: 'big wave' });
+    expect(dbRow('SELECT description, status FROM highlights WHERE id = ?', 2)).toEqual({ description: 'big wave', status: 'confirmed' });
+    expect(dbRow('SELECT label, actor FROM operations ORDER BY id DESC LIMIT 1')).toEqual({ label: 'Edit description', actor: 'user' });
+    await run('moment', 'describe', '3', 'harbour', '--ai');
+    expect(dbRow('SELECT description, status FROM highlights WHERE id = ?', 3)).toEqual({ description: 'harbour', status: 'proposed' });
+    expect(dbRow('SELECT actor FROM operations ORDER BY id DESC LIMIT 1').actor).toBe('ai');
+    await run('cut', 'undo', '--json');
+    expect(dbRow('SELECT description FROM highlights WHERE id = ?', 3).description).toBe('town');
+    await run('moment', 'describe', '2', 'x'.repeat(301));
+    expect(process.exitCode).toBe(1);
+    expect(dbRow('SELECT description FROM highlights WHERE id = ?', 2).description).toBe('big wave');
   });
 
   it('moment cut-out with a bad range exits 1 and changes nothing', async () => {

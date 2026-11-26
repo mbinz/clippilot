@@ -338,10 +338,10 @@ export function createCutRoutes(db: Database.Database, options: CutRoutesOptions
   });
 
   const momentRow = (momentId: number) => db.prepare(
-    'SELECT id, clip_id, start_sec, end_sec, speed, user_tier, status FROM highlights WHERE id = ?').get(momentId) as
+    'SELECT id, clip_id, start_sec, end_sec, speed, user_tier, status, description FROM highlights WHERE id = ?').get(momentId) as
     { id: number; start_sec: number; end_sec: number } & Record<string, unknown>;
 
-  /** The moment is the edit: in/out, speed and ★ (tier) of a moment, as one undoable step. */
+  /** The moment is the edit: in/out, speed, ★ (tier) and description of a moment, as one undoable step. */
   app.patch('/moments/:id', async (c) => {
     const body = await bodyOf(c);
     return guard(() => {
@@ -351,11 +351,14 @@ export function createCutRoutes(db: Database.Database, options: CutRoutesOptions
       const speed = body.speed === undefined ? undefined : num(body.speed, 'speed');
       const tier = body.tier;
       if (tier !== undefined && tier !== null && typeof tier !== 'string') throw new Error('tier must be hero, solid, filler or null');
+      const description = body.description;
+      if (description !== undefined && typeof description !== 'string') throw new Error('description must be a string');
       const parts: string[] = [];
       if (trim) parts.push(labels.trimMoment());
       if (speed !== undefined) parts.push(labels.momentSpeed(speed));
       if (tier !== undefined) parts.push(labels.momentTier(tier));
-      if (!parts.length) throw new Error('Nothing to update (start_sec / end_sec, speed, tier)');
+      if (description !== undefined) parts.push(labels.editDescription());
+      if (!parts.length) throw new Error('Nothing to update (start_sec / end_sec, speed, tier, description)');
       return logged(cutId, parts.join(', '), () => {
         if (trim) {
           const cur = momentRow(momentId);
@@ -365,6 +368,7 @@ export function createCutRoutes(db: Database.Database, options: CutRoutesOptions
         }
         if (speed !== undefined) svc.setMomentSpeed(momentId, speed);
         if (tier !== undefined) svc.setMomentTier(momentId, tier as Tier | null);
+        if (description !== undefined) svc.setMomentDescription(momentId, description);
         return momentRow(momentId);
       });
     })(c);
