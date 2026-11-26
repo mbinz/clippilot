@@ -26,10 +26,11 @@ Order agreed 2026-11-25. Each line: theme — what — spec.
   [spec](docs/specs/board-fixes.md)
 
 ### Next
-- [ ] **Board fixes, part 3** — critic findings on the board (apply / dismiss) — grill first, no spec yet
-- [ ] **Board editing** — UI feedback round 1 (2026-11-25): editable panel strip, more panels on screen, choose another
-  moment (similar under panel / details under panel / side-by-side compare), create a moment. Raw — sequence against
-  this list, then grill → mockup → build; plan together with part 3 — [feedback](docs/specs/board-editing.md)
+- [ ] **Board editing** — grilled 2026-11-26, build before Odeceixe: BE1 panel grid + drag/insert → BE2 panel view
+  (two-up) → BE3 pool "find what's missing" (≈ marks, ghost placement; no side drawer) → BE4 create a moment → BE5
+  full-screen compare — [spec](docs/specs/board-editing.md)
+- [ ] **Board fixes, part 3** — critic findings on the board (apply / dismiss), inside the BE2 panel view — grill
+  first, no spec yet
 - [x] **Learning from edits** L1 who made each edit (`operations.actor`, `--ai` on scene/panel verbs) — done 2026-11-25,
   ahead of L0 so this week's board edits are recorded
 - [ ] **Learning from edits, part 1b** — L0 instructions in one folder. Note: skills aren't in the repo (only
@@ -75,6 +76,7 @@ shakes, draft rules, critics, review loop, acceptance loop run) — details in [
 [docs/specs/](docs/specs/).
 
 ## Deferred / future
+- Clip tool (own page): one clip, its moments, edit tools + browser for clips the AI skipped — [board editing](docs/specs/board-editing.md#deferred)
 - Look fingerprints aren't redone when `look_model` changes (stale rule is range only)
 - objc warning: duplicate libvips (sharp + transformers.js) — harmless so far, watch for crashes
 - Music-aware cutting (track per cut, length fitting, beat sync)
