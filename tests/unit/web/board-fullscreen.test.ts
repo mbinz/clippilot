@@ -11,7 +11,7 @@ describe('fitTwoUp (two players side by side, same height, as large as the view 
     expect(left.h).toBe(535); // floor((1920 - 16) / 2 / (16/9))
     expect(left.w).toBe(951);
     expect(left.x).toBe(1); // (1920 - 1918) / 2
-    expect(right.x).toBe(left.w + 16);
+    expect(right.x).toBe(left.x + left.w + 16);
     expect(left.y).toBe(Math.floor((1080 - left.h) / 2));
   });
 
