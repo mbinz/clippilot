@@ -90,7 +90,7 @@ export function otherInEvent(m: PoolMoment, moments: PoolMoment[]): PoolMoment[]
 }
 
 /** The moment a panel shows: filled -> its moment, candidates -> first candidate. */
-function panelMomentId(p: PoolPanel): number | null {
+export function panelMomentId(p: PoolPanel): number | null {
   if (p.state === 'filled') return p.moment_id;
   if (p.state === 'candidates') return p.candidates[0]?.id ?? null;
   return null;
