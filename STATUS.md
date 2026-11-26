@@ -36,7 +36,7 @@ Order agreed 2026-11-25. Each line: theme — what — spec.
 - [x] **Learning from edits** L1 who made each edit (`operations.actor`, `--ai` on scene/panel verbs) — done 2026-11-25,
   ahead of L0 so this week's board edits are recorded
 - [ ] **Learning from edits, part 1b** — L0 instructions in one folder. Note: skills aren't in the repo (only
-  `~/.claude/skills/`), `npm run skill:install` points at missing paths — L0 fixes both — [spec](docs/specs/learning.md)
+  `~/.claude/skills/`), `npm run skill:install` points at missing paths — L0 fixes both. Keep dev tooling (`.claude/agents/implementer.md`, restored 2026-11-26) apart from product skills/agents (clippilot, cut-critic, review-loop) — cc77714 lost the implementer by moving them together — [spec](docs/specs/learning.md)
 - [ ] **Odeceixe end to end** — brief → draft → review loop on `~/Video/ClipPilot Odeceixe`; first real test of
   similar moments
 - [ ] **Learning from edits, part 2** — L2 `learn context` → L3 learning skill; first run on Odeceixe —
