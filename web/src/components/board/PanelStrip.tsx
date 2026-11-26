@@ -1,9 +1,10 @@
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { BoardMoment, BoardPanel } from '../../board/types';
 import { fmtSec, panelLength, panelRange } from '../../board/logic';
 import { VideoThumb } from './VideoThumb';
 import { panelMedia } from './media';
 import { PANEL_MIME, dragKind, moveTarget } from '../../board/grid';
+import { rowEnd } from '../../board/panelview';
 
 interface Props {
   panels: BoardPanel[];
@@ -18,18 +19,44 @@ interface Props {
   onInsertMoment: (momentId: number, position: number) => void;
   /** A panel was dropped on insert slot `position` of this scene (already corrected for its own removal). */
   onMovePanel: (panelId: number, position: number) => void;
+  /** The panel view of the selected panel: shown full width right after the last panel of that panel's row. */
+  view?: ReactNode;
 }
 
-export function PanelStrip({ panels, selectedId, momentsById, onSelect, onAdd, onDropMoment, onInsertMoment, onMovePanel }: Props) {
+export function PanelStrip({ panels, selectedId, momentsById, onSelect, onAdd, onDropMoment, onInsertMoment, onMovePanel, view }: Props) {
   const [drop, setDrop] = useState<number | 'add' | `slot${number}` | null>(null);
   /** Something is being dragged anywhere on the page: slots show their "＋". */
   const [dragging, setDragging] = useState<'panel' | 'moment' | null>(null);
   const selectedRef = useRef<HTMLDivElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const unitRefs = useRef<(HTMLDivElement | null)[]>([]);
+  /** Panels per row of the wrapping grid (measured: units that share the first one's offsetTop). */
+  const [perRow, setPerRow] = useState(Math.max(1, panels.length));
 
-  // Keep the selected panel visible (e.g. after "N to choose" jumps to a panel outside the strip's viewport).
+  useLayoutEffect(() => {
+    const measure = () => {
+      const els = unitRefs.current.slice(0, panels.length);
+      if (!els[0]) return;
+      const top = els[0].offsetTop;
+      let n = 0;
+      for (const el of els) {
+        if (el && Math.abs(el.offsetTop - top) < 2) n++;
+        else break;
+      }
+      setPerRow(Math.max(1, n));
+    };
+    measure();
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    if (ro && boxRef.current) ro.observe(boxRef.current);
+    return () => ro?.disconnect();
+  }, [panels.length]);
+
+  // Bring the selected panel's row (and the view under it) to the top: also after "N to choose" jumps to another panel.
   useEffect(() => {
-    selectedRef.current?.scrollIntoView?.({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    selectedRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
   }, [selectedId]);
+  const selIndex = view ? panels.findIndex((p) => p.id === selectedId) : -1;
+  const viewAfter = selIndex >= 0 ? rowEnd(selIndex, perRow, panels.length) : -1;
 
   useEffect(() => {
     const start = (e: DragEvent) => setDragging(dragKind(e.dataTransfer?.types ?? []));
@@ -97,7 +124,7 @@ export function PanelStrip({ panels, selectedId, momentsById, onSelect, onAdd, o
   );
 
   return (
-    <div className="flex flex-wrap items-stretch gap-y-3.5 px-1 pb-3.5 pt-1">
+    <div ref={boxRef} className="flex flex-wrap items-stretch gap-y-3.5 px-1 pb-3.5 pt-1">
       {panels.map((p, i) => {
         const r = panelRange(p);
         const { poster, src } = panelMedia(p, momentsById);
@@ -108,6 +135,7 @@ export function PanelStrip({ panels, selectedId, momentsById, onSelect, onAdd, o
         const sel = p.id === selectedId;
         return (
           <Fragment key={p.id}>
+          <div ref={(el) => { unitRefs.current[i] = el; }} className="flex flex-none items-stretch">
           {slot(i)}
           <div
             ref={p.id === selectedId ? selectedRef : undefined}
@@ -116,7 +144,7 @@ export function PanelStrip({ panels, selectedId, momentsById, onSelect, onAdd, o
               e.dataTransfer.setData(PANEL_MIME, String(p.id));
               e.dataTransfer.effectAllowed = 'move';
             }}
-            className="group w-[190px] flex-none cursor-pointer"
+            className="group w-[190px] flex-none scroll-mt-1 cursor-pointer"
             onClick={() => onSelect(p.id)}
             onDragOver={over(p.id, ['moment'])}
             onDragLeave={leave(p.id)}
@@ -156,9 +184,12 @@ export function PanelStrip({ panels, selectedId, momentsById, onSelect, onAdd, o
             </div>
             <div className="mt-1.5 truncate text-xs text-bd-muted group-hover:text-bd-text">{p.intent}</div>
           </div>
+          </div>
+          {i === viewAfter && <div className="w-full flex-none">{view}</div>}
           </Fragment>
         );
       })}
+      <div className="flex flex-none items-stretch">
       {slot(panels.length)}
       <div
         onClick={() => onAdd()}
@@ -171,6 +202,7 @@ export function PanelStrip({ panels, selectedId, momentsById, onSelect, onAdd, o
         }`}
       >
         {'＋'}
+      </div>
       </div>
     </div>
   );

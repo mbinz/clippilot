@@ -3,13 +3,12 @@ import type { PM } from '../../board/types';
 import { starLabel, transcriptView, shakeLine, shakeFitLine, jitterLine, type SpokenSegment, type StoryLink } from '../../board/drawer';
 import { fetchTranscript } from '../../board/api';
 import { effectiveTier, isHero, isOut, type UsageEntry } from '../../board/pool';
-import { btn, btnGhost, kbd, tagAi, tagMine } from './ui';
+import { REASONS, btn, btnGhost, kbd, tagAi, tagMine } from './ui';
 import { ClipPlayer } from './ClipPlayer';
 import { MomentTile } from './MomentTile';
 import { SpeedSegment, kindLabel } from './MomentBits';
 import { GRID } from './MomentPool';
 
-const REASONS = ['shake', 'blur', 'boring', 'duplicate', 'bad timing', 'other'];
 const link = 'cursor-pointer border-0 bg-transparent p-0 text-bd-text underline underline-offset-[3px]';
 const boxHead = 'text-[11px] font-semibold uppercase tracking-[.07em] text-bd-muted';
 

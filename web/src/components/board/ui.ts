@@ -15,3 +15,6 @@ export const intentFrom = (description: string): string => description.split(/[,
 /** Primary button inside the amber panel drawer. */
 export const btnAttn = `${BASE} bg-bd-attn border-bd-attn text-[#1d1400] font-semibold`;
 export const kbd = 'text-[11px] text-bd-dim';
+
+/** Reasons offered when a moment is rejected. */
+export const REASONS = ['shake', 'blur', 'boring', 'duplicate', 'bad timing', 'other'];

@@ -13,6 +13,8 @@ interface Props {
   editable: boolean;
   /** amber = your edit (panel drawer), white = review (moment drawer). */
   tone: 'amber' | 'white';
+  /** Moments already in the story show as neutral bars instead of green / violet. */
+  neutralUsage?: boolean;
   onRange?: (a: number, b: number) => void;
   onRangeCommit?: () => void;
   /** Shakes of the selected moment as small ticks (neutral; fainter when low confidence). */
@@ -36,7 +38,9 @@ export function ClipTimeline(p: Props) {
           const hero = isHero(x);
           const colour = cur
             ? 'bg-bd-focus'
-            : u
+            : u && p.neutralUsage
+              ? 'bg-bd-muted'
+              : u
               ? u.source === 'user'
                 ? 'bg-[color-mix(in_srgb,var(--color-bd-mine)_55%,var(--color-bd-s2))]'
                 : 'bg-[color-mix(in_srgb,var(--color-bd-ai)_55%,var(--color-bd-s2))]'

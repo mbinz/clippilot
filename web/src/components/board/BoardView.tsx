@@ -5,12 +5,13 @@ import { cutLength, fmtClock, sceneLength, toChoose } from '../../board/logic';
 import { moveTarget } from '../../board/grid';
 import { starTarget, storyLink } from '../../board/drawer';
 import { alternatives, otherInEvent, usage as usageOfTree } from '../../board/pool';
+import { afterUse, candidateRow, nextPanel } from '../../board/panelview';
 import type { BoardMoment, BoardPanel, BoardScene, PM } from '../../board/types';
 import { BoardToolbar } from './BoardToolbar';
 import { SceneNav } from './SceneNav';
 import { PanelStrip } from './PanelStrip';
 import { MomentPool } from './MomentPool';
-import { PanelDrawer } from './PanelDrawer';
+import { PanelView } from './PanelView';
 import { MomentDrawer } from './MomentDrawer';
 import { BriefModal } from './BriefModal';
 import { PreviewModal, type PreviewItem } from './PreviewModal';
@@ -61,7 +62,7 @@ export function BoardView({ projectId }: Props) {
   const { tree, moments, history, actions } = board;
   const [projectName, setProjectName] = useState('');
   const [sceneId, setSceneId] = useState<number | null>(null);
-  /** Which drawer is open, by what was clicked: a panel in the strip, or a moment in the pool. */
+  /** What is open: the panel view under a panel's row (`preview` = the chosen right-hand candidate), or the moment drawer. */
   const [open, setOpen] = useState<Open>(null);
   const [briefOpen, setBriefOpen] = useState(false);
   const [preview, setPreview] = useState<PreviewItem[] | null>(null);
@@ -95,21 +96,28 @@ export function BoardView({ projectId }: Props) {
   };
   const selPanel = open?.kind === 'panel' ? findPanel(open.slot) : null;
   const selMoment = open?.kind === 'moment' ? pmById.get(open.mid) ?? null : null;
-  const drawerKind: 'panel' | 'moment' | null = selPanel ? 'panel' : selMoment ? 'moment' : null;
+  /** The side drawer is for moments only (until BE3); panels open the panel view inside the grid. */
+  const drawerKind: 'moment' | null = selMoment && !selPanel ? 'moment' : null;
   const panelCurrentId = (p: BoardPanel): number | null =>
     p.state === 'filled' ? p.moment_id : p.state === 'candidates' ? p.candidates[0]?.id ?? null : null;
   const curMoment = selPanel ? pmById.get(panelCurrentId(selPanel.panel) ?? -1) ?? null : null;
-  const shownMoment = selPanel ? (open?.kind === 'panel' && open.preview !== null ? pmById.get(open.preview) ?? null : curMoment) : null;
+  const row = useMemo(
+    () => (selPanel ? candidateRow(selPanel.panel, { scenes }, pms).flatMap((c) => { const m = pmById.get(c.id); return m ? [{ m, c }] : []; }) : []),
+    [selPanel, scenes, pms, pmById],
+  );
+  // Right-hand candidate: the one chosen (row click, ←/→, timeline, pool "compare"), else the first of the row.
+  const chosenId = selPanel && open?.kind === 'panel' && open.preview !== null && open.preview !== curMoment?.id ? open.preview : null;
+  const rightMoment = selPanel ? (chosenId !== null ? pmById.get(chosenId) : undefined) ?? row[0]?.m ?? null : null;
 
-  // Opening a moment (or previewing one in a panel drawer) marks it seen.
-  const viewedId = selMoment?.id ?? shownMoment?.id ?? null;
+  // Opening a moment, or showing one in the panel view, marks it seen.
+  const viewedKey = [selMoment?.id, curMoment?.id, rightMoment?.id].filter((x) => x !== undefined).join(',');
   const setSeen = board.setSeen;
   useEffect(() => {
-    if (viewedId !== null) setSeen(viewedId, true);
-  }, [viewedId, setSeen, moments.length]);
+    for (const id of viewedKey.split(',')) if (id) setSeen(Number(id), true);
+  }, [viewedKey, setSeen, moments.length]);
 
   const drawerRef = useRef<HTMLElement>(null);
-  const drawerKey = `${drawerKind}:${selPanel?.panel.id ?? selMoment?.id ?? ''}`;
+  const drawerKey = `${drawerKind}:${selMoment?.id ?? ''}`;
   useEffect(() => {
     drawerRef.current?.scrollTo?.({ top: 0 });
   }, [drawerKey]);
@@ -121,8 +129,8 @@ export function BoardView({ projectId }: Props) {
       scene_id: selPanel?.scene.id ?? scene.id,
       panel_id: selPanel?.panel.id ?? null,
       moment_id: selMoment?.id ?? null,
-      drawer: drawerKind,
-      preview_moment_id: selPanel && open?.kind === 'panel' ? open.preview : null,
+      drawer: selPanel ? 'panel' : drawerKind,
+      preview_moment_id: selPanel ? rightMoment?.id ?? null : null,
     }
     : null;
   const selKey = selBody ? selectionKey(selBody) : null;
@@ -137,8 +145,8 @@ export function BoardView({ projectId }: Props) {
   }, [selKey]);
 
   const closeDrawer = () => setOpen(null);
-  const openPanel = (id: number, preview?: number) => {
-    if (open?.kind === 'panel' && open.slot === id && preview === undefined) return setOpen(null);
+  const openPanel = (id: number, preview?: number, keepOpen = false) => {
+    if (!keepOpen && open?.kind === 'panel' && open.slot === id && preview === undefined) return setOpen(null);
     const f = findPanel(id);
     if (!f) return;
     setSceneId(f.scene.id);
@@ -221,8 +229,26 @@ export function BoardView({ projectId }: Props) {
   const useInPanel = async (f: { panel: BoardPanel; scene: BoardScene }, m: PM) => {
     const no = f.scene.panels.indexOf(f.panel) + 1;
     const isCandidate = f.panel.state === 'candidates' && f.panel.candidates.some((c) => c.id === m.id);
+    const prev = panelCurrentId(f.panel);
     const r = isCandidate ? await actions.pickCandidate(f.panel.id, m.id) : await actions.placeMoment(f.panel.id, m.id, `Use moment in panel ${no}`);
-    if (r) setOpen({ kind: 'panel', slot: f.panel.id, preview: null });
+    // The panel is yours now; what was in it becomes the right-hand candidate (using it again swaps back).
+    if (r) setOpen({ kind: 'panel', slot: f.panel.id, preview: afterUse(prev === m.id ? null : prev, []) });
+  };
+  /** Tab / Shift+Tab: the next / previous panel in cut order, across scenes. */
+  const stepPanel = (dir: 1 | -1) => {
+    const id = selPanel ? nextPanel({ scenes }, selPanel.panel.id, dir) : null;
+    const f = findPanel(id);
+    if (!f) return;
+    setSceneId(f.scene.id);
+    setOpen({ kind: 'panel', slot: f.panel.id, preview: null });
+  };
+  const nextChoose = () => {
+    const c = choose.find((x) => x.panelId !== selPanel?.panel.id) ?? choose[0];
+    if (c) openPanel(c.panelId, undefined, true);
+  };
+  const starMoment = (m: PM) => {
+    const t = starTarget(m);
+    void actions.patchMoment(m.id, { tier: t }, t === 'hero' ? '★' : 'Remove ★');
   };
   const trim = (m: PM, a: number, b: number) => void actions.patchMoment(m.id, { start_sec: a, end_sec: b }, 'Trim moment');
   const speed = (m: PM, v: number) => void actions.patchMoment(m.id, { speed: v }, `Speed ${Math.round(v * 100)} %`);
@@ -259,7 +285,7 @@ export function BoardView({ projectId }: Props) {
         total={cutLength(scenes)}
         toChooseCount={choose.length}
         history={history}
-        onNextChoose={() => choose[0] && openPanel(choose[0].panelId)}
+        onNextChoose={nextChoose}
         onUndo={board.undo}
         onRedo={board.redo}
         onBrief={() => setBriefOpen(true)}
@@ -268,7 +294,7 @@ export function BoardView({ projectId }: Props) {
         exporting={exporting}
       />
 
-      {/* The drawer is a real grid column: it pushes the board aside. Below 900 px it is a full-screen sheet. */}
+      {/* The moment drawer is a real grid column (until BE3): it pushes the board aside. Below 900 px it is a full-screen sheet. */}
       <div
         className="grid min-h-0 flex-1 grid-cols-[200px_minmax(0,1fr)_var(--dw)] overflow-hidden transition-[grid-template-columns] duration-[180ms] ease-out max-[900px]:grid-cols-[minmax(0,1fr)] max-[900px]:grid-rows-[auto_minmax(0,1fr)]"
         style={{ '--dw': drawerKind ? 'min(480px,42vw)' : '0px' } as React.CSSProperties}
@@ -318,53 +344,64 @@ export function BoardView({ projectId }: Props) {
             onDropMoment={dropMoment}
             onInsertMoment={insertMoment}
             onMovePanel={(id, pos) => void actions.movePanel(id, scene.id, pos)}
+            view={selPanel && selPanel.scene.id === scene.id ? (
+              <PanelView
+                key={selPanel.panel.id}
+                panel={selPanel.panel}
+                scene={selPanel.scene}
+                left={curMoment}
+                right={rightMoment}
+                row={row}
+                moments={pms}
+                usage={usage}
+                currentSceneIndex={sceneIdx}
+                keysOn={!preview && !briefOpen}
+                onClose={closeDrawer}
+                onSelect={(id) => setOpen({ kind: 'panel', slot: selPanel.panel.id, preview: id })}
+                onUse={(m) => void useInPanel(selPanel, m)}
+                onDropUse={(mid) => {
+                  const m = pmById.get(mid);
+                  if (m) void useInPanel(selPanel, m);
+                }}
+                onStep={stepPanel}
+                onNextChoose={nextChoose}
+                onTrim={trim}
+                onSpeed={speed}
+                onIntent={(t) => void actions.patchPanel(selPanel.panel.id, { intent: t }, 'Edit intent')}
+                onDelete={async () => {
+                  const r = await actions.deletePanel(selPanel.panel.id, panelNo(selPanel));
+                  if (r) closeDrawer();
+                }}
+                onStar={starMoment}
+                onReject={(m, reason) => void actions.rejectMoment(m.id, reason)}
+                onSeen={(id, seen) => {
+                  setSeen(id, seen);
+                  if (!seen) toast('Marked unseen');
+                }}
+                onFinder={(m) => revealClip(m.clip_id).catch((err) => toast(err instanceof Error ? err.message : String(err)))}
+                onHide={(m) => void actions.hideClip(m.clip_id, m.clip.file_name)}
+              />
+            ) : undefined}
           />
 
-          <MomentPool
-            moments={pms}
-            eventId={scene.event_id}
-            usage={usage}
-            currentSceneIndex={sceneIdx}
-            selectedId={selMoment?.id ?? (selPanel ? shownMoment?.id ?? null : null)}
-            onSelect={openMoment}
-            onSeen={(id) => setSeen(id, true)}
-          />
+          {/* The pool makes room for the panel view and returns when it closes. */}
+          {!selPanel && (
+            <MomentPool
+              moments={pms}
+              eventId={scene.event_id}
+              usage={usage}
+              currentSceneIndex={sceneIdx}
+              selectedId={selMoment?.id ?? null}
+              onSelect={openMoment}
+              onSeen={(id) => setSeen(id, true)}
+            />
+          )}
         </main>
 
         <aside
           ref={drawerRef}
-          className={`col-start-3 min-w-0 overflow-auto px-4 pb-[30px] pt-3.5 max-[900px]:fixed max-[900px]:inset-0 max-[900px]:z-[15] max-[900px]:border-l-0 ${
-            drawerKind === 'panel'
-              ? 'border-l-[3px] border-bd-attn bg-[color-mix(in_srgb,var(--color-bd-attn)_6%,var(--color-bd-s1))]'
-              : 'border-l border-bd-line2 bg-bd-s1'
-          } ${drawerKind ? '' : 'hidden'}`}
+          className={`col-start-3 min-w-0 overflow-auto border-l border-bd-line2 bg-bd-s1 px-4 pb-[30px] pt-3.5 max-[900px]:fixed max-[900px]:inset-0 max-[900px]:z-[15] max-[900px]:border-l-0 ${drawerKind ? '' : 'hidden'}`}
         >
-          {selPanel && (
-            <PanelDrawer
-              key={selPanel.panel.id}
-              panel={selPanel.panel}
-              scene={selPanel.scene}
-              current={curMoment}
-              shown={shownMoment}
-              moments={pms}
-              momentsById={momentsById}
-              usage={usage}
-              currentSceneIndex={sceneIdx}
-              onPreview={(id) => setOpen({ kind: 'panel', slot: selPanel.panel.id, preview: id })}
-              onUse={(m) => void useInPanel(selPanel, m)}
-              onClose={closeDrawer}
-              onSpeed={speed}
-              onTrim={trim}
-              onIntent={(t) => void actions.patchPanel(selPanel.panel.id, { intent: t }, 'Edit intent')}
-              onDelete={async () => {
-                const r = await actions.deletePanel(selPanel.panel.id, panelNo(selPanel));
-                if (r) closeDrawer();
-              }}
-              onReview={(mid) => setOpen({ kind: 'moment', mid, othersOpen: false })}
-              onPanel={(id) => openPanel(id)}
-              onSeen={(id) => setSeen(id, true)}
-            />
-          )}
           {!selPanel && selMoment && open?.kind === 'moment' && (
             <MomentDrawer
               key={selMoment.id}
@@ -383,10 +420,7 @@ export function BoardView({ projectId }: Props) {
               onSelect={(mid) => setOpen({ kind: 'moment', mid, othersOpen: open.othersOpen })}
               onOpenMoment={(mid) => setOpen({ kind: 'moment', mid, othersOpen: false })}
               onFinder={() => revealClip(selMoment.clip_id).catch((err) => toast(err instanceof Error ? err.message : String(err)))}
-              onStar={() => {
-                const t = starTarget(selMoment);
-                void actions.patchMoment(selMoment.id, { tier: t }, t === 'hero' ? '★' : 'Remove ★');
-              }}
+              onStar={() => starMoment(selMoment)}
               onReject={(reason) => void actions.rejectMoment(selMoment.id, reason)}
               onRestore={() =>
                 void (selMoment.status === 'rejected'

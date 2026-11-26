@@ -20,10 +20,24 @@ interface Props {
   seekRef: MutableRefObject<((t: number) => void) | null>;
   /** Playhead position as a fraction of the clip. */
   onTime: (fraction: number) => void;
+  /** Sound off (default). Only one of two side-by-side players should be unmuted. */
+  muted?: boolean;
+  /** Changes = restart the loop from `a` (two-up: both sides start together). */
+  restartToken?: number;
+  /** The video is ready and started playing (the other side of a two-up restarts now). */
+  onStarted?: () => void;
 }
 
 /** Drawer player: the range loops; a seek outside it plays the clip on until the next seek back inside. */
-export function DrawerPlayer({ src, a, b, rate, duration, fps, hint, videoRef, seekRef, onTime }: Props) {
+/** play(), falling back to muted when the browser refuses autoplay with sound (Safari). */
+function playOn(v: HTMLVideoElement): void {
+  v.play().catch(() => {
+    v.muted = true;
+    v.play().catch(() => {});
+  });
+}
+
+export function DrawerPlayer({ src, a, b, rate, duration, fps, hint, videoRef, seekRef, onTime, muted = true, restartToken, onStarted }: Props) {
   const cur = useRef({ a, b, rate });
   cur.current = { a, b, rate };
   const free = useRef(false);
@@ -35,6 +49,23 @@ export function DrawerPlayer({ src, a, b, rate, duration, fps, hint, videoRef, s
     const jump = frameLoopTarget(t, cur.current.a, cur.current.b, free.current, frameSec(fps));
     if (jump !== null) v.currentTime = jump;
   }, [src, fps]);
+
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.muted = muted;
+  }, [muted, videoRef]);
+
+  // A new token restarts the loop (not on mount: the player starts itself once its metadata is loaded).
+  const lastToken = useRef(restartToken);
+  useEffect(() => {
+    if (lastToken.current === restartToken) return;
+    lastToken.current = restartToken;
+    const v = videoRef.current;
+    if (!v) return;
+    free.current = false;
+    v.currentTime = cur.current.a;
+    v.playbackRate = cur.current.rate;
+    playOn(v);
+  }, [restartToken, videoRef]);
 
   // Speed only applies inside the range.
   useEffect(() => {
@@ -57,14 +88,15 @@ export function DrawerPlayer({ src, a, b, rate, duration, fps, hint, videoRef, s
           ref={videoRef}
           className="block h-full w-full cursor-pointer object-contain"
           src={src ?? undefined}
-          muted
+          muted={muted}
           playsInline
           preload="auto"
           onLoadedMetadata={(e) => {
             const v = e.currentTarget;
             v.currentTime = cur.current.a;
             v.playbackRate = cur.current.rate;
-            v.play().catch(() => {});
+            playOn(v);
+            onStarted?.();
           }}
           onTimeUpdate={(e) => {
             const t = e.currentTarget.currentTime; // read once (Safari advances it between reads)
