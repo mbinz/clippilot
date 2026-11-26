@@ -27,7 +27,7 @@ Order agreed 2026-11-25. Each line: theme — what — spec.
 
 ### Next
 - [ ] **Board editing** — grilled 2026-11-26, build before Odeceixe: BE1 panel grid + drag/insert (done 2026-11-26) → BE2 panel view
-  (two-up, done 2026-11-26) → BE3 pool "find what's missing" (≈ marks, ghost placement; no side drawer) → BE4 create a moment → BE5
+  (two-up, done 2026-11-26) → BE3 pool "find what's missing" (≈ marks, ghost placement; no side drawer; done 2026-11-26) → BE4 create a moment → BE5
   full-screen compare — [spec](docs/specs/board-editing.md)
 - [ ] **Board fixes, part 3** — critic findings on the board (apply / dismiss), inside the BE2 panel view — grill
   first, no spec yet
@@ -59,6 +59,8 @@ Order agreed 2026-11-25. Each line: theme — what — spec.
 
 ### Cleanup (any gap)
 - [ ] Dead S1 motion code
+- [ ] Dead drawer helpers after BE3 (`storyLink`, `optionList`, `otherOptions`, `decisionFor`, `panelPosition` in `web/src/board/drawer.ts`, `otherInEvent` in `pool.ts`; keep `transcriptView` for BE5)
+- [ ] Pool tiles: shake hint (bare ≈, bottom right) is easy to confuse with the new "≈ N" mark — give shakes another icon
 - [ ] Retire the old clip similarity (SM4) — [spec](docs/specs/similar-moments.md)
 - [ ] Light-jitter ("locked") calibration — deferred by the user; Arrifana counts as all handheld until then
 
