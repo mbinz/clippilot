@@ -172,7 +172,7 @@ describe('clippilot scene / panel / moment / clip', () => {
     expect(cmds).not.toContain('trim');
     expect(cmds).not.toContain('speed');
     const momentCmds = createProgram().commands.find((c) => c.name() === 'moment')!.commands.map((c) => c.name());
-    expect(momentCmds).toEqual(expect.arrayContaining(['trim', 'speed', 'star', 'unstar', 'reset', 'reject', 'unreject']));
+    expect(momentCmds).toEqual(expect.arrayContaining(['trim', 'speed', 'star', 'unstar', 'reset', 'reject', 'unreject', 'add']));
   });
 
   it('moment star / unstar / reset: logged on the Main cut and undoable', async () => {
@@ -336,6 +336,28 @@ describe('clippilot --ai edits and cut-out', () => {
     expect((await run('cut', 'show', '--json')).scenes[0].panels.map((x: any) => x.moment_id)).toEqual([3]);
     expect(dbRow('SELECT COUNT(*) AS n FROM highlights').n).toBe(3);
     expect(dbRow('SELECT end_sec FROM highlights WHERE id = 3').end_sec).toBe(6);
+  });
+
+  it('moment add makes a confirmed user moment (--json row), one undo step; --ai makes an unprotected proposal', async () => {
+    const res = await run('moment', 'add', '1', '20', '24', '--description', 'new wave');
+    expect(res).toMatchObject({ ok: true, clip_id: 1, start_sec: 20, end_sec: 24, status: 'confirmed', description: 'new wave' });
+    expect(dbRow('SELECT status, tier, created_by FROM highlights WHERE id = ?', res.id)).toEqual({ status: 'confirmed', tier: 'solid', created_by: 'user' });
+    expect(dbRow('SELECT label, actor FROM operations ORDER BY id DESC LIMIT 1')).toEqual({ label: 'New moment', actor: 'user' });
+    const ai = await run('moment', 'add', '1', '25', '28', '--ai');
+    expect(reasons(ai.id)).toEqual([]);
+    expect(dbRow('SELECT actor FROM operations ORDER BY id DESC LIMIT 1').actor).toBe('ai');
+    await run('cut', 'undo', '--json');
+    await run('cut', 'undo', '--json');
+    expect(dbRow('SELECT COUNT(*) AS n FROM highlights').n).toBe(3);
+  });
+
+  it('moment add with a bad range or unknown clip exits 1 and changes nothing', async () => {
+    await run('moment', 'add', '1', '20', '20');
+    expect(process.exitCode).toBe(1);
+    process.exitCode = undefined;
+    await run('moment', 'add', '99', '1', '5');
+    expect(process.exitCode).toBe(1);
+    expect(dbRow('SELECT COUNT(*) AS n FROM highlights').n).toBe(3);
   });
 
   it('moment cut-out with a bad range exits 1 and changes nothing', async () => {

@@ -343,6 +343,19 @@ export function registerCutCommands(parent: Command): void {
       print({ ok: true, id: toId(id) });
     }));
 
+  momentCmd.command('add <clip> <start> <end>')
+    .description('Make a new moment on a clip (seconds; clamped to the clip, at least 0.5 s). Yours: confirmed, tier solid, no analysis. Run `analyze` to compute its look fingerprint')
+    .option('--description <text>', 'What it shows')
+    .option(...cutOpt)
+    .option(...aiOpt)
+    .action((clip: string, start: string, end: string, o) => withSvc(({ db, svc }) => {
+      const cutId = logCutOf(svc, o.cut, svc.projectIdOfClip(toId(clip)));
+      const id = svc.command(cutId, labels.newMoment(),
+        () => svc.createMoment(toId(clip), toNum(start, 'start'), toNum(end, 'end'), { ai: o.ai, description: o.description }), actorOf(o));
+      const row = db.prepare('SELECT id, clip_id, start_sec, end_sec, status, description FROM highlights WHERE id = ?').get(id) as object;
+      print({ ok: true, ...row });
+    }));
+
   momentCmd.command('speed <id> <speed>')
     .description('Set playback speed of a moment: 1, 0.5 or 0.25 (needs enough source fps)')
     .option(...cutOpt)
