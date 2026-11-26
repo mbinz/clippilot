@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchProjects } from '../../api/client';
 import { useBoard } from '../../board/useBoard';
 import { cutLength, fmtClock, sceneLength, toChoose } from '../../board/logic';
+import { moveTarget } from '../../board/grid';
 import { starTarget, storyLink } from '../../board/drawer';
 import { alternatives, otherInEvent, usage as usageOfTree } from '../../board/pool';
 import type { BoardMoment, BoardPanel, BoardScene, PM } from '../../board/types';
@@ -187,8 +188,8 @@ export function BoardView({ projectId }: Props) {
   const sceneIdx = scenes.indexOf(scene);
   const toast = board.say;
 
-  const addPanel = async () => {
-    const r = await actions.addPanel(scene.id, { intent: 'New shot' });
+  const addPanel = async (position?: number) => {
+    const r = await actions.addPanel(scene.id, { intent: 'New shot', position });
     if (r) setOpen({ kind: 'panel', slot: r.id, preview: null });
   };
   const dropMoment = async (mid: number, pid: number | null) => {
@@ -202,6 +203,19 @@ export function BoardView({ projectId }: Props) {
       const r = await actions.placeMoment(pid, mid, `Place moment in panel ${f.scene.panels.indexOf(f.panel) + 1}`);
       if (r) setOpen({ kind: 'panel', slot: pid, preview: null });
     }
+  };
+  const insertMoment = async (mid: number, position: number) => {
+    const m = momentsById.get(mid);
+    if (!m) return;
+    const r = await actions.addPanel(scene.id, { moment_id: mid, position, intent: intentFrom(m.description) }, 'Add moment as new panel');
+    if (r) setOpen({ kind: 'panel', slot: r.id, preview: null });
+  };
+  /** A panel dropped on a scene in the nav: to the end of that scene. */
+  const dropPanelOnScene = (panelId: number, targetId: number) => {
+    const target = scenes.find((s) => s.id === targetId);
+    if (!target) return;
+    const pos = moveTarget(target.panels.map((p) => p.id), panelId, target.panels.length);
+    if (pos !== null) void actions.movePanel(panelId, targetId, pos);
   };
   /** "Use this in panel N": a candidate is picked, anything else is placed. */
   const useInPanel = async (f: { panel: BoardPanel; scene: BoardScene }, m: PM) => {
@@ -274,6 +288,7 @@ export function BoardView({ projectId }: Props) {
             }
           }}
           onMove={(dir) => void actions.moveScene(scene.id, sceneIdx + dir)}
+          onDropPanel={dropPanelOnScene}
           onDelete={async () => {
             const next = scenes[sceneIdx - 1] ?? scenes[sceneIdx + 1];
             const r = await actions.deleteScene(scene.id, scene.name);
@@ -297,11 +312,12 @@ export function BoardView({ projectId }: Props) {
           <PanelStrip
             panels={scene.panels}
             selectedId={selPanel?.panel.id ?? null}
-            compact={drawerKind !== null}
             momentsById={momentsById}
             onSelect={(id) => openPanel(id)}
             onAdd={addPanel}
             onDropMoment={dropMoment}
+            onInsertMoment={insertMoment}
+            onMovePanel={(id, pos) => void actions.movePanel(id, scene.id, pos)}
           />
 
           <MomentPool
@@ -340,7 +356,6 @@ export function BoardView({ projectId }: Props) {
               onSpeed={speed}
               onTrim={trim}
               onIntent={(t) => void actions.patchPanel(selPanel.panel.id, { intent: t }, 'Edit intent')}
-              onMove={(dir) => void actions.movePanel(selPanel.panel.id, selPanel.scene.id, selPanel.scene.panels.indexOf(selPanel.panel) + dir)}
               onDelete={async () => {
                 const r = await actions.deletePanel(selPanel.panel.id, panelNo(selPanel));
                 if (r) closeDrawer();

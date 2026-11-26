@@ -1,23 +1,29 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import type { BoardMoment, BoardPanel } from '../../board/types';
 import { fmtSec, panelLength, panelRange } from '../../board/logic';
 import { VideoThumb } from './VideoThumb';
 import { panelMedia } from './media';
+import { PANEL_MIME, dragKind, moveTarget } from '../../board/grid';
 
 interface Props {
   panels: BoardPanel[];
   selectedId: number | null;
-  /** A drawer is open: panels shrink to leave room. */
-  compact: boolean;
   momentsById: Map<number, BoardMoment>;
   onSelect: (id: number) => void;
-  onAdd: () => void;
+  /** New empty panel at `position` (undefined = at the end). */
+  onAdd: (position?: number) => void;
   /** A moment (id from the pool) was dropped on a panel, or on the "+" tile (panelId null). */
   onDropMoment: (momentId: number, panelId: number | null) => void;
+  /** A moment was dropped on insert slot `position`: new filled panel there. */
+  onInsertMoment: (momentId: number, position: number) => void;
+  /** A panel was dropped on insert slot `position` of this scene (already corrected for its own removal). */
+  onMovePanel: (panelId: number, position: number) => void;
 }
 
-export function PanelStrip({ panels, selectedId, compact, momentsById, onSelect, onAdd, onDropMoment }: Props) {
-  const [drop, setDrop] = useState<number | 'add' | null>(null);
+export function PanelStrip({ panels, selectedId, momentsById, onSelect, onAdd, onDropMoment, onInsertMoment, onMovePanel }: Props) {
+  const [drop, setDrop] = useState<number | 'add' | `slot${number}` | null>(null);
+  /** Something is being dragged anywhere on the page: slots show their "＋". */
+  const [dragging, setDragging] = useState<'panel' | 'moment' | null>(null);
   const selectedRef = useRef<HTMLDivElement>(null);
 
   // Keep the selected panel visible (e.g. after "N to choose" jumps to a panel outside the strip's viewport).
@@ -25,22 +31,73 @@ export function PanelStrip({ panels, selectedId, compact, momentsById, onSelect,
     selectedRef.current?.scrollIntoView?.({ behavior: 'smooth', inline: 'center', block: 'nearest' });
   }, [selectedId]);
 
-  const over = (key: number | 'add') => (e: React.DragEvent) => {
+  useEffect(() => {
+    const start = (e: DragEvent) => setDragging(dragKind(e.dataTransfer?.types ?? []));
+    const end = () => {
+      setDragging(null);
+      setDrop(null);
+    };
+    window.addEventListener('dragenter', start);
+    window.addEventListener('dragend', end);
+    window.addEventListener('drop', end);
+    return () => {
+      window.removeEventListener('dragenter', start);
+      window.removeEventListener('dragend', end);
+      window.removeEventListener('drop', end);
+    };
+  }, []);
+
+  type Key = number | 'add' | `slot${number}`;
+  /** Panels accept moments only; slots accept both. */
+  const over = (key: Key, accepts: ('panel' | 'moment')[]) => (e: React.DragEvent) => {
+    const k = dragKind(e.dataTransfer.types);
+    if (!k || !accepts.includes(k)) return;
     e.preventDefault();
     setDrop(key);
   };
-  const leave = (key: number | 'add') => (e: React.DragEvent) => {
+  const leave = (key: Key) => (e: React.DragEvent) => {
     if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDrop((d) => (d === key ? null : d));
   };
   const drops = (panelId: number | null) => (e: React.DragEvent) => {
+    if (dragKind(e.dataTransfer.types) !== 'moment') return;
     e.preventDefault();
     setDrop(null);
     const mid = Number(e.dataTransfer.getData('text/plain'));
     if (mid) onDropMoment(mid, panelId);
   };
+  const dropsOnSlot = (index: number) => (e: React.DragEvent) => {
+    const k = dragKind(e.dataTransfer.types);
+    if (!k) return;
+    e.preventDefault();
+    setDrop(null);
+    if (k === 'moment') {
+      const mid = Number(e.dataTransfer.getData('text/plain'));
+      if (mid) onInsertMoment(mid, index);
+    } else {
+      const pid = Number(e.dataTransfer.getData(PANEL_MIME));
+      const to = pid ? moveTarget(panels.map((p) => p.id), pid, index) : null;
+      if (to !== null) onMovePanel(pid, to);
+    }
+  };
+
+  const slot = (index: number) => (
+    <div
+      key={`slot${index}`}
+      onClick={() => onAdd(index)}
+      onDragOver={over(`slot${index}`, ['panel', 'moment'])}
+      onDragLeave={leave(`slot${index}`)}
+      onDrop={dropsOnSlot(index)}
+      title="Insert panel here (or drop a moment / panel)"
+      className={`group/slot flex w-3 flex-none cursor-pointer items-center justify-center self-stretch rounded-[5px] text-sm leading-none transition-colors ${
+        drop === `slot${index}` ? 'bg-bd-focus/40 text-bd-text' : dragging ? 'bg-bd-s2 text-bd-muted' : 'text-transparent hover:bg-bd-s2 hover:text-bd-text'
+      }`}
+    >
+      {'＋'}
+    </div>
+  );
 
   return (
-    <div className="flex items-start gap-3 overflow-x-auto px-1 pb-3.5 pt-1">
+    <div className="flex flex-wrap items-stretch gap-y-3.5 px-1 pb-3.5 pt-1">
       {panels.map((p, i) => {
         const r = panelRange(p);
         const { poster, src } = panelMedia(p, momentsById);
@@ -50,12 +107,18 @@ export function PanelStrip({ panels, selectedId, compact, momentsById, onSelect,
           : 'border-[3px] border-dashed border-bd-ai';
         const sel = p.id === selectedId;
         return (
+          <Fragment key={p.id}>
+          {slot(i)}
           <div
-            key={p.id}
             ref={p.id === selectedId ? selectedRef : undefined}
-            className={`group flex-none cursor-pointer ${compact ? 'w-[150px]' : 'w-[190px]'}`}
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.setData(PANEL_MIME, String(p.id));
+              e.dataTransfer.effectAllowed = 'move';
+            }}
+            className="group w-[190px] flex-none cursor-pointer"
             onClick={() => onSelect(p.id)}
-            onDragOver={over(p.id)}
+            onDragOver={over(p.id, ['moment'])}
             onDragLeave={leave(p.id)}
             onDrop={drops(p.id)}
           >
@@ -93,11 +156,13 @@ export function PanelStrip({ panels, selectedId, compact, momentsById, onSelect,
             </div>
             <div className="mt-1.5 truncate text-xs text-bd-muted group-hover:text-bd-text">{p.intent}</div>
           </div>
+          </Fragment>
         );
       })}
+      {slot(panels.length)}
       <div
-        onClick={onAdd}
-        onDragOver={over('add')}
+        onClick={() => onAdd()}
+        onDragOver={over('add', ['moment'])}
         onDragLeave={leave('add')}
         onDrop={drops(null)}
         title="Add panel (or drop a moment here)"

@@ -26,7 +26,6 @@ interface Props {
   onSpeed: (m: PM, speed: number) => void;
   onTrim: (m: PM, a: number, b: number) => void;
   onIntent: (text: string) => void;
-  onMove: (dir: -1 | 1) => void;
   onDelete: () => void;
   onReview: (momentId: number) => void;
   onPanel: (panelId: number) => void;
@@ -202,8 +201,6 @@ export function PanelDrawer(p: Props) {
           className="min-h-11 w-full resize-y rounded-lg border border-bd-line bg-bd-s2 px-[9px] py-[7px] font-[inherit] text-bd-text"
         />
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
-          <button className={btn} disabled={index === 0} onClick={() => p.onMove(-1)}>{'←'} Move</button>
-          <button className={btn} disabled={index === scene.panels.length - 1} onClick={() => p.onMove(1)}>Move {'→'}</button>
           <div className="flex-1" />
           <button className={btnDanger} onClick={p.onDelete}>Delete panel</button>
         </div>
