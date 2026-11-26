@@ -27,7 +27,7 @@ Order agreed 2026-11-25. Each line: theme — what — spec.
 
 ### Next
 - [ ] **Board editing** — grilled 2026-11-26, build before Odeceixe: BE1 panel grid + drag/insert (done 2026-11-26) → BE2 panel view
-  (two-up, done 2026-11-26) → BE3 pool "find what's missing" (≈ marks, ghost placement; no side drawer; done 2026-11-26) → BE4 create a moment → BE5
+  (two-up, done 2026-11-26) → BE3 pool "find what's missing" (≈ marks, ghost placement; no side drawer; done 2026-11-26) → BE4 create a moment (done 2026-11-26; migration 030 `highlights.created_by`, CLI `moment add`) → BE5
   full-screen compare — [spec](docs/specs/board-editing.md)
 - [ ] **Board fixes, part 3** — critic findings on the board (apply / dismiss), inside the BE2 panel view — grill
   first, no spec yet
