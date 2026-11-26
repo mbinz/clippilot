@@ -165,6 +165,21 @@ export function useBoard(projectId: number | undefined) {
     api.markSeen(id, seen).catch(() => {});
   }, []);
 
+  /**
+   * A new moment's look fingerprint is computed in the background after the request (it changes no undo head), so the
+   * pool's similar ids / look groups are fetched again a few times shortly afterwards.
+   */
+  const laterTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => () => laterTimers.current.forEach(clearTimeout), [projectId]);
+  const refreshMomentsLater = useCallback((pid: number) => {
+    for (const ms of [4000, 12000, 40000]) {
+      laterTimers.current.push(setTimeout(() => {
+        if (busy.current > 0) return;
+        api.fetchMoments(pid).then(setMoments).catch(() => {});
+      }, ms));
+    }
+  }, []);
+
   const undo = useCallback(async () => {
     if (cutId === null || projectId === undefined) return;
     try {
@@ -211,6 +226,11 @@ export function useBoard(projectId: number | undefined) {
         act(label, () => api.patchPanel(id, patch)),
       patchMoment: (id: number, patch: api.MomentPatch, label: string) =>
         act(label, () => api.patchMoment(id, cutId!, patch)),
+      createMoment: async (clipId: number, startSec: number, endSec: number) => {
+        const r = await act('New moment', () => api.createMoment(clipId, cutId!, startSec, endSec));
+        if (r && projectId !== undefined) refreshMomentsLater(projectId);
+        return r;
+      },
       movePanel: (id: number, sceneId: number, position: number) => act('Move panel', () => api.movePanel(id, sceneId, position)),
       placeMoment: (panelId: number, momentId: number, label: string) => act(label, () => api.placeMoment(panelId, momentId)),
       pickCandidate: (panelId: number, momentId: number) => act('Choose candidate', () => api.pickCandidate(panelId, momentId)),

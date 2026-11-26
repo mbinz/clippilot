@@ -269,6 +269,13 @@ export function BoardView({ projectId }: Props) {
     const t = starTarget(m);
     void actions.patchMoment(m.id, { tier: t }, t === 'hero' ? '★' : 'Remove ★');
   };
+  /** "New moment" from a selection: it becomes the right-hand candidate of the open panel view, or replaces the placed moment. */
+  const createMoment = async (clipId: number, a: number, b: number) => {
+    const r = await actions.createMoment(clipId, a, b);
+    if (!r) return;
+    if (open?.kind === 'panel') setOpen({ ...open, preview: r.id });
+    else if (open?.kind === 'place') setOpen({ ...open, mid: r.id });
+  };
   const trim = (m: PM, a: number, b: number) => void actions.patchMoment(m.id, { start_sec: a, end_sec: b }, 'Trim moment');
   const speed = (m: PM, v: number) => void actions.patchMoment(m.id, { speed: v }, `Speed ${Math.round(v * 100)} %`);
 
@@ -377,6 +384,7 @@ export function BoardView({ projectId }: Props) {
                   const m = pmById.get(id);
                   if (m) poolClick(m, poolMark(m, { scenes }, pms, scene.id));
                 }}
+                onCreate={(clipId, a, b) => void createMoment(clipId, a, b)}
               />
             ) : selPanel && selPanel.scene.id === scene.id ? (
               <PanelView
@@ -400,6 +408,7 @@ export function BoardView({ projectId }: Props) {
                 onStep={stepPanel}
                 onNextChoose={nextChoose}
                 onTrim={trim}
+                onCreate={(clipId, a, b) => void createMoment(clipId, a, b)}
                 onSpeed={speed}
                 onIntent={(t) => void actions.patchPanel(selPanel.panel.id, { intent: t }, 'Edit intent')}
                 onDelete={async () => {

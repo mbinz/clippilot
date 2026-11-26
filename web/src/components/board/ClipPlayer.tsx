@@ -24,10 +24,12 @@ interface Props {
   onStarted?: () => void;
   /** Moments in the story as neutral bars (not green / violet). */
   neutralUsage?: boolean;
+  /** "New moment" from a selection on the timeline (BE4). */
+  onCreate?: (a: number, b: number) => void;
 }
 
 /** Player + timeline + range label of one moment. Mount with `key={moment.id}`. */
-export function ClipPlayer({ moment: m, clipMoments, usage, editable, tone, hint, footer, onPick, onTrim, muted, restartToken, onStarted, neutralUsage }: Props) {
+export function ClipPlayer({ moment: m, clipMoments, usage, editable, tone, hint, footer, onPick, onTrim, muted, restartToken, onStarted, neutralUsage, onCreate }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const seekRef = useRef<((t: number) => void) | null>(null);
   const [playhead, setPlayhead] = useState(0);
@@ -44,7 +46,7 @@ export function ClipPlayer({ moment: m, clipMoments, usage, editable, tone, hint
         duration={m.clip.duration_sec} moments={clipMoments} currentId={m.id} usage={usage}
         range={trim.range} editable={editable} tone={tone} neutralUsage={neutralUsage} onRange={trim.live} onRangeCommit={trim.release}
         shakes={shakeMarks(m.shakes, trim.range, m.clip.duration_sec)}
-        playhead={playhead} onPick={onPick} onSeek={(t) => seekRef.current?.(t)}
+        playhead={playhead} onPick={onPick} onSeek={(t) => seekRef.current?.(t)} onCreate={onCreate}
       />
       <div className="mt-1 flex justify-between gap-2 text-[11px] tabular-nums text-bd-muted">
         <span>0:00</span>

@@ -71,6 +71,9 @@ export interface MomentPatch {
 /** The moment is the edit: in/out and speed are set on the moment (every panel using it follows). */
 export const patchMoment = (momentId: number, cutId: number, patch: MomentPatch) =>
   call<Mutation>('PATCH', `/moments/${momentId}`, { cut_id: cutId, ...patch });
+/** BE4: a new moment from a selection on a clip's timeline (yours: confirmed, tier solid). Its look fingerprint follows in the background. */
+export const createMoment = (clipId: number, cutId: number, startSec: number, endSec: number) =>
+  call<Mutation<{ id: number }>>('POST', `/clips/${clipId}/moments`, { cut_id: cutId, start_sec: startSec, end_sec: endSec });
 export const movePanel = (panelId: number, sceneId: number, position: number) =>
   call<Mutation>('POST', `/panels/${panelId}/move`, { scene_id: sceneId, position });
 export const placeMoment = (panelId: number, momentId: number) =>

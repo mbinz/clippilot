@@ -18,6 +18,8 @@ interface Props {
   onCancel: () => void;
   /** A mark on the clip timeline was clicked. */
   onPick: (momentId: number) => void;
+  /** "New moment" from a selection on the clip's timeline (BE4): replaces the moment being placed. */
+  onCreate: (clipId: number, a: number, b: number) => void;
 }
 
 const typing = (): boolean => {
@@ -83,6 +85,7 @@ export function PlacementView(p: Props) {
           footer={`${Math.round(m.clip.duration_sec)} s · ${m.clip.file_name}`}
           onPick={(id) => id !== m.id && p.onPick(id)}
           onTrim={() => {}}
+          onCreate={(a, b) => p.onCreate(m.clip_id, a, b)}
         />
         <p className="mb-0 mt-2 line-clamp-2 text-[12.5px] text-[#cfd3db]">
           {m.description} <span className={kbd}>{kindLabel(m)}</span>

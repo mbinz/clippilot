@@ -33,6 +33,8 @@ export interface PanelViewProps {
   onStep: (dir: 1 | -1) => void;
   onNextChoose: () => void;
   onTrim: (m: PM, a: number, b: number) => void;
+  /** "New moment" from a selection on a clip's timeline (BE4). */
+  onCreate: (clipId: number, a: number, b: number) => void;
   onSpeed: (m: PM, speed: number) => void;
   onIntent: (text: string) => void;
   onDelete: () => void;
@@ -260,6 +262,7 @@ export function PanelView(p: PanelViewProps) {
                 footer={footer(left)}
                 onPick={(id) => id !== left.id && p.onSelect(id)}
                 onTrim={(a, b) => p.onTrim(left, a, b)}
+                onCreate={(a, b) => p.onCreate(left.clip_id, a, b)}
               />
               <p className="mb-0 mt-2 line-clamp-2 text-[12.5px] text-[#cfd3db]">{left.description}</p>
               <IntentInput panel={panel} onIntent={p.onIntent} />
@@ -301,7 +304,7 @@ export function PanelView(p: PanelViewProps) {
                   moment={right}
                   clipMoments={clipMoments(right)}
                   usage={p.usage}
-                  editable={false}
+                  editable={!isOut(right)}
                   tone="white"
                   neutralUsage
                   muted={sound !== 'right'}
@@ -309,7 +312,8 @@ export function PanelView(p: PanelViewProps) {
                   hint="loops the moment"
                   footer={footer(right)}
                   onPick={(id) => id !== right.id && p.onSelect(id)}
-                  onTrim={() => {}}
+                  onTrim={(a, b) => p.onTrim(right, a, b)}
+                  onCreate={(a, b) => p.onCreate(right.clip_id, a, b)}
                 />
               </div>
               <p className="mb-0 mt-2 line-clamp-2 text-[12.5px] text-[#cfd3db]">
