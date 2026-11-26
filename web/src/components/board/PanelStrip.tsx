@@ -1,9 +1,9 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import type { BoardMoment, BoardPanel } from '../../board/types';
+import type { BoardMoment, BoardPanel, PM } from '../../board/types';
 import { fmtSec, panelLength, panelRange } from '../../board/logic';
 import { VideoThumb } from './VideoThumb';
 import { panelMedia } from './media';
-import { PANEL_MIME, dragKind, moveTarget } from '../../board/grid';
+import { GHOST_MIME, PANEL_MIME, dragKind, moveTarget } from '../../board/grid';
 import { rowEnd } from '../../board/panelview';
 
 interface Props {
@@ -21,21 +21,31 @@ interface Props {
   onMovePanel: (panelId: number, position: number) => void;
   /** The panel view of the selected panel: shown full width right after the last panel of that panel's row. */
   view?: ReactNode;
+  /** Placement ghost (BE3): a moment waiting at insert slot `slot`; `view` (the placement view) then sits under the ghost's row. */
+  ghost?: { moment: PM; slot: number };
+  onMoveGhost?: (slot: number) => void;
+  /** The ghost was dropped on an empty / CHOOSE panel: place / pick it there. */
+  onGhostOnPanel?: (panelId: number) => void;
 }
 
-export function PanelStrip({ panels, selectedId, momentsById, onSelect, onAdd, onDropMoment, onInsertMoment, onMovePanel, view }: Props) {
+export function PanelStrip({ panels, selectedId, momentsById, onSelect, onAdd, onDropMoment, onInsertMoment, onMovePanel, view, ghost, onMoveGhost, onGhostOnPanel }: Props) {
   const [drop, setDrop] = useState<number | 'add' | `slot${number}` | null>(null);
   /** Something is being dragged anywhere on the page: slots show their "＋". */
-  const [dragging, setDragging] = useState<'panel' | 'moment' | null>(null);
+  const [dragging, setDragging] = useState<'panel' | 'moment' | 'ghost' | null>(null);
   const selectedRef = useRef<HTMLDivElement>(null);
+  const ghostRef = useRef<HTMLDivElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const unitRefs = useRef<(HTMLDivElement | null)[]>([]);
-  /** Panels per row of the wrapping grid (measured: units that share the first one's offsetTop). */
-  const [perRow, setPerRow] = useState(Math.max(1, panels.length));
+  const ghostSlot = ghost ? Math.min(Math.max(ghost.slot, 0), panels.length) : -1;
+  /** Units in grid order: the panels, plus the ghost at its slot. */
+  const unitCount = panels.length + (ghost ? 1 : 0);
+  const ghostUnit = ghost ? ghostSlot : -1; // flat index of the ghost
+  /** Units per row of the wrapping grid (measured: units that share the first one's offsetTop). */
+  const [perRow, setPerRow] = useState(Math.max(1, unitCount));
 
   useLayoutEffect(() => {
     const measure = () => {
-      const els = unitRefs.current.slice(0, panels.length);
+      const els = unitRefs.current.slice(0, unitCount);
       if (!els[0]) return;
       const top = els[0].offsetTop;
       let n = 0;
@@ -49,14 +59,20 @@ export function PanelStrip({ panels, selectedId, momentsById, onSelect, onAdd, o
     const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
     if (ro && boxRef.current) ro.observe(boxRef.current);
     return () => ro?.disconnect();
-  }, [panels.length]);
+  }, [unitCount]);
 
   // Bring the selected panel's row (and the view under it) to the top: also after "N to choose" jumps to another panel.
   useEffect(() => {
     selectedRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
   }, [selectedId]);
-  const selIndex = view ? panels.findIndex((p) => p.id === selectedId) : -1;
-  const viewAfter = selIndex >= 0 ? rowEnd(selIndex, perRow, panels.length) : -1;
+  useEffect(() => {
+    if (ghost) ghostRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+  }, [ghost?.moment.id, ghostSlot]);
+  // flat index of the unit the view hangs under (the ghost, else the selected panel); a panel after the ghost shifts by one
+  const flatOfPanel = (i: number): number => (ghost && i >= ghostSlot ? i + 1 : i);
+  const selIndex = view ? (ghost ? ghostUnit : panels.findIndex((p) => p.id === selectedId)) : -1;
+  const anchor = ghost ? selIndex : selIndex >= 0 ? flatOfPanel(selIndex) : -1;
+  const viewAfterFlat = anchor >= 0 ? rowEnd(anchor, perRow, unitCount) : -1;
 
   useEffect(() => {
     const start = (e: DragEvent) => setDragging(dragKind(e.dataTransfer?.types ?? []));
@@ -76,7 +92,7 @@ export function PanelStrip({ panels, selectedId, momentsById, onSelect, onAdd, o
 
   type Key = number | 'add' | `slot${number}`;
   /** Panels accept moments only; slots accept both. */
-  const over = (key: Key, accepts: ('panel' | 'moment')[]) => (e: React.DragEvent) => {
+  const over = (key: Key, accepts: ('panel' | 'moment' | 'ghost')[]) => (e: React.DragEvent) => {
     const k = dragKind(e.dataTransfer.types);
     if (!k || !accepts.includes(k)) return;
     e.preventDefault();
@@ -86,7 +102,14 @@ export function PanelStrip({ panels, selectedId, momentsById, onSelect, onAdd, o
     if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDrop((d) => (d === key ? null : d));
   };
   const drops = (panelId: number | null) => (e: React.DragEvent) => {
-    if (dragKind(e.dataTransfer.types) !== 'moment') return;
+    const k = dragKind(e.dataTransfer.types);
+    if (k === 'ghost' && panelId !== null) {
+      e.preventDefault();
+      setDrop(null);
+      onGhostOnPanel?.(panelId);
+      return;
+    }
+    if (k !== 'moment') return;
     e.preventDefault();
     setDrop(null);
     const mid = Number(e.dataTransfer.getData('text/plain'));
@@ -97,7 +120,8 @@ export function PanelStrip({ panels, selectedId, momentsById, onSelect, onAdd, o
     if (!k) return;
     e.preventDefault();
     setDrop(null);
-    if (k === 'moment') {
+    if (k === 'ghost') onMoveGhost?.(index);
+    else if (k === 'moment') {
       const mid = Number(e.dataTransfer.getData('text/plain'));
       if (mid) onInsertMoment(mid, index);
     } else {
@@ -123,6 +147,37 @@ export function PanelStrip({ panels, selectedId, momentsById, onSelect, onAdd, o
     </div>
   );
 
+  /** The placement ghost: a pseudo-panel (dashed violet, the moment's thumb), draggable to any slot or empty / CHOOSE panel. */
+  const ghostTile = (m: PM) => (
+    <div ref={(el) => { unitRefs.current[ghostUnit] = el; }} className="flex flex-none items-stretch">
+      <div
+        ref={ghostRef}
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData(GHOST_MIME, String(m.id));
+          e.dataTransfer.effectAllowed = 'move';
+        }}
+        title="Drag to a slot, or onto an empty / CHOOSE panel"
+        className="w-[190px] flex-none cursor-grab"
+      >
+        <div className="relative aspect-video overflow-hidden rounded-[9px] bg-black">
+          <VideoThumb poster={m.thumbnail} src={m.clip.proxy_url} a={m.start_sec} b={m.end_sec} rate={2} fps={m.clip.fps} />
+          <div className="pointer-events-none absolute inset-0 z-[3] rounded-[9px] border-[3px] border-dashed border-bd-ai" />
+          <span className="pointer-events-none absolute right-1.5 top-1.5 z-[4] rounded-[5px] bg-bd-ai px-1.5 text-[10.5px] font-bold text-[#1a0b3d]">NEW HERE</span>
+        </div>
+        <div className="mt-1.5 truncate text-xs text-bd-muted">{m.description}</div>
+      </div>
+    </div>
+  );
+
+  /** The ghost, and the placement view when the ghost ends its row. */
+  const ghostWithView = (m: PM) => (
+    <>
+      {ghostTile(m)}
+      {viewAfterFlat === ghostUnit && <div className="w-full flex-none">{view}</div>}
+    </>
+  );
+
   return (
     <div ref={boxRef} className="flex flex-wrap items-stretch gap-y-3.5 px-1 pb-3.5 pt-1">
       {panels.map((p, i) => {
@@ -135,7 +190,8 @@ export function PanelStrip({ panels, selectedId, momentsById, onSelect, onAdd, o
         const sel = p.id === selectedId;
         return (
           <Fragment key={p.id}>
-          <div ref={(el) => { unitRefs.current[i] = el; }} className="flex flex-none items-stretch">
+          {ghost && i === ghostSlot && ghostWithView(ghost.moment)}
+          <div ref={(el) => { unitRefs.current[flatOfPanel(i)] = el; }} className="flex flex-none items-stretch">
           {slot(i)}
           <div
             ref={p.id === selectedId ? selectedRef : undefined}
@@ -146,7 +202,7 @@ export function PanelStrip({ panels, selectedId, momentsById, onSelect, onAdd, o
             }}
             className="group w-[190px] flex-none scroll-mt-1 cursor-pointer"
             onClick={() => onSelect(p.id)}
-            onDragOver={over(p.id, ['moment'])}
+            onDragOver={over(p.id, p.state === 'filled' ? ['moment'] : ['moment', 'ghost'])}
             onDragLeave={leave(p.id)}
             onDrop={drops(p.id)}
           >
@@ -185,10 +241,11 @@ export function PanelStrip({ panels, selectedId, momentsById, onSelect, onAdd, o
             <div className="mt-1.5 truncate text-xs text-bd-muted group-hover:text-bd-text">{p.intent}</div>
           </div>
           </div>
-          {i === viewAfter && <div className="w-full flex-none">{view}</div>}
+          {flatOfPanel(i) === viewAfterFlat && <div className="w-full flex-none">{view}</div>}
           </Fragment>
         );
       })}
+      {ghost && ghostSlot === panels.length && ghostWithView(ghost.moment)}
       <div className="flex flex-none items-stretch">
       {slot(panels.length)}
       <div

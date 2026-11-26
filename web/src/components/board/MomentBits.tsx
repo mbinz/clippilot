@@ -1,7 +1,5 @@
-import type { ReactNode } from 'react';
 import type { PM } from '../../board/types';
 import { speedOk } from '../../board/logic';
-import { effectiveTier } from '../../board/pool';
 import { sectionLabel } from './ui';
 
 /** Speed 100 / 50 / 25 % of a moment; options the clip's frame rate cannot support are disabled. */
@@ -23,27 +21,6 @@ export function SpeedSegment({ m, onSpeed }: { m: PM; onSpeed: (v: number) => vo
           </button>
         ))}
       </div>
-    </div>
-  );
-}
-
-export function Fact({ children, bad }: { children: ReactNode; bad?: boolean }) {
-  return (
-    <span className={`rounded-full border border-bd-line px-[9px] py-px text-[11.5px] ${bad ? 'text-bd-bad' : 'text-bd-muted'}`}>{children}</span>
-  );
-}
-
-/** Tags of a moment: tier, shot, role, slow-mo, audio, issues. */
-export function MomentFacts({ m }: { m: PM }) {
-  const fps = m.clip.fps ?? 0;
-  return (
-    <div className="mt-2 flex flex-wrap gap-1.5">
-      <Fact>{effectiveTier(m)}</Fact>
-      {m.shot && <Fact>{m.shot}</Fact>}
-      {m.role && <Fact>{m.role}</Fact>}
-      {m.slowmo !== 'none' && <Fact>{'\u{1F422}'} {fps >= 48 ? 'slow-mo ok' : `slow-mo wanted, only ${m.clip.fps ?? '?'} fps`}</Fact>}
-      {m.audio_keep && <Fact>{'\u{1F50A}'} {m.audio_type}</Fact>}
-      {m.issues.map((x) => <Fact key={x} bad>{'⚠'} {x}</Fact>)}
     </div>
   );
 }

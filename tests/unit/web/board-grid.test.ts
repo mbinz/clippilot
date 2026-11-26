@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { moveTarget, dragKind, PANEL_MIME } from '../../../web/src/board/grid.js';
+import { moveTarget, dragKind, PANEL_MIME, GHOST_MIME } from '../../../web/src/board/grid.js';
 
 describe('moveTarget (position to send when a panel is dropped on insert slot i)', () => {
   const ids = [10, 11, 12, 13];
@@ -32,6 +32,9 @@ describe('dragKind (from DataTransfer.types)', () => {
   });
   it('plain text = moment id', () => {
     expect(dragKind(['text/plain'])).toBe('moment');
+  });
+  it('the placement ghost has its own payload (BE3); it wins over plain text', () => {
+    expect(dragKind([GHOST_MIME, 'text/plain'])).toBe('ghost');
   });
   it('anything else = null', () => {
     expect(dragKind([])).toBeNull();

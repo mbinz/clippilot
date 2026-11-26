@@ -1,38 +1,56 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { PM } from '../../board/types';
-import type { UsageEntry } from '../../board/pool';
+import { isOut, onlyNew, poolMark, poolSort, type PoolMark, type PoolSectionKey, type PoolTree, type UsageEntry } from '../../board/pool';
 import { poolView } from '../../board/drawer';
 import { MomentTile } from './MomentTile';
 
 interface Props {
   moments: PM[];
+  tree: PoolTree;
   eventId: number | null;
+  /** The viewed scene: its panels win when several hold a similar moment. */
+  sceneId: number;
   usage: Record<number, UsageEntry>;
   currentSceneIndex: number;
+  /** The moment being placed (ghost), highlighted. */
   selectedId: number | null;
-  onSelect: (id: number) => void;
+  onSelect: (m: PM, mark: PoolMark) => void;
   onSeen: (id: number) => void;
+  tools: NonNullable<Parameters<typeof MomentTile>[0]['tools']>;
 }
 
 const moreBtn = 'cursor-pointer border-0 bg-transparent py-1 text-xs text-bd-muted underline underline-offset-[3px]';
 export const GRID = 'grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-2';
 
-export function MomentPool({ moments, eventId, usage, currentSceneIndex, selectedId, onSelect, onSeen }: Props) {
+const SECTION: Record<PoolSectionKey, string> = {
+  'star-new': '\u2605 new',
+  'star-similar': '\u2605 already in the story, similar',
+  new: 'New',
+  similar: 'Similar to a panel',
+};
+
+export function MomentPool({ moments, tree, eventId, sceneId, usage, currentSceneIndex, selectedId, onSelect, onSeen, tools }: Props) {
   const [scope, setScope] = useState<'event' | 'all'>('event');
+  const [fresh, setFresh] = useState(false);
   const [showOut, setShowOut] = useState(false);
   const view = poolView(moments, scope, eventId, new Set(Object.keys(usage).map(Number)));
-  const nHeroes = view.heroes.reduce((n, g) => n + g.length, 0);
-  const nRest = view.rest.reduce((n, g) => n + g.length, 0);
+  const markOf = useMemo(() => {
+    const cache = new Map<number, PoolMark>();
+    return (m: PM): PoolMark => {
+      let r = cache.get(m.id);
+      if (!r) cache.set(m.id, (r = poolMark(m, tree, moments, sceneId)));
+      return r;
+    };
+  }, [tree, moments, sceneId]);
+  const unused = [...view.heroes.flat(), ...view.rest.flat()];
+  const nSimilar = unused.filter((m) => markOf(m).kind === 'similar').length;
+  const sections = poolSort(fresh ? onlyNew(unused, markOf) : unused, markOf);
 
   const tile = (m: PM) => (
     <MomentTile
-      key={m.id} m={m} used={usage[m.id]} currentSceneIndex={currentSceneIndex}
-      selected={selectedId === m.id} onSelect={() => onSelect(m.id)} onSeen={onSeen}
+      key={m.id} m={m} used={usage[m.id]} currentSceneIndex={currentSceneIndex} mark={isOut(m) ? undefined : markOf(m)} tools={tools}
+      selected={selectedId === m.id} onSelect={() => onSelect(m, markOf(m))} onSeen={onSeen}
     />
-  );
-  // Groups of similar moments sit side by side; a small gap between their grids, no labels.
-  const groups = (gs: PM[][]) => (
-    <div className="flex flex-col gap-4">{gs.map((g) => <div key={g[0].id} className={GRID}>{g.map(tile)}</div>)}</div>
   );
   const h4 = 'mb-1.5 mt-0 text-[11.5px] font-medium text-bd-dim';
 
@@ -52,6 +70,13 @@ export function MomentPool({ moments, eventId, usage, currentSceneIndex, selecte
             </button>
           ))}
         </div>
+        <button
+          onClick={() => setFresh((v) => !v)}
+          title="Hide moments that look like something already in the story"
+          className={`cursor-pointer rounded-full border px-2.5 py-0.5 text-xs ${fresh ? 'border-bd-muted bg-bd-s2 text-bd-text' : 'border-bd-line bg-transparent text-bd-muted'}`}
+        >
+          Only new{nSimilar > 0 ? ` \u00b7 hides ${nSimilar}` : ''}
+        </button>
         <div className="flex-1" />
         <div className="flex flex-wrap gap-3.5 text-[11px] text-bd-dim">
           <span>unused only {'·'} {view.inStory} in the story</span>
@@ -59,18 +84,13 @@ export function MomentPool({ moments, eventId, usage, currentSceneIndex, selecte
         </div>
       </div>
 
-      {nHeroes > 0 && (
-        <div>
-          <h4 className={h4}>{'★'} {nHeroes}</h4>
-          {groups(view.heroes)}
+      {sections.map((s, i) => (
+        <div key={s.key} className={i > 0 ? 'mt-[18px]' : ''}>
+          <h4 className={h4}>{SECTION[s.key]} {'·'} {s.moments.length}</h4>
+          <div className={GRID}>{s.moments.map(tile)}</div>
         </div>
-      )}
-      {nRest > 0 && (
-        <div className={nHeroes > 0 ? 'mt-[18px]' : ''}>
-          <h4 className={h4}>All other moments {'·'} {nRest} {'·'} similar ones side by side</h4>
-          {groups(view.rest)}
-        </div>
-      )}
+      ))}
+      {sections.length === 0 && <div className="text-bd-dim">Nothing unused{fresh ? ' that is new' : ''} here.</div>}
 
       {view.out.length > 0 && (
         <div className="mt-3.5">

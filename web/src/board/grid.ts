@@ -1,8 +1,12 @@
 /** Drag payload type of a panel (moments use plain `text/plain` = moment id). */
 export const PANEL_MIME = 'application/x-clippilot-panel';
 
+/** Drag payload type of the placement ghost (BE3). */
+export const GHOST_MIME = 'application/x-clippilot-ghost';
+
 /** What is being dragged, from `DataTransfer.types` (readable during dragover; the data itself is not). */
-export function dragKind(types: readonly string[]): 'panel' | 'moment' | null {
+export function dragKind(types: readonly string[]): 'panel' | 'moment' | 'ghost' | null {
+  if (types.includes(GHOST_MIME)) return 'ghost';
   if (types.includes(PANEL_MIME)) return 'panel';
   if (types.includes('text/plain')) return 'moment';
   return null;

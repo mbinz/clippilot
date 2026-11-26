@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { fetchProjects } from '../../api/client';
+import { fetchEvents, fetchProjects } from '../../api/client';
 import { useBoard } from '../../board/useBoard';
 import { cutLength, fmtClock, sceneLength, toChoose } from '../../board/logic';
 import { moveTarget } from '../../board/grid';
-import { starTarget, storyLink } from '../../board/drawer';
-import { alternatives, otherInEvent, usage as usageOfTree } from '../../board/pool';
+import { starTarget } from '../../board/drawer';
+import { ghostSlot, isOut, placementScene, poolMark, usage as usageOfTree, type PoolMark } from '../../board/pool';
 import { afterUse, candidateRow, nextPanel } from '../../board/panelview';
 import type { BoardMoment, BoardPanel, BoardScene, PM } from '../../board/types';
 import { BoardToolbar } from './BoardToolbar';
@@ -12,18 +12,19 @@ import { SceneNav } from './SceneNav';
 import { PanelStrip } from './PanelStrip';
 import { MomentPool } from './MomentPool';
 import { PanelView } from './PanelView';
-import { MomentDrawer } from './MomentDrawer';
+import { PlacementView } from './PlacementView';
 import { BriefModal } from './BriefModal';
 import { PreviewModal, type PreviewItem } from './PreviewModal';
 import { panelMedia } from './media';
 import { exportCut, revealClip, putSelection } from '../../board/api';
 import { selectionKey, type SelectionBody } from '../../board/refresh';
 import { Toast } from './Toast';
-import { btnGhost, intentFrom } from './ui';
+import { btnGhost, btnPrimary, intentFrom } from './ui';
 
 type Open =
   | { kind: 'panel'; slot: number; preview: number | null }
-  | { kind: 'moment'; mid: number; othersOpen: boolean }
+  /** Placement of a new moment: the ghost sits at insert slot `slot` of scene `sceneId` (null = no scene for its event yet). */
+  | { kind: 'place'; mid: number; sceneId: number | null; slot: number }
   | null;
 
 interface Props {
@@ -61,8 +62,9 @@ export function BoardView({ projectId }: Props) {
   const board = useBoard(projectId);
   const { tree, moments, history, actions } = board;
   const [projectName, setProjectName] = useState('');
+  const [eventNames, setEventNames] = useState<Map<number, string>>(new Map());
   const [sceneId, setSceneId] = useState<number | null>(null);
-  /** What is open: the panel view under a panel's row (`preview` = the chosen right-hand candidate), or the moment drawer. */
+  /** What is open: the panel view under a panel's row (`preview` = the chosen right-hand candidate), or a placement (ghost). */
   const [open, setOpen] = useState<Open>(null);
   const [briefOpen, setBriefOpen] = useState(false);
   const [preview, setPreview] = useState<PreviewItem[] | null>(null);
@@ -71,6 +73,7 @@ export function BoardView({ projectId }: Props) {
   useEffect(() => {
     if (projectId === undefined) return;
     fetchProjects().then((r) => setProjectName(r.data.find((p) => p.id === projectId)?.name ?? '')).catch(() => {});
+    fetchEvents(projectId).then((r) => setEventNames(new Map(r.data.map((e) => [e.id, e.name])))).catch(() => {});
   }, [projectId]);
 
   useEffect(() => {
@@ -95,9 +98,9 @@ export function BoardView({ projectId }: Props) {
     return null;
   };
   const selPanel = open?.kind === 'panel' ? findPanel(open.slot) : null;
-  const selMoment = open?.kind === 'moment' ? pmById.get(open.mid) ?? null : null;
-  /** The side drawer is for moments only (until BE3); panels open the panel view inside the grid. */
-  const drawerKind: 'moment' | null = selMoment && !selPanel ? 'moment' : null;
+  /** The moment being placed (its ghost), if any; `placeScene` is null while the event has no scene yet. */
+  const placing = open?.kind === 'place' ? pmById.get(open.mid) ?? null : null;
+  const placeScene = open?.kind === 'place' && open.sceneId !== null ? scenes.find((s) => s.id === open.sceneId) ?? null : null;
   const panelCurrentId = (p: BoardPanel): number | null =>
     p.state === 'filled' ? p.moment_id : p.state === 'candidates' ? p.candidates[0]?.id ?? null : null;
   const curMoment = selPanel ? pmById.get(panelCurrentId(selPanel.panel) ?? -1) ?? null : null;
@@ -110,26 +113,21 @@ export function BoardView({ projectId }: Props) {
   const rightMoment = selPanel ? (chosenId !== null ? pmById.get(chosenId) : undefined) ?? row[0]?.m ?? null : null;
 
   // Opening a moment, or showing one in the panel view, marks it seen.
-  const viewedKey = [selMoment?.id, curMoment?.id, rightMoment?.id].filter((x) => x !== undefined).join(',');
+  const viewedKey = [placing?.id, curMoment?.id, rightMoment?.id].filter((x) => x !== undefined).join(',');
   const setSeen = board.setSeen;
   useEffect(() => {
     for (const id of viewedKey.split(',')) if (id) setSeen(Number(id), true);
   }, [viewedKey, setSeen, moments.length]);
 
-  const drawerRef = useRef<HTMLElement>(null);
-  const drawerKey = `${drawerKind}:${selMoment?.id ?? ''}`;
-  useEffect(() => {
-    drawerRef.current?.scrollTo?.({ top: 0 });
-  }, [drawerKey]);
-
   // Tell the server what is selected (debounced; deduped by key) so `clippilot board context` can answer "this panel".
   const selBody: SelectionBody | null = board.cutId !== null && scene
     ? {
       cut_id: board.cutId,
-      scene_id: selPanel?.scene.id ?? scene.id,
+      scene_id: selPanel?.scene.id ?? placeScene?.id ?? scene.id,
       panel_id: selPanel?.panel.id ?? null,
-      moment_id: selMoment?.id ?? null,
-      drawer: selPanel ? 'panel' : drawerKind,
+      // a placement reports as the "moment" focus of the selection (the server's `drawer: 'moment'`)
+      moment_id: placing?.id ?? null,
+      drawer: selPanel ? 'panel' : placing ? 'moment' : null,
       preview_moment_id: selPanel ? rightMoment?.id ?? null : null,
     }
     : null;
@@ -152,8 +150,15 @@ export function BoardView({ projectId }: Props) {
     setSceneId(f.scene.id);
     setOpen({ kind: 'panel', slot: id, preview: preview ?? null });
   };
-  const openMoment = (mid: number) =>
-    setOpen(open?.kind === 'moment' && open.mid === mid ? null : { kind: 'moment', mid, othersOpen: false });
+  /** Click / double-click on a pool tile: ≈ N opens panel N with the moment on the right; a new one starts its placement. */
+  const poolClick = (m: PM, mark: PoolMark) => {
+    if (isOut(m)) return;
+    if (mark.kind === 'similar') return openPanel(mark.panelId, m.id, true);
+    const target = placementScene(m, { scenes }, pms, scene.id);
+    const ts = scenes.find((s) => s.id === target);
+    if (ts) setSceneId(ts.id);
+    setOpen({ kind: 'place', mid: m.id, sceneId: ts?.id ?? null, slot: ts ? ghostSlot(m, ts, pms) : 0 });
+  };
 
   // Keyboard: ⌘Z / ⇧⌘Z (not while typing), Esc closes the drawer.
   const kb = useRef({ undo: board.undo, redo: board.redo, closeDrawer, escape: () => {} });
@@ -212,11 +217,25 @@ export function BoardView({ projectId }: Props) {
       if (r) setOpen({ kind: 'panel', slot: pid, preview: null });
     }
   };
-  const insertMoment = async (mid: number, position: number) => {
+  const insertMoment = async (mid: number, position: number, intoSceneId = scene.id) => {
     const m = momentsById.get(mid);
     if (!m) return;
-    const r = await actions.addPanel(scene.id, { moment_id: mid, position, intent: intentFrom(m.description) }, 'Add moment as new panel');
+    const r = await actions.addPanel(intoSceneId, { moment_id: mid, position, intent: intentFrom(m.description) }, 'Add moment as new panel');
     if (r) setOpen({ kind: 'panel', slot: r.id, preview: null });
+  };
+  /** "New scene for <event>", then the placed moment goes in as its first panel. */
+  const newSceneForPlacing = async () => {
+    if (!placing) return;
+    const name = eventNames.get(placing.clip.event_id ?? -1) ?? 'New scene';
+    const r = await actions.addScene(name, sceneIdx + 1, placing.clip.event_id);
+    if (!r) return;
+    setSceneId(r.id);
+    await insertMoment(placing.id, 0, r.id);
+  };
+  /** The ghost was dropped on an empty / CHOOSE panel: fill / decide that panel with the moment. */
+  const ghostOnPanel = (panelId: number) => {
+    const f = findPanel(panelId);
+    if (f && placing) void useInPanel(f, placing);
   };
   /** A panel dropped on a scene in the nav: to the end of that scene. */
   const dropPanelOnScene = (panelId: number, targetId: number) => {
@@ -269,7 +288,6 @@ export function BoardView({ projectId }: Props) {
     }
   };
 
-  const eventName = (m: PM) => scenes.find((s) => s.event?.id === m.clip.event_id)?.event?.name ?? '';
   const panelNo = (f: { panel: BoardPanel; scene: BoardScene }) => f.scene.panels.indexOf(f.panel) + 1;
 
   return (
@@ -294,11 +312,7 @@ export function BoardView({ projectId }: Props) {
         exporting={exporting}
       />
 
-      {/* The moment drawer is a real grid column (until BE3): it pushes the board aside. Below 900 px it is a full-screen sheet. */}
-      <div
-        className="grid min-h-0 flex-1 grid-cols-[200px_minmax(0,1fr)_var(--dw)] overflow-hidden transition-[grid-template-columns] duration-[180ms] ease-out max-[900px]:grid-cols-[minmax(0,1fr)] max-[900px]:grid-rows-[auto_minmax(0,1fr)]"
-        style={{ '--dw': drawerKind ? 'min(480px,42vw)' : '0px' } as React.CSSProperties}
-      >
+      <div className="grid min-h-0 flex-1 grid-cols-[200px_minmax(0,1fr)] overflow-hidden max-[900px]:grid-cols-[minmax(0,1fr)] max-[900px]:grid-rows-[auto_minmax(0,1fr)]">
         <SceneNav
           scenes={scenes}
           selectedId={scene.id}
@@ -344,7 +358,27 @@ export function BoardView({ projectId }: Props) {
             onDropMoment={dropMoment}
             onInsertMoment={insertMoment}
             onMovePanel={(id, pos) => void actions.movePanel(id, scene.id, pos)}
-            view={selPanel && selPanel.scene.id === scene.id ? (
+            ghost={placing && placeScene && placeScene.id === scene.id ? { moment: placing, slot: Math.min(open?.kind === 'place' ? open.slot : 0, scene.panels.length) } : undefined}
+            onMoveGhost={(slot) => open?.kind === 'place' && setOpen({ ...open, slot })}
+            onGhostOnPanel={ghostOnPanel}
+            view={placing && placeScene && placeScene.id === scene.id && open?.kind === 'place' ? (
+              <PlacementView
+                key={placing.id}
+                moment={placing}
+                scene={placeScene}
+                slot={Math.min(open.slot, placeScene.panels.length)}
+                moments={pms}
+                usage={usage}
+                keysOn={!preview && !briefOpen}
+                onInsert={() => void insertMoment(placing.id, Math.min(open.slot, placeScene.panels.length), placeScene.id)}
+                onShift={(dir) => setOpen({ ...open, slot: Math.max(0, Math.min(placeScene.panels.length, open.slot + dir)) })}
+                onCancel={closeDrawer}
+                onPick={(id) => {
+                  const m = pmById.get(id);
+                  if (m) poolClick(m, poolMark(m, { scenes }, pms, scene.id));
+                }}
+              />
+            ) : selPanel && selPanel.scene.id === scene.id ? (
               <PanelView
                 key={selPanel.panel.id}
                 panel={selPanel.panel}
@@ -384,62 +418,44 @@ export function BoardView({ projectId }: Props) {
             ) : undefined}
           />
 
+          {/* No scene for the placed moment's event yet: offer one. */}
+          {placing && open?.kind === 'place' && !placeScene && (
+            <div className="mb-3 flex flex-wrap items-center gap-2.5 rounded-xl border border-dashed border-bd-ai px-3.5 py-2.5">
+              <span className="text-bd-muted">
+                No scene for {eventNames.get(placing.clip.event_id ?? -1) ?? 'this moment\u2019s event'} yet.
+              </span>
+              <button className={btnPrimary} onClick={() => void newSceneForPlacing()}>
+                New scene for {eventNames.get(placing.clip.event_id ?? -1) ?? 'its event'}
+              </button>
+              <button className={btnGhost} onClick={closeDrawer}>Cancel</button>
+            </div>
+          )}
+
           {/* The pool makes room for the panel view and returns when it closes. */}
           {!selPanel && (
             <MomentPool
               moments={pms}
+              tree={{ scenes }}
+              sceneId={scene.id}
               eventId={scene.event_id}
               usage={usage}
               currentSceneIndex={sceneIdx}
-              selectedId={selMoment?.id ?? null}
-              onSelect={openMoment}
+              selectedId={placing?.id ?? null}
+              onSelect={poolClick}
               onSeen={(id) => setSeen(id, true)}
+              tools={{
+                onStar: starMoment,
+                onReject: (m, reason) => void actions.rejectMoment(m.id, reason),
+                onToggleSeen: (m) => {
+                  setSeen(m.id, !m.seen);
+                  if (m.seen) toast('Marked unseen');
+                },
+                onRestore: (m) =>
+                  void (m.status === 'rejected' ? actions.unrejectMoment(m.id) : actions.unhideClip(m.clip_id, m.clip.file_name)),
+              }}
             />
           )}
         </main>
-
-        <aside
-          ref={drawerRef}
-          className={`col-start-3 min-w-0 overflow-auto border-l border-bd-line2 bg-bd-s1 px-4 pb-[30px] pt-3.5 max-[900px]:fixed max-[900px]:inset-0 max-[900px]:z-[15] max-[900px]:border-l-0 ${drawerKind ? '' : 'hidden'}`}
-        >
-          {!selPanel && selMoment && open?.kind === 'moment' && (
-            <MomentDrawer
-              key={selMoment.id}
-              moment={selMoment}
-              clipMoments={pms.filter((m) => m.clip_id === selMoment.clip_id)}
-              usage={usage}
-              currentSceneIndex={sceneIdx}
-              eventName={eventName(selMoment)}
-              sceneName={scene.name}
-              story={storyLink(selMoment, { scenes }, pms, scene.id)}
-              similar={alternatives(selMoment, pms) as PM[]}
-              others={otherInEvent(selMoment, pms) as PM[]}
-              othersOpen={open.othersOpen}
-              onToggleOthers={() => setOpen({ ...open, othersOpen: !open.othersOpen })}
-              onClose={closeDrawer}
-              onSelect={(mid) => setOpen({ kind: 'moment', mid, othersOpen: open.othersOpen })}
-              onOpenMoment={(mid) => setOpen({ kind: 'moment', mid, othersOpen: false })}
-              onFinder={() => revealClip(selMoment.clip_id).catch((err) => toast(err instanceof Error ? err.message : String(err)))}
-              onStar={() => starMoment(selMoment)}
-              onReject={(reason) => void actions.rejectMoment(selMoment.id, reason)}
-              onRestore={() =>
-                void (selMoment.status === 'rejected'
-                  ? actions.unrejectMoment(selMoment.id)
-                  : actions.unhideClip(selMoment.clip_id, selMoment.clip.file_name))}
-              onUnseen={() => {
-                setSeen(selMoment.id, false);
-                toast('Marked unseen');
-              }}
-              onSpeed={(v) => speed(selMoment, v)}
-              onTrim={(a, b) => trim(selMoment, a, b)}
-              onOpenPanel={(id) => openPanel(id)}
-              onCompare={(id) => openPanel(id, selMoment.id)}
-              onAdd={() => void actions.addPanel(scene.id, { moment_id: selMoment.id, intent: intentFrom(selMoment.description) }, `Add moment to “${scene.name}”`)}
-              onHide={() => void actions.hideClip(selMoment.clip_id, selMoment.clip.file_name)}
-              onSeen={(id) => setSeen(id, true)}
-            />
-          )}
-        </aside>
       </div>
 
       {briefOpen && (
