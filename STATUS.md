@@ -18,6 +18,10 @@ Projects: `~/Video/ClipPilot Arrifana` (main test cut), `~/Video/ClipPilot Odece
 Order agreed 2026-11-25. Each line: theme — what — spec.
 
 ### Now
+- [ ] **Board views lock-in** — UI feedback 2026-11-27: storyboard overview (keep), panel details (one big video,
+  "Find alternatives"), locked alternatives split view; pool sections confusing; alternatives only unused moments.
+  User wants this **before anything else** — first grill + order it against the open todos below, then mockup, then
+  slices — [feedback](docs/specs/board-views.md)
 - [x] **Similar moments** SM1 look fingerprints in `analyze` (SigLIP, 0.24 s/moment) + SM2 drawer ranking — done
   2026-11-25; Arrifana (180) + Odeceixe (19) fingerprinted
 - [x] **Similar moments** SM3 look groups everywhere (pool, `slotFor`, draft rule, critic) — done 2026-11-25;
