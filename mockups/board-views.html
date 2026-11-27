@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Board views</title>
+<!-- Board views lock-in mockup (grill 2026-11-27, docs/specs/board-views.md). Static; serve with scripts/mockups/serve.ts
+     so proxies play:  npx tsx scripts/mockups/serve.ts 4318 mockups "<workdir>/.clippilot/proxies"
+     Data: board-views.data.js (gitignored, scripts/mockups/extract-mockup-data.ts) = the real Arrifana "Main" cut.
+     Mockup-only: panel 5 of "Cliffs of Arrifana" is turned into a CHOOSE panel and an empty panel is added after panel 8,
+     so both states can be tried. Look-alike candidates are approximated by "same event" (no look groups in the data).
+     Edits change only this page (reload = reset). -->
+<style>
+  :root{
+    --bg:#0e0f12; --s1:#16181d; --s2:#1d2026; --line:#272a31; --line2:#363a43;
+    --text:#eceef2; --muted:#8a909c; --dim:#5d636e; --focus:#f4f5f7;
+    --ai:#a78bfa; --mine:#34d399; --attn:#fbbf24; --bad:#f87171;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);font:13px/1.45 -apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif;overflow:hidden}
+  button{font:inherit;color:inherit}
+  .btn{background:var(--s2);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer;white-space:nowrap}
+  .btn:hover{border-color:var(--line2)}
+  .btn.primary{background:var(--focus);border-color:var(--focus);color:#0e0f12;font-weight:600}
+  .btn.icon{padding:6px 10px}
+  .btn.ghost{background:none;border-color:transparent;color:var(--muted)}
+  .btn.ghost:hover{color:var(--text)}
+  .btn.on-star{color:var(--attn)}
+  .btn.on-bad{color:var(--bad)}
+  .muted{color:var(--muted)} .dim{color:var(--dim)}
+  .kbd{font-size:11px;color:var(--dim)}
+  .kbd b{font-weight:500;border:1px solid var(--line2);border-radius:4px;padding:0 4px;color:var(--muted)}
+  .spacer{flex:1}
+
+  #app{height:100vh;display:grid;grid-template-rows:auto minmax(0,1fr)}
+  header{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line)}
+  header h1{font-size:14px;margin:0;font-weight:600}
+  .len{font-variant-numeric:tabular-nums;color:var(--muted)} .len b{color:var(--text);font-weight:600}
+
+  /* ---------- overview ---------- */
+  .ov{display:grid;grid-template-columns:200px minmax(0,1fr);min-height:0}
+  nav{border-right:1px solid var(--line);padding:12px 8px;overflow:auto}
+  .scene-item{display:flex;gap:8px;padding:7px 8px;border-radius:8px;cursor:pointer;color:var(--muted)}
+  .scene-item:hover{background:var(--s1);color:var(--text)}
+  .scene-item.sel{background:var(--s2);color:var(--text)}
+  .scene-item .n{width:16px;color:var(--dim);font-variant-numeric:tabular-nums}
+  .scene-item .need{width:7px;height:7px;border-radius:50%;background:var(--attn);align-self:center;margin-left:auto}
+  main{overflow:auto;padding:18px 22px 60px}
+  h2{font-size:15px;margin:0 0 2px;font-weight:600}
+  .sub{color:var(--muted);margin-bottom:14px}
+  .grid{display:flex;flex-wrap:wrap;align-items:flex-start;gap:0}
+  .pool-h{display:flex;align-items:baseline;gap:10px;margin:34px 0 10px;padding-top:18px;border-top:1px solid var(--line)}
+  .pool-h h3{margin:0;font-size:13px;font-weight:600}
+  .pool{display:flex;flex-wrap:wrap;gap:10px}
+
+  /* panel tile (grid + strip) */
+  .panel{width:190px;cursor:pointer;flex:none}
+  .panel .th{position:relative;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:#000;outline:2px solid transparent;outline-offset:1px}
+  .panel .th img,.panel .th video,.tile .th img,.tile .th video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .panel .no{position:absolute;left:6px;top:5px;font-size:11px;font-weight:600;text-shadow:0 1px 3px #000}
+  .panel .dur{position:absolute;right:6px;bottom:5px;font-size:11px;font-variant-numeric:tabular-nums;text-shadow:0 1px 3px #000}
+  .panel .src{position:absolute;left:0;right:0;bottom:0;height:3px}
+  .panel.ai .src{background:var(--ai)} .panel.mine .src{background:var(--mine)}
+  .panel.choose .th{outline:2px dashed var(--attn)}
+  .panel.gap .th{background:var(--s1);outline:2px dashed var(--line2);display:grid;place-items:center;color:var(--dim)}
+  .panel .intent{color:var(--muted);font-size:12px;margin-top:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:34px}
+  .panel:hover .th{outline-color:var(--line2)}
+  .panel.sel .th{outline:2px solid var(--focus)}
+  .panel.drop-on .th{outline:2px solid var(--focus);filter:brightness(1.3)}
+
+  /* drop slots between panels */
+  .slot{width:14px;align-self:stretch;flex:none;position:relative}
+  .slot::after{content:"";position:absolute;left:5px;top:0;width:4px;height:calc(100% - 40px);border-radius:2px;background:transparent}
+  body.dragging .slot::after{background:var(--line)}
+  .slot.drop-on::after{background:var(--focus)!important;left:3px;width:8px}
+
+  /* pool tile */
+  .tile{width:150px;cursor:pointer}
+  .tile .th{position:relative;aspect-ratio:16/9;border-radius:7px;overflow:hidden;background:#000;outline:2px solid transparent;outline-offset:1px}
+  .tile:hover .th{outline-color:var(--line2)}
+  .tile .star{position:absolute;left:5px;top:3px;color:var(--attn);font-size:13px;text-shadow:0 1px 3px #000}
+  .tile .dur{position:absolute;right:5px;bottom:4px;font-size:11px;text-shadow:0 1px 3px #000}
+  .tile.seen .th img{filter:saturate(.15) brightness(.7)}
+  .tile.sel .th{outline:2px solid var(--focus)}
+
+  /* ---------- moment overlay ---------- */
+  .scrim{position:fixed;inset:0;background:rgba(5,6,8,.82);display:grid;place-items:center;z-index:20}
+  .sheet{background:var(--s1);border:1px solid var(--line);border-radius:14px;padding:16px;width:min(1100px,92vw)}
+  .sheet .vid{width:100%;aspect-ratio:16/9;max-height:66vh;background:#000;border-radius:10px;display:block;object-fit:contain}
+  .sheet .row{display:flex;align-items:center;gap:8px;margin-top:12px}
+
+  /* clip timeline */
+  .tl{position:relative;height:28px;background:var(--s2);border-radius:6px;margin-top:12px;cursor:pointer;user-select:none}
+  .tl .mk{position:absolute;top:6px;bottom:6px;border-radius:3px;background:var(--line2)}
+  .tl .mk:hover{background:var(--muted)}
+  .tl .mk.incut{background:#4b505b}
+  .tl .mk.cur{background:color-mix(in srgb,var(--focus) 30%,transparent);outline:1.5px solid var(--focus);top:3px;bottom:3px}
+  .tl .ph{position:absolute;top:0;bottom:0;width:2px;background:var(--focus);pointer-events:none}
+  .tl .h{position:absolute;top:0;bottom:0;width:10px;margin-left:-5px;cursor:ew-resize;z-index:2}
+  .tl .h::after{content:"";position:absolute;left:3px;top:2px;bottom:2px;width:4px;border-radius:2px;background:var(--focus)}
+  .tl-meta{display:flex;justify-content:space-between;font-size:11px;color:var(--dim);margin-top:4px;font-variant-numeric:tabular-nums}
+
+  /* ---------- panel focus (locked) ---------- */
+  .fx{display:grid;grid-template-rows:auto auto minmax(0,1fr);min-height:0;overflow:hidden}
+  .fx-bar{display:flex;align-items:center;gap:12px;padding:8px 16px 0}
+  .strip-wrap{display:flex;align-items:stretch;gap:12px;padding:8px 16px 10px;border-bottom:1px solid var(--line)}
+  .strip-name{width:120px;flex:none;align-self:center;color:var(--muted);font-weight:600;font-size:12px;line-height:1.3}
+  .strip{display:flex;overflow-x:auto;overflow-y:hidden;align-items:flex-start;padding:3px 0 2px;scrollbar-width:thin}
+  .strip .panel{width:112px}
+  .strip .panel .intent{display:none}
+  .strip .slot{width:10px}
+  .strip .slot::after{left:3px;height:100%}
+  .stage{min-height:0;display:grid;padding:12px 16px 12px}
+  .stage.details{grid-template-rows:minmax(0,1fr) auto}
+  .stage.split{grid-template-rows:minmax(0,1fr) auto 118px}
+  .players{display:flex;justify-content:center;align-items:center;gap:14px;min-height:0}
+  .player{position:relative;background:#000;border-radius:10px;overflow:hidden;flex:none}
+  .player video,.player img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+  .player.choose{outline:2px dashed var(--attn);outline-offset:2px}
+  .player.empty{background:var(--s1);outline:2px dashed var(--line2);display:grid;place-items:center;color:var(--dim)}
+  .player.dragover{outline:2px solid var(--focus)}
+  .player .tag{position:absolute;left:10px;top:8px;font-size:11px;color:var(--muted);text-shadow:0 1px 3px #000}
+  .player .snd{position:absolute;right:8px;top:6px;font-size:13px;background:rgba(0,0,0,.5);border:0;border-radius:6px;padding:2px 6px;cursor:pointer;color:var(--muted)}
+  .player .snd.on{color:var(--text)}
+  .under{display:flex;justify-content:center;gap:14px;padding-top:10px}
+  .under > div{display:flex;align-items:center;gap:6px}
+  .details-under{width:100%;max-width:var(--pw,100%);margin:0 auto}
+  .cands{display:flex;gap:10px;overflow-x:auto;overflow-y:hidden;padding:12px 2px 4px;align-items:flex-start;scrollbar-width:thin}
+  .cands .tile{flex:none;width:140px}
+  .cands .grp{flex:none;align-self:center;writing-mode:vertical-rl;transform:rotate(180deg);font-size:10px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase}
+  .menu{position:absolute;background:var(--s2);border:1px solid var(--line2);border-radius:10px;padding:5px;min-width:180px;z-index:5}
+  .menu div{padding:6px 10px;border-radius:6px;cursor:pointer} .menu div:hover{background:var(--line)}
+  .menu .bad{color:var(--bad)}
+
+  .full{position:fixed;inset:0;background:#000;z-index:30;display:flex;align-items:center;justify-content:center;gap:12px}
+  .full .player{border-radius:0}
+  .full .hint{position:absolute;bottom:10px;left:0;right:0;text-align:center}
+
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--s2);border:1px solid var(--line2);border-radius:999px;padding:7px 16px;z-index:40;display:flex;gap:12px;align-items:center}
+  .mocknote{position:fixed;right:10px;bottom:8px;font-size:11px;color:var(--dim);z-index:1}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="mocknote">mockup · reload resets</div>
+<script src="board-views.data.js"></script>
+<script>
+const D = window.DATA;
+const clipById = new Map(D.clips.map(c => [c.id, c]));
+const momById = new Map(D.moments.map(m => [m.id, m]));
+const cut = D.cut;
+
+/* ---------- mockup-only states: one CHOOSE panel + one empty panel ---------- */
+(function seedStates(){
+  const s = cut.scenes[0];
+  const used = usedIds();
+  const free = D.moments.filter(m => clipById.get(m.clip_id).event_id === s.event_id && !used.has(m.id) && m.status !== 'rejected');
+  const p = s.panels[4];
+  if (p && free.length >= 3) { p.state = 'candidates'; p.source = 'ai'; p.cands = free.slice(0, 3).map(m => m.id); p.moment_id = null; p.intent = p.intent || 'Pick a moment'; }
+  s.panels.splice(8, 0, { id: 99901, intent: 'Close on the kids at the railing', state: 'gap', source: 'ai', moment_id: null, cands: [] });
+})();
+
+/* ---------- state ---------- */
+const S = { mode: 'overview', sceneIdx: 0, panelId: null, view: 'details', cand: 0, justReplaced: null,
+            overlay: null, soundRight: false, full: false, menu: false, star: {}, rej: {}, seen: {}, trim: {} };
+
+/* ---------- helpers ---------- */
+function usedIds(){ const u = new Set(); for (const s of cut.scenes) for (const p of s.panels) if (p.moment_id) u.add(p.moment_id); return u; }
+const recTime = m => Date.parse(clipById.get(m.clip_id).recorded_at) / 1000 + m.start_sec;
+const isStar = m => (S.star[m.id] ?? (m.tier === 'hero'));
+const isOut = m => (S.rej[m.id] ?? m.status === 'rejected') || !!clipById.get(m.clip_id).hidden;
+const scene = () => cut.scenes[S.sceneIdx];
+const panel = () => scene().panels.find(p => p.id === S.panelId);
+const range = m => S.trim[m.id] ?? [m.start_sec, m.end_sec];
+const fmt = s => s < 60 ? s.toFixed(1) + 's' : `${Math.floor(s/60)}:${String(Math.round(s%60)).padStart(2,'0')}`;
+const panelMoment = p => p.moment_id ? momById.get(p.moment_id) : (p.state === 'candidates' && p.cands[0] ? momById.get(p.cands[0]) : null);
+const panelDur = p => { const m = panelMoment(p); if (!m) return 0; const [a,b] = range(m); return (b - a) / (p.speed || 1); };
+const src = m => { const c = clipById.get(m.clip_id); return c.proxy ? '/proxies/' + c.proxy : ''; };
+const el = (tag, attrs = {}, ...kids) => { const e = document.createElement(tag); for (const [k,v] of Object.entries(attrs)) { if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else if (k === 'class') e.className = v; else if (k === 'style') e.style.cssText = v; else if (v !== false && v != null) e.setAttribute(k, v); } for (const k of kids.flat(3)) if (k != null && k !== false && k !== '') e.append(k.nodeType ? k : document.createTextNode(k)); return e; };
+
+/** Candidates: AI candidates, then the scene's event (★ first, then nearest in recording time) — never a moment that is in any panel,
+ *  except the one just replaced (swap back). */
+function candidates(p){
+  const used = usedIds(); const s = scene(); const own = panelMoment(p)?.id;
+  const ok = m => m && !isOut(m) && m.id !== own && (!used.has(m.id) || m.id === S.justReplaced);
+  const out = []; const seen = new Set();
+  const add = (m, g) => { if (ok(m) && !seen.has(m.id)) { seen.add(m.id); out.push({ m, g }); } };
+  if (S.justReplaced) add(momById.get(S.justReplaced), 'just out');
+  const cands = p.state === 'candidates' ? p.cands.slice(1) : [];
+  if (p.state === 'candidates' && !p.moment_id && p.cands[0] && S.view === 'split') {/* left = first candidate */}
+  for (const id of cands) add(momById.get(id), 'AI');
+  const i = s.panels.indexOf(p); const ref = panelMoment(p) || panelMoment(s.panels[i-1] || {}) || panelMoment(s.panels[i+1] || {});
+  const spot = ref ? recTime(ref) : 0;
+  D.moments.filter(m => clipById.get(m.clip_id).event_id === s.event_id)
+    .sort((a,b) => Number(isStar(b)) - Number(isStar(a)) || Math.abs(recTime(a)-spot) - Math.abs(recTime(b)-spot))
+    .forEach(m => add(m, 'event'));
+  return out;
+}
+
+/* looping video for one moment */
+function loopVideo(m, { muted = true, autoplay = true, onTime } = {}){
+  const v = el('video', { playsinline: '', preload: 'auto', poster: D.thumbs[m.id] || '' });
+  v.muted = muted; v.src = src(m);
+  const [a, b] = range(m);
+  v.addEventListener('loadedmetadata', () => { v.currentTime = a; if (autoplay) v.play().catch(() => { v.muted = true; v.play().catch(()=>{}); }); });
+  v.addEventListener('timeupdate', () => { const t = v.currentTime; const [a2, b2] = range(m); if (t >= b2 || t < a2 - 0.3) v.currentTime = a2; onTime && onTime(t); });
+  return v;
+}
+function hoverPlay(th, m){
+  let v = null;
+  th.addEventListener('mouseenter', () => { if (!m || !src(m)) return; v = loopVideo(m); th.append(v); });
+  th.addEventListener('mouseleave', () => { v && v.remove(); v = null; });
+}
+
+/* ---------- drag & drop ---------- */
+let drag = null; // moment id
+function draggable(node, m){
+  node.draggable = true;
+  node.addEventListener('dragstart', e => { drag = m.id; e.dataTransfer.setData('text/plain', String(m.id)); document.body.classList.add('dragging'); });
+  node.addEventListener('dragend', () => { drag = null; document.body.classList.remove('dragging'); document.querySelectorAll('.drop-on,.dragover').forEach(n => n.classList.remove('drop-on','dragover')); });
+}
+function dropTarget(node, fn, cls = 'drop-on'){
+  node.addEventListener('dragover', e => { if (drag == null) return; e.preventDefault(); node.classList.add(cls); });
+  node.addEventListener('dragleave', () => node.classList.remove(cls));
+  node.addEventListener('drop', e => { e.preventDefault(); node.classList.remove(cls); const id = drag; drag = null; document.body.classList.remove('dragging'); if (id != null) fn(id); });
+}
+function replaceIn(p, id){
+  const prev = p.moment_id; p.moment_id = id; p.state = 'filled'; p.source = 'mine'; p.cands = [];
+  S.justReplaced = prev; toast(`Panel ${scene().panels.indexOf(p)+1}: replaced`);
+}
+function insertAt(i, id){
+  const p = { id: 90000 + Math.floor(Math.random()*9999), intent: '', state: 'filled', source: 'mine', moment_id: id, cands: [] };
+  scene().panels.splice(i, 0, p); toast(`New panel ${i+1}`); return p;
+}
+let toastT;
+function toast(msg){
+  document.querySelector('.toast')?.remove(); clearTimeout(toastT);
+  const t = el('div', { class: 'toast' }, msg, el('span', { class: 'kbd' }, el('b', {}, '⌘Z'), ' undo'));
+  document.body.append(t); toastT = setTimeout(() => t.remove(), 2600);
+}
+
+/* ---------- panel tile (grid + strip) ---------- */
+function panelTile(p, i, { strip = false } = {}){
+  const m = panelMoment(p);
+  const cls = ['panel', p.state === 'candidates' ? 'choose' : p.state === 'gap' ? 'gap' : p.source === 'ai' ? 'ai' : 'mine', strip && p.id === S.panelId ? 'sel' : ''].join(' ');
+  const th = el('div', { class: 'th' },
+    p.state === 'gap' ? el('span', {}, 'empty') : m && el('img', { src: D.thumbs[m.id] || '', alt: '' }),
+    el('span', { class: 'no' }, String(i+1)),
+    p.state === 'candidates' && el('span', { class: 'dur', style: 'color:var(--attn)' }, 'choose'),
+    p.state === 'filled' && el('span', { class: 'dur' }, fmt(panelDur(p))),
+    el('i', { class: 'src' }));
+  if (p.state !== 'gap') hoverPlay(th, m);
+  const node = el('div', { class: cls, title: p.intent || '' , onclick: () => openPanel(p) }, th, el('div', { class: 'intent' }, p.intent || ''));
+  dropTarget(node, id => { replaceIn(p, id); render(); });
+  return node;
+}
+function panelRow(s, { strip = false } = {}){
+  const kids = [];
+  s.panels.forEach((p, i) => {
+    const slot = el('div', { class: 'slot' }); dropTarget(slot, id => { const np = insertAt(i, id); if (S.mode === 'focus') { S.panelId = np.id; S.justReplaced = null; } render(); });
+    kids.push(slot, panelTile(p, i, { strip }));
+  });
+  const end = el('div', { class: 'slot' }); dropTarget(end, id => { insertAt(s.panels.length, id); render(); }); kids.push(end);
+  return kids;
+}
+
+/* ---------- pool tile ---------- */
+function poolTile(m, { onclick, sel = false } = {}){
+  const th = el('div', { class: 'th' }, el('img', { src: D.thumbs[m.id] || '', alt: '' }),
+    isStar(m) && el('span', { class: 'star' }, '★'), el('span', { class: 'dur' }, fmt(range(m)[1] - range(m)[0])));
+  hoverPlay(th, m);
+  const t = el('div', { class: 'tile' + (S.seen[m.id] ? ' seen' : '') + (sel ? ' sel' : ''), title: m.description, onclick }, th);
+  draggable(t, m);
+  return t;
+}
+
+/* ---------- clip timeline ---------- */
+function clipTimeline(m, { trim = false, onPick, videoRef } = {}){
+  const c = clipById.get(m.clip_id); const dur = c.duration_sec; const used = usedIds();
+  const pct = s => (s / dur * 100) + '%';
+  const tl = el('div', { class: 'tl' });
+  for (const o of D.moments.filter(x => x.clip_id === c.id)) {
+    const [a, b] = range(o);
+    const mk = el('div', { class: 'mk' + (o.id === m.id ? ' cur' : used.has(o.id) ? ' incut' : ''), style: `left:${pct(a)};width:${pct(b-a)}`, title: o.description });
+    if (o.id !== m.id && onPick) mk.addEventListener('click', e => { e.stopPropagation(); onPick(o); });
+    tl.append(mk);
+  }
+  const ph = el('div', { class: 'ph', style: `left:${pct(range(m)[0])}` }); tl.append(ph);
+  if (trim) {
+    for (const side of [0, 1]) {
+      const h = el('div', { class: 'h', style: `left:${pct(range(m)[side])}` });
+      h.addEventListener('pointerdown', e => {
+        e.preventDefault(); h.setPointerCapture(e.pointerId);
+        const r = tl.getBoundingClientRect();
+        const move = ev => {
+          const t = Math.max(0, Math.min(dur, (ev.clientX - r.left) / r.width * dur));
+          const cur = [...range(m)]; cur[side] = side === 0 ? Math.min(t, cur[1] - 0.4) : Math.max(t, cur[0] + 0.4);
+          S.trim[m.id] = cur; h.style.left = pct(cur[side]);
+          tl.querySelector('.cur').style.cssText = `left:${pct(cur[0])};width:${pct(cur[1]-cur[0])}`;
+          meta.firstChild.textContent = `${fmt(cur[0])} – ${fmt(cur[1])} · ${fmt(cur[1]-cur[0])}`;
+          if (videoRef?.v) videoRef.v.currentTime = cur[side];
+        };
+        const up = () => { h.removeEventListener('pointermove', move); h.removeEventListener('pointerup', up); renderStripOnly(); };
+        h.addEventListener('pointermove', move); h.addEventListener('pointerup', up);
+      });
+      tl.append(h);
+    }
+  }
+  const [a, b] = range(m);
+  const meta = el('div', { class: 'tl-meta' }, el('span', {}, `${fmt(a)} – ${fmt(b)} · ${fmt(b-a)}`), el('span', {}, `${c.file} · ${fmt(dur)}`));
+  return { node: el('div', {}, tl, meta), setTime: t => { ph.style.left = pct(t); } };
+}
+
+/* ---------- render ---------- */
+const app = document.getElementById('app');
+function header(){
+  const total = cut.scenes.reduce((s, sc) => s + sc.panels.reduce((a, p) => a + panelDur(p), 0), 0);
+  return el('header', {}, el('h1', {}, 'ClipPilot'), el('span', { class: 'muted' }, 'Arrifana · Main'), el('span', { class: 'spacer' }),
+    el('span', { class: 'len' }, el('b', {}, fmt(total)), ' total'));
+}
+function render(){
+  document.querySelectorAll('.scrim,.full').forEach(n => n.remove());
+  app.replaceChildren(header(), S.mode === 'overview' ? overview() : focus());
+  if (S.overlay) document.body.append(overlay());
+  if (S.full) document.body.append(fullScreen());
+}
+
+function overview(){
+  const s = scene(); const used = usedIds();
+  const navItems = cut.scenes.map((sc, i) => el('div', { class: 'scene-item' + (i === S.sceneIdx ? ' sel' : ''), onclick: () => { S.sceneIdx = i; render(); } },
+    el('span', { class: 'n' }, String(i+1)), el('span', {}, sc.name), sc.panels.some(p => p.state !== 'filled') && el('span', { class: 'need' })));
+  const pool = D.moments.filter(m => clipById.get(m.clip_id).event_id === s.event_id && !used.has(m.id) && !isOut(m))
+    .sort((a, b) => Number(isStar(b)) - Number(isStar(a)) || recTime(a) - recTime(b));
+  const dur = s.panels.reduce((a, p) => a + panelDur(p), 0);
+  return el('div', { class: 'ov' }, el('nav', {}, navItems),
+    el('main', {},
+      el('h2', {}, s.name), el('div', { class: 'sub' }, `${s.panels.length} panels · ${fmt(dur)}`),
+      el('div', { class: 'grid' }, panelRow(s)),
+      el('div', { class: 'pool-h' }, el('h3', {}, 'Not in the cut'), el('span', { class: 'muted' }, `${pool.length} moments · ★ first, then recording time · drag onto the board to place`)),
+      el('div', { class: 'pool' }, pool.map(m => poolTile(m, { onclick: () => { S.overlay = m.id; render(); } })))));
+}
+
+function overlay(){
+  const m = momById.get(S.overlay);
+  const tl = clipTimeline(m, { onPick: o => { S.overlay = o.id; render(); } });
+  const v = loopVideo(m, { muted: false, onTime: t => tl.setTime(t) }); v.className = 'vid';
+  const tog = (k, label, on) => el('button', { class: 'btn icon' + (on ? (k === 'rej' ? ' on-bad' : ' on-star') : ''), onclick: () => {
+    if (k === 'star') S.star[m.id] = !isStar(m); else if (k === 'rej') S.rej[m.id] = !(S.rej[m.id] ?? false); else S.seen[m.id] = !S.seen[m.id]; render(); } }, label);
+  const sheet = el('div', { class: 'sheet', onclick: e => e.stopPropagation() }, v, tl.node,
+    el('div', { class: 'row' }, tog('star', '★', isStar(m)), tog('rej', '✕', S.rej[m.id]), tog('seen', S.seen[m.id] ? '◉ seen' : '○ seen', S.seen[m.id]),
+      el('span', { class: 'spacer' }), el('span', { class: 'kbd' }, 'click another moment on the timeline · ', el('b', {}, 'Esc'), ' close')));
+  return el('div', { class: 'scrim', onclick: () => { S.overlay = null; render(); } }, sheet);
+}
+
+function openPanel(p){
+  S.mode = 'focus'; S.panelId = p.id; S.justReplaced = null; S.cand = 0; S.menu = false;
+  S.view = (p.state === 'filled') ? 'details' : 'split';
+  render();
+}
+
+let stripNode = null;
+function renderStripOnly(){ if (!stripNode) return; stripNode.replaceChildren(...panelRow(scene(), { strip: true })); }
+
+function focus(){
+  const s = scene(); const p = panel(); const i = s.panels.indexOf(p);
+  stripNode = el('div', { class: 'strip' }, panelRow(s, { strip: true }));
+  const bar = el('div', { class: 'fx-bar' },
+    el('button', { class: 'btn ghost', onclick: back }, '← Overview'),
+    el('span', { class: 'muted' }, `Panel ${i+1} of ${s.panels.length}`, p.intent ? ` · ${p.intent}` : ''),
+    el('span', { class: 'spacer' }),
+    el('span', { class: 'kbd' }, el('b', {}, 'Tab'), ' next panel · ',
+      S.view === 'details' ? [el('b', {}, 'A'), ' alternatives · '] : [el('b', {}, '←→'), ' candidate · ', el('b', {}, '↵'), ' use · ', el('b', {}, 'F'), ' full screen · '],
+      el('b', {}, 'Esc'), ' back'));
+  const strip = el('div', { class: 'strip-wrap' }, el('div', { class: 'strip-name' }, s.name), stripNode);
+  const stage = S.view === 'details' ? details(p) : split(p);
+  const fx = el('div', { class: 'fx' }, bar, strip, stage);
+  requestAnimationFrame(() => { stripNode.querySelector('.panel.sel')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); layoutPlayers(); });
+  return fx;
+}
+
+function details(p){
+  const m = panelMoment(p);
+  const vref = {};
+  const tl = clipTimeline(m, { trim: true, videoRef: vref });
+  const v = loopVideo(m, { muted: false, onTime: t => tl.setTime(t) }); vref.v = v;
+  const pl = el('div', { class: 'player', 'data-fit': '1' }, v);
+  const menuBtn = el('button', { class: 'btn icon', onclick: e => { e.stopPropagation(); S.menu = !S.menu; menu.style.display = S.menu ? 'block' : 'none'; } }, '⋯');
+  const menu = el('div', { class: 'menu', style: 'display:none;bottom:42px;right:0' },
+    el('div', {}, 'Speed …'), el('div', {}, 'Edit intent …'), el('div', {}, 'Hide clip'), el('div', {}, 'Show in Finder'), el('div', { class: 'bad' }, 'Delete panel'));
+  const star = el('button', { class: 'btn icon' + (isStar(m) ? ' on-star' : ''), onclick: () => { S.star[m.id] = !isStar(m); render(); } }, '★');
+  const rej = el('button', { class: 'btn icon' + (S.rej[m.id] ? ' on-bad' : ''), onclick: () => { S.rej[m.id] = !S.rej[m.id]; render(); } }, '✕');
+  const under = el('div', { class: 'details-under' }, tl.node,
+    el('div', { class: 'row', style: 'display:flex;gap:8px;margin-top:10px;align-items:center;position:relative' },
+      el('button', { class: 'btn primary', onclick: () => { S.view = 'split'; S.cand = 0; render(); } }, 'Find alternatives'),
+      el('span', { class: 'kbd' }, el('b', {}, 'A')), el('span', { class: 'spacer' }), star, rej, el('div', { style: 'position:relative' }, menuBtn, menu)));
+  return el('div', { class: 'stage details' }, el('div', { class: 'players' }, pl), under);
+}
+
+function split(p){
+  const left = panelMoment(p); const cs = candidates(p);
+  if (S.cand >= cs.length) S.cand = Math.max(0, cs.length - 1);
+  const right = cs[S.cand]?.m || null;
+  const mkPlayer = (m, side) => {
+    const sound = side === 'R' ? S.soundRight : !S.soundRight;
+    const cls = 'player' + (side === 'L' && p.state === 'candidates' ? ' choose' : '') + (!m ? ' empty' : '');
+    const pl = el('div', { class: cls, 'data-fit': '2' },
+      m ? loopVideo(m, { muted: !sound }) : el('span', {}, side === 'L' ? 'empty panel — use a candidate' : 'no unused moments'),
+      el('span', { class: 'tag' }, side === 'L' ? (p.state === 'candidates' ? 'AI pick · not decided' : p.state === 'gap' ? '' : 'in the panel') : 'candidate'),
+      m && el('button', { class: 'snd' + (sound ? ' on' : ''), title: 'sound', onclick: () => { S.soundRight = side === 'R'; render(); } }, sound ? '🔊' : '🔈'));
+    if (side === 'R' && m) draggable(pl, m);
+    if (side === 'L') dropTarget(pl, id => { replaceIn(p, id); S.cand = 0; render(); }, 'dragover');
+    return pl;
+  };
+  const vote = (m, withUse) => m ? el('div', {},
+    withUse && el('button', { class: 'btn primary', onclick: () => useThis(p, m) }, 'Use this ↵'),
+    el('button', { class: 'btn icon' + (isStar(m) ? ' on-star' : ''), onclick: () => { S.star[m.id] = !isStar(m); render(); } }, '★'),
+    el('button', { class: 'btn icon' + (S.rej[m.id] ? ' on-bad' : ''), onclick: () => { S.rej[m.id] = !S.rej[m.id]; render(); } }, '✕')) : el('div');
+  const L = mkPlayer(left, 'L'), R = mkPlayer(right, 'R');
+  const players = el('div', { class: 'players' }, L, R);
+  const under = el('div', { class: 'under' });
+  const uL = el('div', { 'data-under': 'L' }, vote(left, p.state === 'candidates')), uR = el('div', { 'data-under': 'R' }, vote(right, true));
+  under.append(uL, uR);
+  let lastG = null;
+  const row = el('div', { class: 'cands' });
+  cs.forEach((c, i) => {
+    if (c.g !== lastG) { row.append(el('div', { class: 'grp' }, c.g)); lastG = c.g; }
+    row.append(poolTile(c.m, { sel: i === S.cand, onclick: () => { S.cand = i; render(); } }));
+  });
+  requestAnimationFrame(() => row.querySelector('.tile.sel')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }));
+  return el('div', { class: 'stage split' }, players, under, row);
+}
+
+function useThis(p, m){
+  if (p.state === 'candidates' && !p.moment_id && m.id === p.cands[0]) { p.moment_id = m.id; p.state = 'filled'; p.source = 'mine'; p.cands = []; S.justReplaced = null; toast('Picked'); }
+  else { const prev = p.moment_id ?? (p.state === 'candidates' ? p.cands[0] : null); p.moment_id = m.id; p.state = 'filled'; p.source = 'mine'; p.cands = []; S.justReplaced = prev; toast('Swapped — ↵ swaps back'); }
+  S.cand = 0; render();
+}
+
+function layoutPlayers(){
+  const box = document.querySelector('.players'); if (!box) return;
+  const pls = [...box.querySelectorAll('.player')]; if (!pls.length) return;
+  const W = box.clientWidth, H = box.clientHeight, gap = 14, n = pls.length;
+  let w = Math.min((W - gap * (n - 1)) / n, H * 16 / 9), h = w * 9 / 16;
+  pls.forEach(pl => { pl.style.width = w + 'px'; pl.style.height = h + 'px'; });
+  document.querySelector('.details-under')?.style.setProperty('--pw', Math.max(w, 520) + 'px');
+  document.querySelectorAll('[data-under]').forEach(u => { u.style.width = w + 'px'; u.style.justifyContent = 'center'; });
+}
+window.addEventListener('resize', layoutPlayers);
+
+function fullScreen(){
+  const p = panel(); const left = panelMoment(p); const right = candidates(p)[S.cand]?.m;
+  const box = el('div', { class: 'full' });
+  const W = innerWidth, H = innerHeight - 40, w = Math.min((W - 12) / 2, H * 16 / 9), h = w * 9 / 16;
+  for (const [m, side] of [[left, 'L'], [right, 'R']]) {
+    const pl = el('div', { class: 'player' + (!m ? ' empty' : ''), style: `width:${w}px;height:${h}px` }, m && loopVideo(m, { muted: side === 'R' ? !S.soundRight : S.soundRight }));
+    box.append(pl);
+  }
+  box.append(el('div', { class: 'hint kbd' }, el('b', {}, '←→'), ' candidate · ', el('b', {}, '↵'), ' use · ', el('b', {}, 'Esc'), ' leave full screen'));
+  return box;
+}
+
+function back(){
+  if (S.full) S.full = false;
+  else if (S.mode === 'focus' && S.view === 'split' && panel()?.state === 'filled' && panel()?.moment_id) { S.view = 'details'; S.justReplaced = null; }
+  else if (S.mode === 'focus') { S.mode = 'overview'; S.panelId = null; }
+  else if (S.overlay) S.overlay = null;
+  render();
+}
+
+document.addEventListener('keydown', e => {
+  if (e.target.closest?.('input,textarea')) return;
+  if (e.key === 'Escape') { e.preventDefault(); if (S.overlay) { S.overlay = null; render(); } else back(); return; }
+  if (S.mode !== 'focus') return;
+  const s = scene(); const p = panel(); const i = s.panels.indexOf(p);
+  if (e.key === 'Tab') { e.preventDefault(); const j = i + (e.shiftKey ? -1 : 1); if (j >= 0 && j < s.panels.length) openPanel(s.panels[j]); return; }
+  if (S.view === 'details' && (e.key === 'a' || e.key === 'A')) { S.view = 'split'; S.cand = 0; render(); return; }
+  if (S.view === 'split') {
+    const cs = candidates(p);
+    if (e.key === 'ArrowRight') { S.cand = Math.min(cs.length - 1, S.cand + 1); render(); }
+    else if (e.key === 'ArrowLeft') { S.cand = Math.max(0, S.cand - 1); render(); }
+    else if (e.key === 'Enter' && cs[S.cand]) useThis(p, cs[S.cand].m);
+    else if (e.key === 'f' || e.key === 'F') { S.full = !S.full; render(); }
+  }
+});
+document.addEventListener('click', () => { if (S.menu) { S.menu = false; document.querySelectorAll('.menu').forEach(m => m.style.display = 'none'); } });
+
+render();
+</script>
+</body>
+</html>
